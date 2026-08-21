@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-canvas: 248 250 252;
+    --color-overlay: 15 23 42;
+    --color-surface: 255 255 255;
+    --color-surface-raised: 241 245 249;
+    --color-field: 248 250 252;
+    --color-border: 203 213 225;
+    --color-border-strong: 148 163 184;
+    --color-foreground: 15 23 42;
+    --color-muted: 71 85 105;
+    --color-subtle: 100 116 139;
+    --color-accent: 8 145 178;
+    --color-accent-hover: 14 116 144;
+    --color-accent-foreground: 255 255 255;
+    --color-accent-soft: 207 250 254;
+    --color-accent-soft-border: 103 232 249;
+    --color-accent-soft-foreground: 21 94 117;
+    --color-success: 5 150 105;
+    --color-success-soft: 236 253 245;
+    --color-success-border: 110 231 183;
+    --color-success-foreground: 6 95 70;
+    --color-error: 225 29 72;
+    --color-error-hover: 190 24 93;
+    --color-error-soft: 255 241 242;
+    --color-error-border: 253 164 175;
+    --color-error-foreground: 159 18 57;
+    --color-error-solid-foreground: 255 255 255;
+    --color-warning: 180 83 9;
+    --color-warning-border: 251 191 36;
+    --color-warning-foreground: 69 26 3;
+  }
+
+  :root.dark {
+    --color-canvas: 2 6 23;
+    --color-overlay: 2 6 23;
+    --color-surface: 15 23 42;
+    --color-surface-raised: 30 41 59;
+    --color-field: 2 6 23;
+    --color-border: 30 41 59;
+    --color-border-strong: 71 85 105;
+    --color-foreground: 241 245 249;
+    --color-muted: 148 163 184;
+    --color-subtle: 100 116 139;
+    --color-accent: 34 211 238;
+    --color-accent-hover: 103 232 249;
+    --color-accent-foreground: 2 6 23;
+    --color-accent-soft: 8 51 68;
+    --color-accent-soft-border: 22 78 99;
+    --color-accent-soft-foreground: 207 250 254;
+    --color-success: 52 211 153;
+    --color-success-soft: 2 44 34;
+    --color-success-border: 16 185 129;
+    --color-success-foreground: 209 250 229;
+    --color-error: 251 113 133;
+    --color-error-hover: 254 205 211;
+    --color-error-soft: 76 5 25;
+    --color-error-border: 244 63 94;
+    --color-error-foreground: 255 228 230;
+    --color-error-solid-foreground: 2 6 23;
+    --color-warning: 252 211 77;
+    --color-warning-border: 245 158 11;
+    --color-warning-foreground: 2 6 23;
+  }
+
+  body { @apply min-h-screen bg-canvas text-foreground antialiased; }
+  button, input { font: inherit; }
+}

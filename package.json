@@ -1,0 +1,14 @@
+{
+  "name": "ottlib",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build --workspace @ottlib/shared && npm run build --workspace @ottlib/server && npm run build --workspace @ottlib/client",
+    "dev": "npm run build --workspace @ottlib/shared && concurrently \"npm run dev --workspace @ottlib/server\" \"npm run dev --workspace @ottlib/client\"",
+    "start": "npm run build && node packages/server/dist/index.js",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
