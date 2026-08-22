@@ -12,14 +12,14 @@ interface MovieRow {
 
 interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; title_override: string | null; poster_file: string | null;
-  metadata_status: Movie['metadataStatus']; watched: number; added_at: string; video_height: number | null; hdr_format: string | null;
+  metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
 }
 
 export interface ScannedMovie { folderId: number; path: string; filename: string; title: string; year: number | null; size: number; mtimeMs: number; seenAt: string }
 export type ProbedMediaInfo = Omit<MediaInfo, 'tracks'>;
 export interface PlaybackMovie { id: number; path: string; folderPath: string; filename: string; missing: boolean }
 export interface MetadataTarget { id: number; title: string; year: number | null; rawFilename: string }
-export interface MovieListQuery { search?: string; watched?: boolean; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; cursor?: string; limit?: number }
+export interface MovieListQuery { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; cursor?: string; limit?: number }
 export interface MovieFilterOptions { genres: string[]; actors: string[]; resolutions: string[]; audioLanguages: string[] }
 
 type MovieSort = 'title' | 'year' | 'added' | 'quality';
@@ -97,7 +97,7 @@ export class MovieRepository {
     return row && { id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename };
   }
 
-  public upsertScanned(movie: ScannedMovie): { id: number; needsMatch: boolean; needsProbe: boolean } {
+  public upsertScanned(movie: ScannedMovie): { id: number; inserted: boolean; needsMatch: boolean; needsProbe: boolean } {
     const existing = this.db.prepare('SELECT id, size, mtime_ms, metadata_status, media_probe_status FROM movies WHERE canonical_path = ?').get(movie.path) as any;
     const changed = !existing || existing.size !== movie.size || existing.mtime_ms !== movie.mtimeMs;
     this.db.prepare(`INSERT INTO movies (folder_id, canonical_path, raw_filename, parsed_title, parsed_year, size, mtime_ms, last_seen_at, metadata_status, missing)
@@ -108,7 +108,7 @@ export class MovieRepository {
       metadata_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.metadata_status END,
       media_probe_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.media_probe_status END`).run(movie);
     const row = this.db.prepare('SELECT id FROM movies WHERE canonical_path = ?').get(movie.path) as { id: number };
-    return { id: row.id, needsMatch: changed || existing?.metadata_status === 'error', needsProbe: changed || existing?.media_probe_status === 'pending' };
+    return { id: row.id, inserted: !existing, needsMatch: changed || existing?.metadata_status === 'error', needsProbe: changed || existing?.media_probe_status === 'pending' };
   }
 
   public clearMediaInfo(id: number): void {
@@ -185,11 +185,12 @@ export class MovieRepository {
 
   private summarySelectSql(): string {
     return `SELECT m.id, m.parsed_title, m.parsed_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.video_height, m.hdr_format, COALESCE(ws.watched, 0) AS watched FROM movies m LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = ?`;
+      m.missing, m.video_height, m.hdr_format, COALESCE(ws.watched, 0) AS watched FROM movies m LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = ?`;
   }
 
   private filters(query: MovieListQuery): { clauses: string[]; values: unknown[] } {
-    const clauses = ['m.missing = 0']; const values: unknown[] = [];
+    const clauses = ['1 = 1']; const values: unknown[] = [];
+    if (query.availability) { clauses.push('m.missing = ?'); values.push(Number(query.availability === 'unavailable')); }
     if (query.search?.trim()) {
       const search = query.search.trim().toLowerCase(); const imdbId = search.match(/tt\d{5,}/)?.[0] ?? search;
       clauses.push('(LOWER(COALESCE(m.title_override, m.parsed_title)) LIKE ? OR LOWER(m.imdb_id) LIKE ?)'); values.push(`%${search}%`, `%${imdbId}%`);
@@ -289,6 +290,6 @@ export class MovieRepository {
     id: row.id, title: row.title_override ?? row.parsed_title, year: row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format,
-    watched: Boolean(row.watched), metadataStatus: row.metadata_status, shelves: []
+    watched: Boolean(row.watched), missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []
   });
 }

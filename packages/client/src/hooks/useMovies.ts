@@ -3,11 +3,11 @@ import type { MatchCandidate, Movie, MovieFilterOptions, MovieListPage } from '@
 import { api } from './apiClient';
 import { useToast } from './useToast';
 
-export interface MovieFilters { search?: string; watched?: boolean; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean }
+export interface MovieFilters { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean }
 type MovieListData = InfiniteData<MovieListPage, string | undefined>;
 
 function movieParams(filters: MovieFilters, cursor?: string): URLSearchParams {
-  const params = new URLSearchParams(); if (filters.search) params.set('search', filters.search); if (filters.watched !== undefined) params.set('watched', String(filters.watched)); if (filters.sort) params.set('sort', filters.sort); if (filters.genre) params.set('genre', filters.genre); if (filters.actor) params.set('actor', filters.actor); if (filters.quality) params.set('quality', filters.quality); if (filters.audioLanguage) params.set('audioLanguage', filters.audioLanguage); if (filters.minRating !== undefined) params.set('minRating', String(filters.minRating)); if (filters.needsReview) params.set('needsReview', 'true'); if (cursor) params.set('cursor', cursor);
+  const params = new URLSearchParams(); if (filters.search) params.set('search', filters.search); if (filters.watched !== undefined) params.set('watched', String(filters.watched)); if (filters.availability) params.set('availability', filters.availability); if (filters.sort) params.set('sort', filters.sort); if (filters.genre) params.set('genre', filters.genre); if (filters.actor) params.set('actor', filters.actor); if (filters.quality) params.set('quality', filters.quality); if (filters.audioLanguage) params.set('audioLanguage', filters.audioLanguage); if (filters.minRating !== undefined) params.set('minRating', String(filters.minRating)); if (filters.needsReview) params.set('needsReview', 'true'); if (cursor) params.set('cursor', cursor);
   return params;
 }
 
@@ -21,6 +21,7 @@ export function useMovies(filters: MovieFilters = {}) {
   const data = query.data && { items: query.data.pages.flatMap((page) => page.items), total: query.data.pages[0]?.total ?? 0 };
   return { ...query, data };
 }
+export function useUnavailableMovieCount() { return useQuery({ queryKey: ['unavailable-movie-count'], queryFn: async () => (await api<MovieListPage>('/api/movies?availability=unavailable&limit=1')).total }); }
 export function useMovieFilterOptions() { return useQuery({ queryKey: ['movie-filter-options'], queryFn: () => api<MovieFilterOptions>('/api/movies/filter-options') }); }
 export function useMovie(id: string | undefined) { return useQuery({ queryKey: ['movie', id], enabled: Boolean(id), queryFn: () => api<Movie>(`/api/movies/${id}`) }); }
 export function useMatchCandidates(id: string | undefined, enabled: boolean) {

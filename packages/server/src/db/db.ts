@@ -7,6 +7,7 @@ import { ensureCandidateMediaType } from './migrations/003_candidate_media_type.
 import { ensureImdbId } from './migrations/004_imdb_id.js';
 import { shelvesMigration } from './migrations/005_shelves.js';
 import { ensureMediaProbeSchema } from './migrations/006_media_probe.js';
+import { ensureScanTitlesAdded } from './migrations/007_scan_titles_added.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -20,5 +21,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   ensureImdbId(db);
   db.exec(shelvesMigration);
   ensureMediaProbeSchema(db);
+  ensureScanTitlesAdded(db);
   return db;
 }

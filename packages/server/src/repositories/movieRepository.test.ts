@@ -25,6 +25,17 @@ afterEach(() => {
 });
 
 describe('MovieRepository filters', () => {
+  it('reports whether a scanned movie was inserted or updated', () => {
+    const { repository, close } = createRepository();
+    try {
+      const movie = { folderId: 1, path: 'E:/Movies/new.mkv', filename: 'new.mkv', title: 'New', year: 2024, size: 1, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' };
+      expect(repository.upsertScanned(movie).inserted).toBe(true);
+      expect(repository.upsertScanned(movie).inserted).toBe(false);
+    } finally {
+      close();
+    }
+  });
+
   it('filters by genre, actor, rating, title, and IMDb ID', () => {
     const { repository, close } = createRepository();
     try {
@@ -46,6 +57,18 @@ describe('MovieRepository filters', () => {
       repository.upsertScanned({ folderId: 1, path: 'E:/Movies/unmatched.mkv', filename: 'unmatched.mkv', title: 'Unmatched', year: null, size: 1, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
       repository.saveCandidates(2, [{ provider: 'tmdb', providerId: '2', title: 'Unmatched', year: 2024, score: 0.6, mediaType: 'movie' }]);
       expect(repository.list(undefined, { needsReview: true })).toMatchObject([{ id: 2, metadataStatus: 'suggested' }]);
+    } finally {
+      close();
+    }
+  });
+
+  it('includes unavailable titles by default and filters them by availability', () => {
+    const { repository, close } = createRepository();
+    try {
+      repository.markMissingNotSeen(1, '2026-02-02T00:00:00.000Z');
+      expect(repository.listSummaries(undefined)).toMatchObject({ total: 1, items: [{ id: 1, missing: true }] });
+      expect(repository.listSummaries(undefined, { availability: 'available' })).toMatchObject({ total: 0, items: [] });
+      expect(repository.listSummaries(undefined, { availability: 'unavailable' })).toMatchObject({ total: 1, items: [{ id: 1, missing: true }] });
     } finally {
       close();
     }
@@ -78,7 +101,7 @@ describe('MovieRepository filters', () => {
       expect(first.nextCursor).toEqual(expect.any(String));
       expect(second).toMatchObject({ total: 3, nextCursor: null, items: [{ title: 'Example' }] });
       expect([...first.items, ...second.items].map((movie) => movie.title)).toEqual(['Bravo', 'Charlie', 'Example']);
-      expect(Object.keys(first.items[0]).sort()).toEqual(['hdrFormat', 'id', 'metadataStatus', 'posterUrl', 'resolution', 'shelves', 'title', 'watched', 'year']);
+      expect(Object.keys(first.items[0]).sort()).toEqual(['hdrFormat', 'id', 'metadataStatus', 'missing', 'posterUrl', 'resolution', 'shelves', 'title', 'watched', 'year']);
     } finally {
       close();
     }

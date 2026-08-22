@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   finished_at TEXT,
   files_found INTEGER NOT NULL DEFAULT 0,
   files_processed INTEGER NOT NULL DEFAULT 0,
+  titles_added INTEGER NOT NULL DEFAULT 0,
   error_summary TEXT
 );
 CREATE INDEX IF NOT EXISTS movies_library_idx ON movies (missing, parsed_title);

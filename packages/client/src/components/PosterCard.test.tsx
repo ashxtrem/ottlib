@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MovieListItem } from '@ottlib/shared';
 import { PosterCard } from './PosterCard';
 
-const movie: MovieListItem = { id: 1, title: 'Arrival', year: 2016, posterUrl: null, resolution: null, hdrFormat: null, watched: false, metadataStatus: 'matched', shelves: [] };
+const movie: MovieListItem = { id: 1, title: 'Arrival', year: 2016, posterUrl: null, resolution: null, hdrFormat: null, watched: false, missing: false, metadataStatus: 'matched', shelves: [] };
 
 function render(watched: boolean) {
   return renderToStaticMarkup(<MemoryRouter><PosterCard movie={{ ...movie, watched }} onToggleWatched={vi.fn()} /></MemoryRouter>);
@@ -28,5 +28,10 @@ describe('PosterCard watch state', () => {
     const markup = renderToStaticMarkup(<MemoryRouter><PosterCard movie={{ ...movie, resolution: '4K', hdrFormat: 'HDR10' }} onToggleWatched={vi.fn()} /></MemoryRouter>);
     expect(markup).toContain('4K');
     expect(markup).toContain('HDR');
+  });
+
+  it('marks unavailable titles on the poster image', () => {
+    const markup = renderToStaticMarkup(<MemoryRouter><PosterCard movie={{ ...movie, missing: true }} onToggleWatched={vi.fn()} /></MemoryRouter>);
+    expect(markup).toContain('Unavailable');
   });
 });

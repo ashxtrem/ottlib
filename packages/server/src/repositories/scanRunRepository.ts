@@ -25,8 +25,8 @@ export class ScanRunRepository {
     return this.get(Number(result.lastInsertRowid))!;
   }
 
-  public progress(id: number, filesFound: number, filesProcessed: number): void {
-    this.db.prepare('UPDATE scan_runs SET files_found = ?, files_processed = ? WHERE id = ?').run(filesFound, filesProcessed, id);
+  public progress(id: number, filesFound: number, filesProcessed: number, titlesAdded: number): void {
+    this.db.prepare('UPDATE scan_runs SET files_found = ?, files_processed = ?, titles_added = ? WHERE id = ?').run(filesFound, filesProcessed, titlesAdded, id);
   }
 
   public finish(id: number, status: 'completed' | 'failed', errorSummary: string | null = null): ScanRun {
@@ -38,6 +38,6 @@ export class ScanRunRepository {
 
   private map = (row: any): ScanRun => ({
     id: row.id, status: row.status, startedAt: row.started_at, finishedAt: row.finished_at,
-    filesFound: row.files_found, filesProcessed: row.files_processed, errorSummary: row.error_summary
+    filesFound: row.files_found, filesProcessed: row.files_processed, titlesAdded: row.titles_added, errorSummary: row.error_summary
   });
 }

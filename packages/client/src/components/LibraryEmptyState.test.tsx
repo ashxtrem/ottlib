@@ -6,7 +6,7 @@ import type { Folder, ScanRun } from '@ottlib/shared';
 import { LibraryEmptyState } from './LibraryEmptyState';
 
 const folder: Folder = { id: 1, path: 'E:/Movies', enabled: true, createdAt: '2026-01-01T00:00:00.000Z' };
-const completedScan: ScanRun = { id: 1, status: 'completed', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:01:00.000Z', filesFound: 4, filesProcessed: 4, errorSummary: null };
+const completedScan: ScanRun = { id: 1, status: 'completed', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:01:00.000Z', filesFound: 4, filesProcessed: 4, titlesAdded: 4, errorSummary: null };
 
 function render(props: Partial<ComponentProps<typeof LibraryEmptyState>> = {}) {
   return renderToStaticMarkup(<MemoryRouter><LibraryEmptyState folders={[]} scanHistory={[]} tmdbConfigured={false} filtersActive={false} scanning={false} onStartScan={vi.fn()} onClearFilters={vi.fn()} {...props} /></MemoryRouter>);

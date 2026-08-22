@@ -16,8 +16,9 @@ function limit(value: string | undefined): number {
 
 export function registerLibraryRoutes(app: FastifyInstance, movies: MovieRepository, watches: WatchStateRepository, matcher: MetadataMatchService, library: LibraryService): void {
   app.get('/api/movies', async (request) => {
-    const query = request.query as { search?: string; watched?: string; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: string; needsReview?: string; cursor?: string; limit?: string };
-    return library.listSummaries(deviceId(request.headers), { search: query.search, watched: query.watched === undefined ? undefined : query.watched === 'true', sort: query.sort, genre: query.genre, actor: query.actor, quality: query.quality, audioLanguage: query.audioLanguage, minRating: minRating(query.minRating), needsReview: query.needsReview === 'true', cursor: query.cursor, limit: limit(query.limit) });
+    const query = request.query as { search?: string; watched?: string; availability?: string; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: string; needsReview?: string; cursor?: string; limit?: string };
+    const availability = query.availability === 'available' || query.availability === 'unavailable' ? query.availability : undefined;
+    return library.listSummaries(deviceId(request.headers), { search: query.search, watched: query.watched === undefined ? undefined : query.watched === 'true', availability, sort: query.sort, genre: query.genre, actor: query.actor, quality: query.quality, audioLanguage: query.audioLanguage, minRating: minRating(query.minRating), needsReview: query.needsReview === 'true', cursor: query.cursor, limit: limit(query.limit) });
   });
   app.get('/api/movies/filter-options', async () => movies.listFilterOptions());
   app.get('/api/movies/:id', async (request, reply) => {

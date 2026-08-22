@@ -18,7 +18,7 @@ export class ScanService {
   }
 
   private async execute(runId: number): Promise<void> {
-    let found = 0; let processed = 0; const errors: string[] = [];
+    let found = 0; let processed = 0; let titlesAdded = 0; const errors: string[] = [];
     const settings = this.settings.get();
     for (const folder of this.folders.list().filter((item) => item.enabled)) {
       const seenAt = new Date().toISOString(); let completed = false;
@@ -26,7 +26,7 @@ export class ScanService {
         for await (const candidate of walkMovies(folder.path, settings.extensions, settings.ignoredPatterns, settings.excludedFolders)) {
           found += 1; const parsed = parseTitle(candidate.path);
           const result = this.movies.upsertScanned({ folderId: folder.id, path: resolve(candidate.path), filename: candidate.filename, title: parsed.title, year: parsed.year, size: candidate.size, mtimeMs: candidate.mtimeMs, seenAt });
-          processed += 1; this.runs.progress(runId, found, processed);
+          processed += 1; if (result.inserted) titlesAdded += 1; this.runs.progress(runId, found, processed, titlesAdded);
           if (result.needsProbe) await this.mediaInfo.refresh(result.id, candidate.path);
           if (result.needsMatch) await this.matcher.suggest(result.id, undefined, { autoAccept: true });
         }

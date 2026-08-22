@@ -95,6 +95,7 @@ export const movieListItemSchema = z.object({
   resolution: z.string().nullable(),
   hdrFormat: z.string().nullable(),
   watched: z.boolean(),
+  missing: z.boolean(),
   metadataStatus: z.enum(['pending', 'suggested', 'matched', 'unmatched', 'error']),
   shelves: z.array(shelfMembershipSchema)
 });
@@ -119,6 +120,7 @@ export const scanRunSchema = z.object({
   finishedAt: z.string().nullable(),
   filesFound: z.number().int(),
   filesProcessed: z.number().int(),
+  titlesAdded: z.number().int(),
   errorSummary: z.string().nullable()
 });
 

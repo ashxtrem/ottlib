@@ -21,6 +21,7 @@ interface ShelfSelectionDialogProps {
 
 export function ShelfSelectionDialog({ open, title, confirmLabel, requireName = false, initialName = '', initialSelectedIds = [], saving, onClose, onSave }: ShelfSelectionDialogProps) {
   const [search, setSearch] = useState('');
+  const [availability, setAvailability] = useState<'available' | 'unavailable'>();
   const [genre, setGenre] = useState('');
   const [actor, setActor] = useState('');
   const [quality, setQuality] = useState('');
@@ -31,8 +32,8 @@ export function ShelfSelectionDialog({ open, title, confirmLabel, requireName = 
   const [name, setName] = useState(initialName);
   const [selectedIds, setSelectedIds] = useState<number[]>(initialSelectedIds);
   const debouncedSearch = useDebouncedValue(search);
-  const querySearch = debouncedSearch.trim().length >= 3 ? debouncedSearch : '';
-  const movies = useMovies({ search: querySearch, genre, actor, quality, audioLanguage, minRating, watched, sort });
+  const querySearch = debouncedSearch;
+  const movies = useMovies({ search: querySearch, availability, genre, actor, quality, audioLanguage, minRating, watched, sort });
   const filterOptions = useMovieFilterOptions();
   const loadMore = useRef<HTMLDivElement>(null);
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -41,6 +42,7 @@ export function ShelfSelectionDialog({ open, title, confirmLabel, requireName = 
   useEffect(() => {
     if (!open) return;
     setSearch('');
+    setAvailability(undefined);
     setGenre('');
     setActor('');
     setQuality('');
@@ -57,18 +59,18 @@ export function ShelfSelectionDialog({ open, title, confirmLabel, requireName = 
 
   const toggle = (movie: MovieListItem) => setSelectedIds((current) => current.includes(movie.id) ? current.filter((id) => id !== movie.id) : [...current, movie.id]);
   const selectAllShown = () => setSelectedIds((current) => [...new Set([...current, ...(movies.data?.items ?? []).map((movie) => movie.id)])]);
-  const clearFilters = () => { setSearch(''); setGenre(''); setActor(''); setQuality(''); setAudioLanguage(''); setMinRating(undefined); setWatched(undefined); setSort('title'); };
+  const clearFilters = () => { setSearch(''); setAvailability(undefined); setGenre(''); setActor(''); setQuality(''); setAudioLanguage(''); setMinRating(undefined); setWatched(undefined); setSort('title'); };
   const requestClose = () => {
     if (selectedIds.length > 0 && !window.confirm('Discard the selected titles?')) return;
     onClose();
   };
-  const filterValues = { search, genre, actor, quality, audioLanguage, minRating, watched, sort };
+  const filterValues = { search, availability, genre, actor, quality, audioLanguage, minRating, watched, sort };
   const canSave = requireName ? Boolean(name.trim()) : selectedIds.length > 0;
 
   return <Modal open title={title} onClose={requestClose} maxWidthClassName="max-w-5xl" footer={<><button type="button" onClick={requestClose} className="rounded-lg px-4 py-2 text-sm text-foreground/90 hover:bg-surface-raised">Cancel</button><button type="button" onClick={() => onSave({ name: name.trim(), movieIds: selectedIds })} disabled={!canSave || saving} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-60">{saving ? 'Saving…' : confirmLabel}</button></>}>
     <div className="space-y-3 border-b border-border p-5">
       {requireName && <label className="block text-sm">Shelf name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} maxLength={100} placeholder="e.g. Marvel" className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2" /></label>}
-      <LibraryFilters values={filterValues} options={filterOptions.data} onSearchChange={setSearch} onGenreChange={setGenre} onActorChange={setActor} onQualityChange={setQuality} onAudioLanguageChange={setAudioLanguage} onMinRatingChange={setMinRating} onWatchedChange={setWatched} onSortChange={setSort} onClearFilters={clearFilters} idPrefix="shelf-selection" />
+      <LibraryFilters values={filterValues} options={filterOptions.data} onSearchChange={setSearch} onAvailabilityChange={setAvailability} onGenreChange={setGenre} onActorChange={setActor} onQualityChange={setQuality} onAudioLanguageChange={setAudioLanguage} onMinRatingChange={setMinRating} onWatchedChange={setWatched} onSortChange={setSort} onClearFilters={clearFilters} idPrefix="shelf-selection" />
       <div className="flex flex-wrap items-center gap-3"><p className="text-sm text-muted">{selectedIds.length} title{selectedIds.length === 1 ? '' : 's'} selected</p><button type="button" onClick={selectAllShown} disabled={!movies.data?.items.length} className="text-sm text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50">Select all shown</button>{selectedIds.length > 0 && <button type="button" onClick={() => setSelectedIds([])} className="text-sm text-muted hover:text-foreground hover:underline">Clear selection</button>}</div>
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto p-5">
