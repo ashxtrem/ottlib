@@ -36,6 +36,19 @@ describe('MovieRepository filters', () => {
     }
   });
 
+  it('keeps accepted metadata titles when a file is rescanned', () => {
+    const { repository, close } = createRepository();
+    try {
+      repository.applyMetadata(1, { source: 'tmdb', providerId: '8579674', imdbId: 'tt8579674', title: '1917', year: 2019, overview: null, posterFile: null, backdropFile: null, genres: [], cast: [], rating: null, runtime: null });
+
+      repository.upsertScanned({ folderId: 1, path: 'E:/Movies/example.mkv', filename: 'new vdos (1917).mkv', title: 'new vdos', year: 1917, size: 1, mtimeMs: 1, seenAt: '2026-01-02T00:00:00.000Z' });
+
+      expect(repository.get(1)).toMatchObject({ title: '1917', year: 2019, rawFilename: 'new vdos (1917).mkv', imdbId: 'tt8579674', metadataStatus: 'matched' });
+    } finally {
+      close();
+    }
+  });
+
   it('filters by genre, actor, rating, title, and IMDb ID', () => {
     const { repository, close } = createRepository();
     try {

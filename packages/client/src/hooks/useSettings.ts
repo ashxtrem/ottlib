@@ -1,10 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Folder, Settings, UpdateSettings } from '@ottlib/shared';
+import type { AutoAcceptBackfillResult, AutoAcceptBackfillStatus, Folder, Settings, UpdateSettings } from '@ottlib/shared';
 import { api } from './apiClient';
 import { useToast } from './useToast';
 
 export function useSettings() { return useQuery({ queryKey: ['settings'], queryFn: () => api<Settings>('/api/settings') }); }
 export function useFolders() { return useQuery({ queryKey: ['folders'], queryFn: () => api<Folder[]>('/api/folders') }); }
+export function useAutoAcceptBackfill() {
+  const client = useQueryClient();
+  const status = useQuery({ queryKey: ['auto-accept-backfill'], queryFn: () => api<AutoAcceptBackfillStatus>('/api/movies/backfill-auto-accept') });
+  const run = useMutation({
+    mutationFn: () => api<AutoAcceptBackfillResult>('/api/movies/backfill-auto-accept', { method: 'POST' }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['auto-accept-backfill'] });
+      void client.invalidateQueries({ queryKey: ['movies'] });
+      void client.invalidateQueries({ queryKey: ['movie-filter-options'] });
+    }
+  });
+  return { status, run };
+}
 export function useSettingsActions() {
   const client = useQueryClient(); const { show } = useToast(); const refresh = () => client.invalidateQueries({ queryKey: ['settings'] });
   const update = useMutation({ mutationFn: (settings: UpdateSettings) => api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }), onSuccess: () => { refresh(); show('Settings saved.', 'success'); }, onError: (error) => show(error.message, 'error') });

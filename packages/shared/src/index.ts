@@ -169,6 +169,8 @@ export const matchCandidateSchema = z.object({
   mediaType: z.enum(['movie', 'tv'])
 });
 export const acceptCandidateSchema = z.object({ season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() });
+export const autoAcceptBackfillStatusSchema = z.object({ eligible: z.number().int().nonnegative() });
+export const autoAcceptBackfillResultSchema = z.object({ accepted: z.number().int().nonnegative(), stillNeedsReview: z.number().int().nonnegative() });
 
 export const shelfCoverMovieSchema = z.object({
   id: z.number().int(),
@@ -197,6 +199,8 @@ export type Settings = z.infer<typeof settingsSchema>;
 export type UpdateSettings = z.infer<typeof updateSettingsSchema>;
 export type ScheduleValidationResult = z.infer<typeof scheduleValidationResultSchema>;
 export type MatchCandidate = z.infer<typeof matchCandidateSchema>;
+export type AutoAcceptBackfillStatus = z.infer<typeof autoAcceptBackfillStatusSchema>;
+export type AutoAcceptBackfillResult = z.infer<typeof autoAcceptBackfillResultSchema>;
 export type MovieFilterOptions = z.infer<typeof movieFilterOptionsSchema>;
 export type ShelfCoverMovie = z.infer<typeof shelfCoverMovieSchema>;
 export type ShelfSummary = z.infer<typeof shelfSummarySchema>;

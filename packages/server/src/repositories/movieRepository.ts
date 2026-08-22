@@ -97,13 +97,24 @@ export class MovieRepository {
     return row && { id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename };
   }
 
+  public listSuggestedMetadataTargets(): MetadataTarget[] {
+    const rows = this.db.prepare("SELECT id, COALESCE(title_override, parsed_title) AS title, parsed_year, raw_filename FROM movies WHERE metadata_status = 'suggested'").all() as any[];
+    return rows.map((row) => ({ id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename }));
+  }
+
+  public countSuggestedMetadataTargets(): number {
+    return (this.db.prepare("SELECT COUNT(*) AS count FROM movies WHERE metadata_status = 'suggested'").get() as { count: number }).count;
+  }
+
   public upsertScanned(movie: ScannedMovie): { id: number; inserted: boolean; needsMatch: boolean; needsProbe: boolean } {
     const existing = this.db.prepare('SELECT id, size, mtime_ms, metadata_status, media_probe_status FROM movies WHERE canonical_path = ?').get(movie.path) as any;
     const changed = !existing || existing.size !== movie.size || existing.mtime_ms !== movie.mtimeMs;
     this.db.prepare(`INSERT INTO movies (folder_id, canonical_path, raw_filename, parsed_title, parsed_year, size, mtime_ms, last_seen_at, metadata_status, missing)
       VALUES (@folderId, @path, @filename, @title, @year, @size, @mtimeMs, @seenAt, 'pending', 0)
       ON CONFLICT(canonical_path) DO UPDATE SET folder_id = excluded.folder_id, raw_filename = excluded.raw_filename,
-      parsed_title = excluded.parsed_title, parsed_year = excluded.parsed_year, size = excluded.size, mtime_ms = excluded.mtime_ms,
+      parsed_title = CASE WHEN movies.metadata_status = 'matched' THEN movies.parsed_title ELSE excluded.parsed_title END,
+      parsed_year = CASE WHEN movies.metadata_status = 'matched' THEN movies.parsed_year ELSE excluded.parsed_year END,
+      size = excluded.size, mtime_ms = excluded.mtime_ms,
       last_seen_at = excluded.last_seen_at, missing = 0,
       metadata_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.metadata_status END,
       media_probe_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.media_probe_status END`).run(movie);
@@ -167,10 +178,13 @@ export class MovieRepository {
   }
 
   public applyMetadata(id: number, metadata: { source: string; providerId: string; title: string; year: number | null; overview: string | null; posterFile: string | null; backdropFile: string | null; genres: string[]; cast: string[]; rating: number | null; runtime: number | null; imdbId: string | null }): void {
-    this.db.prepare(`UPDATE movies SET metadata_status = 'matched', metadata_source = @source, provider_id = @providerId,
+    const apply = this.db.transaction((values: typeof metadata & { id: number }) => {
+      this.db.prepare(`UPDATE movies SET metadata_status = 'matched', metadata_source = @source, provider_id = @providerId,
       parsed_title = @title, parsed_year = @year, overview = @overview, poster_file = @posterFile, backdrop_file = @backdropFile,
-      genres_json = @genres, cast_json = @cast, rating = @rating, runtime = @runtime, imdb_id = @imdbId, matched_at = CURRENT_TIMESTAMP, metadata_error = NULL WHERE id = @id`).run({ ...metadata, id, genres: JSON.stringify(metadata.genres), cast: JSON.stringify(metadata.cast) });
-    this.clearCandidates(id);
+      genres_json = @genres, cast_json = @cast, rating = @rating, runtime = @runtime, imdb_id = @imdbId, matched_at = CURRENT_TIMESTAMP, metadata_error = NULL WHERE id = @id`).run({ ...values, genres: JSON.stringify(values.genres), cast: JSON.stringify(values.cast) });
+      this.db.prepare('DELETE FROM movie_match_candidates WHERE movie_id = ?').run(values.id);
+    });
+    apply({ ...metadata, id });
   }
 
   public markUnmatched(id: number, error: string | null = null): void {

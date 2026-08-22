@@ -1,4 +1,5 @@
 import type { MetadataCandidate } from '../providers/metadata/MetadataProvider.js';
+import type { MatchCandidate } from '@ottlib/shared';
 import { createMetadataProviders } from '../providers/metadata/metadataProviders.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
 import { SettingRepository } from '../repositories/settingRepository.js';
@@ -38,17 +39,34 @@ export class MetadataMatchService {
     if (!candidates.length) { this.movies.markUnmatched(movieId, lastError); return; }
     const shortlist = candidates.sort((a, b) => b.score - a.score).slice(0, 5);
     this.movies.saveCandidates(movieId, shortlist.map((candidate) => ({ provider: candidate.provider, providerId: candidate.id, title: candidate.title, year: candidate.year, score: candidate.score, mediaType: candidate.mediaType })));
-    if (options.autoAccept) await this.autoAcceptTopCandidate(movieId, target.rawFilename, shortlist[0]);
+    if (options.autoAccept) await this.autoAcceptTopCandidate(movieId, target.rawFilename);
   }
 
-  private async autoAcceptTopCandidate(movieId: number, rawFilename: string, candidate: (MetadataCandidate & { provider: string }) | undefined): Promise<void> {
-    if (!candidate || candidate.score <= autoAcceptScoreThreshold) return;
-    const savedCandidate = this.movies.getCandidates(movieId).find((item) => item.provider === candidate.provider && item.providerId === candidate.id && item.mediaType === candidate.mediaType);
-    if (!savedCandidate) return;
+  public countAutoAcceptableSuggestions(): number {
+    return this.movies.listSuggestedMetadataTargets().filter((target) => this.autoAcceptCandidate(target.id, target.rawFilename) !== undefined).length;
+  }
+
+  public async backfillAutoAccept(): Promise<{ accepted: number; stillNeedsReview: number }> {
+    const targets = this.movies.listSuggestedMetadataTargets();
+    let accepted = 0;
+    for (const target of targets) {
+      if (await this.autoAcceptTopCandidate(target.id, target.rawFilename)) accepted += 1;
+    }
+    return { accepted, stillNeedsReview: this.movies.countSuggestedMetadataTargets() };
+  }
+
+  private autoAcceptCandidate(movieId: number, rawFilename: string) {
+    const candidate = this.movies.getCandidates(movieId).reduce<MatchCandidate | undefined>((top, item) => !top || item.score > top.score ? item : top, undefined);
+    if (!candidate || candidate.score <= autoAcceptScoreThreshold) return undefined;
     const episode = candidate.mediaType === 'tv' ? detectSeasonEpisode(rawFilename) : {};
-    if (candidate.mediaType === 'tv' && !episode) return;
-    try { await this.accept(movieId, savedCandidate.id, episode ?? {}); }
-    catch { /* Keep the saved suggestions available for review if auto-accept cannot complete. */ }
+    if (candidate.mediaType === 'tv' && !episode) return undefined;
+    return { candidate, episode: episode ?? {} };
+  }
+
+  private async autoAcceptTopCandidate(movieId: number, rawFilename: string): Promise<boolean> {
+    const match = this.autoAcceptCandidate(movieId, rawFilename); if (!match) return false;
+    try { return await this.accept(movieId, match.candidate.id, match.episode) === 'ok'; }
+    catch { return false; /* Keep saved suggestions available for review if automatic acceptance cannot complete. */ }
   }
 
   public async accept(movieId: number, candidateId: number, options: AcceptOptions = {}): Promise<'ok' | 'not-found' | 'needs-episode'> {

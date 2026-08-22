@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { useFolders, useSettings, useSettingsActions } from '../hooks/useSettings';
+import { Link } from 'react-router-dom';
+import { useAutoAcceptBackfill, useFolders, useSettings, useSettingsActions } from '../hooks/useSettings';
 import { useTheme } from '../hooks/useTheme';
 import { api } from '../hooks/apiClient';
 import { useScanHistory, useScanStatus, useStartScan } from '../hooks/useScanStatus';
@@ -18,6 +19,7 @@ export function SettingsPage() {
   const history = useScanHistory();
   const scanStatus = useScanStatus();
   const scan = useStartScan();
+  const autoAcceptBackfill = useAutoAcceptBackfill();
   const { preference, setPreference } = useTheme();
   const { show } = useToast();
   const serverInfo = useQuery({ queryKey: ['server-info'], queryFn: () => api<{ port: number; addresses: string[] }>('/api/server-info') });
@@ -131,6 +133,12 @@ export function SettingsPage() {
 
     <section className="rounded-xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Recent scans</h2><button type="button" onClick={startScan} disabled={!folders.data?.length || scanning} className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60">{scanning ? 'Scanning…' : 'Rescan now'}</button></div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-field p-3">
+        <div><p className="text-sm font-medium">Accept confident existing matches</p><p className="mt-1 text-xs text-muted">Uses saved suggestions only; individual titles can still be corrected from Fix this match.</p></div>
+        <button type="button" onClick={() => autoAcceptBackfill.run.mutate()} disabled={autoAcceptBackfill.status.isLoading || autoAcceptBackfill.run.isPending || !autoAcceptBackfill.status.data?.eligible} className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60">{autoAcceptBackfill.run.isPending ? 'Accepting…' : `Accept ${autoAcceptBackfill.status.data?.eligible ?? 0} confident matches`}</button>
+      </div>
+      {autoAcceptBackfill.run.data && <p className="mt-3 text-sm text-muted">Accepted {autoAcceptBackfill.run.data.accepted} matches. <Link to="/?needsReview=true" className="text-accent hover:underline">{autoAcceptBackfill.run.data.stillNeedsReview} still need review.</Link></p>}
+      {autoAcceptBackfill.run.error && <p className="mt-3 text-sm text-error">{autoAcceptBackfill.run.error.message}</p>}
       <ScanHistoryList runs={history.data} />
     </section>
 
