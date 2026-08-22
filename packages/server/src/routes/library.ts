@@ -10,11 +10,14 @@ function minRating(value: string | undefined): number | undefined {
   if (value === undefined || value === '') return undefined;
   const rating = Number(value); return Number.isFinite(rating) && rating >= 0 && rating <= 10 ? rating : undefined;
 }
+function limit(value: string | undefined): number {
+  const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : 48;
+}
 
 export function registerLibraryRoutes(app: FastifyInstance, movies: MovieRepository, watches: WatchStateRepository, matcher: MetadataMatchService, library: LibraryService): void {
   app.get('/api/movies', async (request) => {
-    const query = request.query as { search?: string; watched?: string; sort?: string; genre?: string; actor?: string; minRating?: string };
-    return library.list(deviceId(request.headers), { search: query.search, watched: query.watched === undefined ? undefined : query.watched === 'true', sort: query.sort, genre: query.genre, actor: query.actor, minRating: minRating(query.minRating) });
+    const query = request.query as { search?: string; watched?: string; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: string; needsReview?: string; cursor?: string; limit?: string };
+    return library.listSummaries(deviceId(request.headers), { search: query.search, watched: query.watched === undefined ? undefined : query.watched === 'true', sort: query.sort, genre: query.genre, actor: query.actor, quality: query.quality, audioLanguage: query.audioLanguage, minRating: minRating(query.minRating), needsReview: query.needsReview === 'true', cursor: query.cursor, limit: limit(query.limit) });
   });
   app.get('/api/movies/filter-options', async () => movies.listFilterOptions());
   app.get('/api/movies/:id', async (request, reply) => {

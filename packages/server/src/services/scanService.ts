@@ -28,7 +28,7 @@ export class ScanService {
           const result = this.movies.upsertScanned({ folderId: folder.id, path: resolve(candidate.path), filename: candidate.filename, title: parsed.title, year: parsed.year, size: candidate.size, mtimeMs: candidate.mtimeMs, seenAt });
           processed += 1; this.runs.progress(runId, found, processed);
           if (result.needsProbe) await this.mediaInfo.refresh(result.id, candidate.path);
-          if (result.needsMatch) await this.matcher.suggest(result.id);
+          if (result.needsMatch) await this.matcher.suggest(result.id, undefined, { autoAccept: true });
         }
         completed = true;
       } catch (error) { errors.push(`${folder.path}: ${error instanceof Error ? error.message : 'scan failed'}`); }

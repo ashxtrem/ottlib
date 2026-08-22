@@ -1,40 +1,45 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { LibraryEmptyState } from '../components/LibraryEmptyState';
 import { PosterGrid } from '../components/PosterGrid';
 import { useMovieFilterOptions, useMovies } from '../hooks/useMovies';
-import { useScanStatus, useStartScan } from '../hooks/useScanStatus';
+import { useScanHistory, useScanStatus, useStartScan } from '../hooks/useScanStatus';
 import { useToast } from '../hooks/useToast';
 import { useLibraryScrollRestoration } from '../hooks/useLibraryScrollRestoration';
 import { useLibraryViewState } from '../hooks/useLibraryViewState';
+import { getLibraryRestoreScrollPosition } from '../hooks/useBackToLibrary';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useScanMovieRefresh } from '../hooks/useScanMovieRefresh';
+import { useFolders, useSettings } from '../hooks/useSettings';
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
+import { LibraryFilters, countActiveFilters } from '../components/LibraryFilters';
+import { ErrorState } from '../components/ErrorState';
 
 export function LibraryPage() {
-  const { search, watched, sort, genre, actor, minRating, setSearch, setWatched, setSort, setGenre, setActor, setMinRating, clearFilters } = useLibraryViewState();
-  const movies = useMovies({ search, watched, sort, genre, actor, minRating }); const filterOptions = useMovieFilterOptions(); const scan = useStartScan(); const scanStatus = useScanStatus(); const { show } = useToast(); const scanProgress = scanStatus.data?.status === 'running' ? scanStatus.data.filesProcessed : undefined;
+  const { state: locationState } = useLocation();
+  const { search, watched, sort, genre, actor, quality, audioLanguage, minRating, needsReview, setSearch, setWatched, setSort, setGenre, setActor, setQuality, setAudioLanguage, setMinRating, setNeedsReview, clearFilters } = useLibraryViewState();
+  const debouncedSearch = useDebouncedValue(search);
+  const querySearch = debouncedSearch.trim().length >= 3 ? debouncedSearch : '';
+  const movies = useMovies({ search: querySearch, watched, sort, genre, actor, quality, audioLanguage, minRating, needsReview }); const filterOptions = useMovieFilterOptions(); const scan = useStartScan(); const scanStatus = useScanStatus(); const scanHistory = useScanHistory(); const folders = useFolders(); const settings = useSettings(); const { show } = useToast(); const loadMore = useRef<HTMLDivElement>(null);
   const startScan = () => {
-    if (!window.confirm('Rescan your library? This may take a while, depending on the number of files.')) return;
-    scan.mutate(undefined, { onSuccess: () => show('Library scan started.', 'success'), onError: (error) => show(error.message, 'error') });
+    if (scanHistory.data?.length && !window.confirm('Rescan your library? This may take a while, depending on the number of files.')) return;
+    scan.mutate(undefined, { onSuccess: () => { void scanHistory.refetch(); show('Library scan started.', 'success'); }, onError: (error) => show(error.message, 'error') });
   };
-  useLibraryScrollRestoration(Boolean(movies.data));
-  useEffect(() => { if (scanStatus.data?.status === 'running') void movies.refetch(); }, [scanStatus.data?.status, scanProgress]);
-  const filtersActive = Boolean(search || genre || actor || minRating !== undefined || watched !== undefined || sort !== 'title');
-  const titleCount = movies.data?.length;
+  useLibraryScrollRestoration(movies.isSuccess, getLibraryRestoreScrollPosition(locationState));
+  useScanMovieRefresh(scanStatus.data?.status, movies.refetch);
+  useInfiniteScroll(loadMore, { enabled: Boolean(movies.hasNextPage), loading: movies.isFetchingNextPage, onLoadMore: () => { void movies.fetchNextPage(); } });
+  useEffect(() => { if (scanStatus.data?.status !== 'running') void scanHistory.refetch(); }, [scanHistory.refetch, scanStatus.data?.status]);
+  const filterValues = { search, genre, actor, quality, audioLanguage, minRating, watched, sort, needsReview };
+  const filtersActive = countActiveFilters(filterValues) > 0;
+  const titleCount = movies.data?.total;
   return <section>
     <div className="mb-6 rounded-xl border border-border bg-surface p-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title or IMDb ID" aria-label="Search title or IMDb ID" className="rounded-lg border border-border bg-field px-4 py-2 outline-none ring-accent focus:ring" />
-        <select value={genre} onChange={(event) => setGenre(event.target.value)} aria-label="Filter by genre" className="rounded-lg border border-border bg-field px-3 py-2"><option value="">All genres</option>{filterOptions.data?.genres.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-        <input value={actor} onChange={(event) => setActor(event.target.value)} list="movie-actors" placeholder="Actor" aria-label="Filter by actor" className="rounded-lg border border-border bg-field px-4 py-2 outline-none ring-accent focus:ring" />
-        <datalist id="movie-actors">{filterOptions.data?.actors.map((value) => <option key={value} value={value} />)}</datalist>
-        <select value={minRating ?? ''} onChange={(event) => setMinRating(event.target.value ? Number(event.target.value) : undefined)} aria-label="Minimum rating" className="rounded-lg border border-border bg-field px-3 py-2"><option value="">Any rating</option><option value="9">9.0+ rating</option><option value="8">8.0+ rating</option><option value="7">7.0+ rating</option><option value="6">6.0+ rating</option><option value="5">5.0+ rating</option></select>
-        <select value={watched === undefined ? 'all' : String(watched)} onChange={(event) => setWatched(event.target.value === 'all' ? undefined : event.target.value === 'true')} aria-label="Watch status" className="rounded-lg border border-border bg-field px-3 py-2"><option value="all">All movies</option><option value="false">Unwatched</option><option value="true">Watched</option></select>
-        <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Sort movies" className="rounded-lg border border-border bg-field px-3 py-2"><option value="title">Title</option><option value="year">Year</option><option value="added">Date added</option></select>
-      </div>
+      <LibraryFilters values={filterValues} options={filterOptions.data} onSearchChange={setSearch} onGenreChange={setGenre} onActorChange={setActor} onQualityChange={setQuality} onAudioLanguageChange={setAudioLanguage} onMinRatingChange={setMinRating} onWatchedChange={setWatched} onSortChange={setSort} onNeedsReviewChange={setNeedsReview} onClearFilters={clearFilters} idPrefix="library" entityName="movies" />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {titleCount !== undefined && <p aria-live="polite" className="text-sm text-muted">{titleCount} {titleCount === 1 ? 'title' : 'titles'}</p>}
-        {search.trim() && <a href={`https://www.imdb.com/find/?q=${encodeURIComponent(search.trim())}&s=tt`} target="_blank" rel="noopener noreferrer" className="text-sm text-[#dcae00] hover:text-[#f5c518] hover:underline">Search IMDb</a>}
-        {filtersActive && <button onClick={clearFilters} className="text-sm text-muted hover:text-accent hover:underline">Clear filters</button>}
-        <button onClick={startScan} disabled={scan.isPending} className="rounded-lg bg-surface-raised px-4 py-2 text-sm font-medium hover:bg-border disabled:cursor-not-allowed disabled:opacity-60 sm:ml-auto">{scan.isPending ? 'Starting…' : 'Rescan now'}</button>
+        {search.trim() && <a href={`https://www.imdb.com/find/?q=${encodeURIComponent(search.trim())}&s=tt`} target="_blank" rel="noopener noreferrer" className="text-sm text-imdb hover:text-imdb-hover hover:underline">Search IMDb</a>}
       </div>
     </div>
-    {movies.isLoading && <p className="text-muted">Loading your library…</p>}{movies.error && <p className="text-error">{movies.error.message}</p>}{movies.data?.length === 0 && <div className="rounded-xl border border-dashed border-border p-12 text-center text-muted">No movies match these filters.</div>}{movies.data && <PosterGrid movies={movies.data} />}
+    {movies.isLoading && <p className="text-muted">Loading your library…</p>}{movies.error && !movies.data && <ErrorState resource="library" error={movies.error} retrying={movies.isFetching} onRetry={movies.refetch} />}{movies.isSuccess && movies.data?.items.length === 0 && <LibraryEmptyState folders={folders.data ?? []} scanHistory={scanHistory.data ?? []} tmdbConfigured={Boolean(settings.data?.tmdbApiKey)} filtersActive={filtersActive} scanning={scanStatus.data?.status === 'running' || scan.isPending} onStartScan={startScan} onClearFilters={clearFilters} />}{movies.data && movies.data.items.length > 0 && <div className={`transition-opacity duration-200 ${movies.isFetching ? 'opacity-60' : 'opacity-100'}`}><PosterGrid movies={movies.data.items} /></div>}{movies.hasNextPage && <div ref={loadMore} aria-live="polite" className="py-8 text-center text-sm text-muted">{movies.isFetchingNextPage ? 'Loading more titles…' : 'Scroll for more titles'}</div>}
   </section>;
 }

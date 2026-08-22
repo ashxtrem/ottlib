@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { formatRuntime } from '@ottlib/shared';
 import { MatchCandidateRow } from '../components/MatchCandidateRow';
-import { PlayButton } from '../components/PlayButton';
+import { MovieActionButtons } from '../components/MovieActionButtons';
 import { MediaInfoPanel } from '../components/MediaInfoPanel';
 import { useMatchCandidates, useMovie, useMovieActions } from '../hooks/useMovies';
 import { MovieShelfDialog } from '../components/MovieShelfDialog';
 import { useShelfActions, useShelves } from '../hooks/useShelves';
+import { useBackToLibrary } from '../hooks/useBackToLibrary';
+import { NoArtworkCard } from '../components/NoArtworkCard';
+import { ErrorState } from '../components/ErrorState';
+
+function BrowseFilterChips({ label, values, parameter }: { label: string; values: string[]; parameter: 'genre' | 'actor' }) {
+  return <div><h2 className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{values.length ? values.map((value) => <Link key={value} to={`/?${parameter}=${encodeURIComponent(value)}`} className="rounded-full border border-accent-soft-border bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent-soft-foreground hover:bg-accent-soft/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={`Browse ${parameter} ${value}`}>{value}</Link>) : <span className="text-sm text-muted">—</span>}</div></div>;
+}
 
 export function MovieDetailPage() {
   const { id } = useParams();
@@ -15,6 +23,7 @@ export function MovieDetailPage() {
   const [imdbInput, setImdbInput] = useState('');
   const [shelfManagerOpen, setShelfManagerOpen] = useState(false);
   const shelves = useShelves(); const shelfActions = useShelfActions();
+  const backToLibrary = useBackToLibrary();
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [id]);
@@ -22,18 +31,19 @@ export function MovieDetailPage() {
   const candidates = useMatchCandidates(id, needsReview);
 
   if (movie.isLoading) return <p className="text-muted">Loading movie…</p>;
-  if (!movie.data) return <p className="text-error">Movie not found.</p>;
+  if (!movie.data) return <ErrorState resource="title" error={movie.error} retrying={movie.isFetching} onRetry={movie.refetch} />;
 
   const item = movie.data;
   const activeTitle = override ?? item.title;
+  const runtime = formatRuntime(item.runtime, item.mediaInfo?.durationMs);
   const imdbUrl = item.imdbId ? `https://www.imdb.com/title/${item.imdbId}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(`${item.title}${item.year ? ` ${item.year}` : ''}`)}&s=tt`;
   return <section className="space-y-6">
-    <Link to="/" className="text-sm text-accent hover:underline">← Back to library</Link>
+    <button type="button" onClick={backToLibrary} className="text-sm text-accent hover:underline">← Back to library</button>
     <div className="overflow-hidden rounded-2xl border border-border bg-surface">
       {item.backdropUrl && <img src={item.backdropUrl} alt="" className="h-56 w-full object-cover opacity-60 md:h-80" />}
       <div className="grid gap-6 p-5 md:grid-cols-[220px_minmax(0,1fr)] md:p-8 xl:grid-cols-[220px_minmax(0,1fr)_260px]">
         <div className="aspect-[2/3] overflow-hidden rounded-xl bg-surface-raised">
-          {item.posterUrl ? <img src={item.posterUrl} alt={`${item.title} poster`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-subtle">No poster</div>}
+          {item.posterUrl ? <img src={item.posterUrl} alt={`${item.title} poster`} loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <NoArtworkCard title={item.title} year={item.year} status={item.metadataStatus} />}
         </div>
         <div className="space-y-5">
           <div><h1 className="flex flex-wrap items-center gap-2 text-3xl font-bold">
@@ -41,10 +51,10 @@ export function MovieDetailPage() {
             <a href={`https://www.google.com/search?q=${encodeURIComponent(`${item.title}${item.year ? ` ${item.year}` : ''}`)}`} target="_blank" rel="noopener noreferrer" title="Search Google for this title" className="text-subtle hover:text-accent" aria-label="Search Google for this title">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
             </a>
-          </h1><p className="mt-2 text-sm text-muted">{item.runtime && `${item.runtime} min · `}{item.rating && `★ ${item.rating.toFixed(1)} · `}{item.metadataSource ?? 'Unmatched'}</p></div>
-          <div className="flex flex-wrap items-center gap-2"><PlayButton movie={item} /><a href={imdbUrl} target="_blank" rel="noopener noreferrer" title="View on IMDb" aria-label="View on IMDb" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#f5c518]/70 text-[#f5c518] hover:bg-[#f5c518]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f5c518]"><svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h16v18H4V3Zm2 2v14h12V5H6Zm2 2h2v10H8V7Zm3.5 0H14v10h-2.5V7Zm4 0H16v10h-1.5V7Z" /></svg><span className="sr-only">View on IMDb</span></a><button type="button" onClick={() => setShelfManagerOpen(true)} title="Manage shelves" aria-label="Manage shelves" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-11Z" /><path d="M8 9h8M8 13h5" /></svg><span className="sr-only">Manage shelves</span></button><button type="button" onClick={() => actions.watch.mutate({ id: item.id, watched: !item.watched })} disabled={actions.watch.isPending} title={item.watched ? 'Mark as unwatched' : 'Mark as watched'} aria-label={item.watched ? 'Mark as unwatched' : 'Mark as watched'} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60">{actions.watch.isPending ? <svg aria-hidden="true" className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12a8 8 0 1 1-2.34-5.66" /></svg> : item.watched ? <svg aria-hidden="true" className="h-5 w-5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m5 12 4 4L19 6" /></svg> : <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8.5" /><path d="m8.5 12 2.3 2.3 4.8-4.8" /></svg>}<span className="sr-only">{item.watched ? 'Mark as unwatched' : 'Mark as watched'}</span></button></div>
+          </h1><p className="mt-2 text-sm text-muted">{[runtime, item.rating ? `★ ${item.rating.toFixed(1)}` : null, item.metadataSource ?? 'Unmatched'].filter(Boolean).join(' · ')}</p></div>
+          <MovieActionButtons imdbUrl={imdbUrl} movie={item} onManageShelves={() => setShelfManagerOpen(true)} onToggleWatched={() => actions.watch.mutate({ id: item.id, watched: !item.watched })} watchPending={actions.watch.isPending} />
           {item.overview && <p className="max-w-3xl leading-7 text-foreground/90">{item.overview}</p>}
-          <div className="grid gap-3 text-sm sm:grid-cols-2"><p><span className="text-subtle">Genres:</span> {item.genres.join(', ') || '—'}</p><p><span className="text-subtle">Cast:</span> {item.cast.join(', ') || '—'}</p></div>
+          <div className="grid gap-5 sm:grid-cols-2"><BrowseFilterChips label="Genres" values={item.genres} parameter="genre" /><BrowseFilterChips label="Cast" values={item.cast} parameter="actor" /></div>
         </div>
         <MediaInfoPanel mediaInfo={item.mediaInfo} filePath={item.filePath} />
       </div>

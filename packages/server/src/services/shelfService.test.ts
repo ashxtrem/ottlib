@@ -59,12 +59,17 @@ describe('ShelfService', () => {
     } finally { close(); }
   });
 
-  it('refuses to remove the final title without creating an empty shelf', () => {
+  it('allows shelves to be empty', () => {
     const { shelves, close } = fixture();
     try {
       const marvel = value(shelves.create('Marvel', [1]));
-      expect(shelves.removeMovie(marvel.id, 1)).toEqual({ error: 'last-movie' });
-      expect(shelves.get(marvel.id)?.movieCount).toBe(1);
+      const empty = value(shelves.create('Empty', []));
+      const dc = value(shelves.create('DC', [2]));
+      value(shelves.removeMovie(marvel.id, 1));
+      value(shelves.updateMovieShelves(2, [], undefined));
+      expect(shelves.get(marvel.id)).toMatchObject({ movieCount: 0, movies: [] });
+      expect(shelves.get(empty.id)).toMatchObject({ movieCount: 0, movies: [] });
+      expect(shelves.get(dc.id)).toMatchObject({ movieCount: 0, movies: [] });
     } finally { close(); }
   });
 });

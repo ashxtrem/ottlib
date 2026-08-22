@@ -4,6 +4,9 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        display: ['Georgia', 'Cambria', '"Times New Roman"', 'serif'],
+      },
       colors: {
         canvas: 'rgb(var(--color-canvas) / <alpha-value>)',
         overlay: 'rgb(var(--color-overlay) / <alpha-value>)',
@@ -34,6 +37,8 @@ export default {
         warning: 'rgb(var(--color-warning) / <alpha-value>)',
         'warning-border': 'rgb(var(--color-warning-border) / <alpha-value>)',
         'warning-foreground': 'rgb(var(--color-warning-foreground) / <alpha-value>)',
+        imdb: 'rgb(var(--color-imdb) / <alpha-value>)',
+        'imdb-hover': 'rgb(var(--color-imdb-hover) / <alpha-value>)',
       },
     },
   },

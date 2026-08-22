@@ -15,7 +15,6 @@ function sendResult<T>(reply: FastifyReply, result: ShelfResult<T>): T | undefin
     'shelf-not-found': [404, 'Shelf not found'],
     'movie-not-found': [404, 'Movie not found'],
     'name-conflict': [409, 'A shelf with that name already exists'],
-    'last-movie': [400, 'A shelf must contain at least one title. Delete the shelf instead.'],
     'invalid-order': [400, 'Order must contain every title in this shelf exactly once']
   } as const;
   const [status, message] = errors[result.error];

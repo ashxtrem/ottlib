@@ -9,6 +9,11 @@ export class ScanRunRepository {
     return row ? this.map(row) : undefined;
   }
 
+  public latest(): ScanRun | undefined {
+    const row = this.db.prepare('SELECT * FROM scan_runs ORDER BY id DESC LIMIT 1').get();
+    return row ? this.map(row) : undefined;
+  }
+
   public failAbandonedRuns(): void {
     this.db.prepare("UPDATE scan_runs SET status = 'failed', finished_at = CURRENT_TIMESTAMP, error_summary = COALESCE(error_summary, 'Scan interrupted by server restart') WHERE status = 'running'").run();
   }

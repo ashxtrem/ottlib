@@ -4,7 +4,7 @@ import { ShelfMovieRepository } from '../repositories/shelfMovieRepository.js';
 import { ShelfRepository, type ShelfRecord } from '../repositories/shelfRepository.js';
 import { LibraryService } from './libraryService.js';
 
-export type ShelfResult<T> = { value: T } | { error: 'shelf-not-found' | 'movie-not-found' | 'name-conflict' | 'last-movie' | 'invalid-order' };
+export type ShelfResult<T> = { value: T } | { error: 'shelf-not-found' | 'movie-not-found' | 'name-conflict' | 'invalid-order' };
 
 export class ShelfService {
   public constructor(
@@ -59,7 +59,6 @@ export class ShelfService {
     if (!this.shelves.exists(id)) return { error: 'shelf-not-found' };
     const movieIds = this.shelfMovies.listMovieIds(id);
     if (!movieIds.includes(movieId)) return { error: 'movie-not-found' };
-    if (movieIds.length === 1) return { error: 'last-movie' };
     this.shelves.transaction(() => {
       this.shelfMovies.removeMovie(id, movieId);
       this.shelves.touch(id);
@@ -85,9 +84,6 @@ export class ShelfService {
     if (newShelfName && this.shelves.nameExists(newShelfName)) return { error: 'name-conflict' };
 
     const currentShelfIds = this.shelfMovies.listMemberships([movieId]).get(movieId)?.map((shelf) => shelf.id) ?? [];
-    const removedShelfIds = currentShelfIds.filter((id) => !uniqueShelfIds.includes(id));
-    if (removedShelfIds.some((id) => this.shelfMovies.countForShelf(id) === 1)) return { error: 'last-movie' };
-
     const result = this.shelves.transaction(() => {
       const finalShelfIds = [...uniqueShelfIds];
       if (newShelfName) finalShelfIds.push(this.shelves.create(newShelfName).id);

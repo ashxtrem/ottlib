@@ -4,17 +4,25 @@ import { MovieRepository } from '../repositories/movieRepository.js';
 import { SettingRepository } from '../repositories/settingRepository.js';
 import { PosterCacheService } from './posterCacheService.js';
 
+export const autoAcceptScoreThreshold = 0.75;
+
 export function extractImdbId(input: string): string | null {
   const match = input.trim().match(/tt\d{6,}/i);
   return match ? match[0].toLowerCase() : null;
 }
 
 export type AcceptOptions = { season?: number; episode?: number };
+export type SuggestOptions = { autoAccept?: boolean };
+
+function detectSeasonEpisode(filename: string): AcceptOptions | null {
+  const match = filename.match(/s(\d{1,2})[\s._-]?e(\d{1,3})/i) ?? filename.match(/\b(\d{1,2})x(\d{2,3})\b/i) ?? filename.match(/season\s?(\d{1,2})\s?episode\s?(\d{1,3})/i);
+  return match ? { season: Number(match[1]), episode: Number(match[2]) } : null;
+}
 
 export class MetadataMatchService {
   public constructor(private readonly movies: MovieRepository, private readonly settings: SettingRepository, private readonly cache: PosterCacheService) {}
 
-  public async suggest(movieId: number, searchTitle?: string): Promise<void> {
+  public async suggest(movieId: number, searchTitle?: string, options: SuggestOptions = {}): Promise<void> {
     const target = this.movies.metadataTarget(movieId); if (!target) return;
     const title = searchTitle?.trim() || target.title;
     const providers = createMetadataProviders(this.settings.get());
@@ -30,6 +38,17 @@ export class MetadataMatchService {
     if (!candidates.length) { this.movies.markUnmatched(movieId, lastError); return; }
     const shortlist = candidates.sort((a, b) => b.score - a.score).slice(0, 5);
     this.movies.saveCandidates(movieId, shortlist.map((candidate) => ({ provider: candidate.provider, providerId: candidate.id, title: candidate.title, year: candidate.year, score: candidate.score, mediaType: candidate.mediaType })));
+    if (options.autoAccept) await this.autoAcceptTopCandidate(movieId, target.rawFilename, shortlist[0]);
+  }
+
+  private async autoAcceptTopCandidate(movieId: number, rawFilename: string, candidate: (MetadataCandidate & { provider: string }) | undefined): Promise<void> {
+    if (!candidate || candidate.score <= autoAcceptScoreThreshold) return;
+    const savedCandidate = this.movies.getCandidates(movieId).find((item) => item.provider === candidate.provider && item.providerId === candidate.id && item.mediaType === candidate.mediaType);
+    if (!savedCandidate) return;
+    const episode = candidate.mediaType === 'tv' ? detectSeasonEpisode(rawFilename) : {};
+    if (candidate.mediaType === 'tv' && !episode) return;
+    try { await this.accept(movieId, savedCandidate.id, episode ?? {}); }
+    catch { /* Keep the saved suggestions available for review if auto-accept cannot complete. */ }
   }
 
   public async accept(movieId: number, candidateId: number, options: AcceptOptions = {}): Promise<'ok' | 'not-found' | 'needs-episode'> {

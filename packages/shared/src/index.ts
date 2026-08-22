@@ -1,5 +1,34 @@
 import { z } from 'zod';
 
+const languageNames: Record<string, string> = {
+  en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
+  bn: 'Bengali', ben: 'Bengali', de: 'German', deu: 'German', es: 'Spanish', spa: 'Spanish', fr: 'French', fra: 'French', it: 'Italian', ita: 'Italian',
+  ja: 'Japanese', jpn: 'Japanese', ko: 'Korean', kor: 'Korean', pt: 'Portuguese', por: 'Portuguese', ru: 'Russian', rus: 'Russian', zh: 'Chinese', zho: 'Chinese'
+};
+
+export function formatRuntime(runtimeMinutes: number | null | undefined, durationMs: number | null | undefined = null): string | null {
+  const minutes = Number.isFinite(runtimeMinutes) && runtimeMinutes! > 0
+    ? Math.round(runtimeMinutes!)
+    : Number.isFinite(durationMs) && durationMs! > 0 ? Math.max(1, Math.round(durationMs! / 60_000)) : null;
+  if (minutes === null) return null;
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}
+
+export function formatResolution(height: number | null | undefined): string | null {
+  if (!Number.isFinite(height) || height! <= 0) return null;
+  if (height! >= 2160) return '4K';
+  if (height! >= 1440) return '1440p';
+  if (height! >= 1080) return '1080p';
+  if (height! >= 720) return '720p';
+  return `${height}p`;
+}
+
+export function formatMediaLanguage(language: string | null | undefined): string {
+  const normalized = language?.trim().toLowerCase();
+  return normalized ? languageNames[normalized] ?? normalized.toUpperCase() : 'Unknown';
+}
+
 export const videoExtensions = ['mp4', 'mkv', 'avi', 'mov', 'm4v', 'wmv', 'flv', 'webm'] as const;
 export const deviceIdSchema = z.string().uuid();
 
@@ -58,6 +87,24 @@ export const movieSchema = z.object({
   shelves: z.array(shelfMembershipSchema)
 });
 
+export const movieListItemSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  year: z.number().int().nullable(),
+  posterUrl: z.string().nullable(),
+  resolution: z.string().nullable(),
+  hdrFormat: z.string().nullable(),
+  watched: z.boolean(),
+  metadataStatus: z.enum(['pending', 'suggested', 'matched', 'unmatched', 'error']),
+  shelves: z.array(shelfMembershipSchema)
+});
+
+export const movieListPageSchema = z.object({
+  items: z.array(movieListItemSchema),
+  nextCursor: z.string().nullable(),
+  total: z.number().int().nonnegative()
+});
+
 export const folderSchema = z.object({
   id: z.number().int(),
   path: z.string(),
@@ -86,14 +133,22 @@ export const settingsSchema = z.object({
 });
 
 export const updateSettingsSchema = settingsSchema.partial();
+export const testTmdbKeySchema = z.object({ tmdbApiKey: z.string().trim().optional() });
+export const scheduleValidationRequestSchema = z.object({ scheduleCron: z.string().trim().min(1) });
+export const scheduleValidationResultSchema = z.object({ valid: z.boolean(), nextRun: z.string().datetime().optional(), error: z.string().optional() });
 export const createFolderSchema = z.object({ path: z.string().min(1) });
 export const moviePatchSchema = z.object({ titleOverride: z.string().trim().min(1).nullable() });
 export const imdbLookupSchema = z.object({ imdbId: z.string().trim().min(1) });
 export const rematchSchema = z.object({ title: z.string().trim().min(1).optional() });
 export const watchStateSchema = z.object({ watched: z.boolean() });
-export const movieFilterOptionsSchema = z.object({ genres: z.array(z.string()), actors: z.array(z.string()) });
+export const movieFilterOptionsSchema = z.object({
+  genres: z.array(z.string()),
+  actors: z.array(z.string()),
+  resolutions: z.array(z.string()),
+  audioLanguages: z.array(z.string())
+});
 export const shelfNameSchema = z.string().trim().min(1).max(100);
-export const shelfCreateSchema = z.object({ name: shelfNameSchema, movieIds: z.array(z.number().int().positive()).min(1) });
+export const shelfCreateSchema = z.object({ name: shelfNameSchema, movieIds: z.array(z.number().int().positive()).min(0) });
 export const shelfRenameSchema = z.object({ name: shelfNameSchema });
 export const shelfMovieIdsSchema = z.object({ movieIds: z.array(z.number().int().positive()).min(1) });
 export const shelfOrderSchema = z.object({ movieIds: z.array(z.number().int().positive()) });
@@ -129,6 +184,8 @@ export const shelfSummarySchema = z.object({
 export const shelfDetailSchema = shelfSummarySchema.extend({ movies: z.array(movieSchema) });
 
 export type Movie = z.infer<typeof movieSchema>;
+export type MovieListItem = z.infer<typeof movieListItemSchema>;
+export type MovieListPage = z.infer<typeof movieListPageSchema>;
 export type MediaInfo = z.infer<typeof mediaInfoSchema>;
 export type MediaTrack = z.infer<typeof mediaTrackSchema>;
 export type ShelfMembership = z.infer<typeof shelfMembershipSchema>;
@@ -136,6 +193,7 @@ export type Folder = z.infer<typeof folderSchema>;
 export type ScanRun = z.infer<typeof scanRunSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type UpdateSettings = z.infer<typeof updateSettingsSchema>;
+export type ScheduleValidationResult = z.infer<typeof scheduleValidationResultSchema>;
 export type MatchCandidate = z.infer<typeof matchCandidateSchema>;
 export type MovieFilterOptions = z.infer<typeof movieFilterOptionsSchema>;
 export type ShelfCoverMovie = z.infer<typeof shelfCoverMovieSchema>;

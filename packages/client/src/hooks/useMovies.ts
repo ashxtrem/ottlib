@@ -1,11 +1,25 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MatchCandidate, Movie, MovieFilterOptions } from '@ottlib/shared';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import type { MatchCandidate, Movie, MovieFilterOptions, MovieListPage } from '@ottlib/shared';
 import { api } from './apiClient';
 import { useToast } from './useToast';
 
-export function useMovies(filters: { search?: string; watched?: boolean; sort?: string; genre?: string; actor?: string; minRating?: number } = {}) {
-  const params = new URLSearchParams(); if (filters.search) params.set('search', filters.search); if (filters.watched !== undefined) params.set('watched', String(filters.watched)); if (filters.sort) params.set('sort', filters.sort); if (filters.genre) params.set('genre', filters.genre); if (filters.actor) params.set('actor', filters.actor); if (filters.minRating !== undefined) params.set('minRating', String(filters.minRating));
-  return useQuery({ queryKey: ['movies', filters], queryFn: () => api<Movie[]>(`/api/movies${params.size ? `?${params}` : ''}`) });
+export interface MovieFilters { search?: string; watched?: boolean; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean }
+type MovieListData = InfiniteData<MovieListPage, string | undefined>;
+
+function movieParams(filters: MovieFilters, cursor?: string): URLSearchParams {
+  const params = new URLSearchParams(); if (filters.search) params.set('search', filters.search); if (filters.watched !== undefined) params.set('watched', String(filters.watched)); if (filters.sort) params.set('sort', filters.sort); if (filters.genre) params.set('genre', filters.genre); if (filters.actor) params.set('actor', filters.actor); if (filters.quality) params.set('quality', filters.quality); if (filters.audioLanguage) params.set('audioLanguage', filters.audioLanguage); if (filters.minRating !== undefined) params.set('minRating', String(filters.minRating)); if (filters.needsReview) params.set('needsReview', 'true'); if (cursor) params.set('cursor', cursor);
+  return params;
+}
+
+export function useMovies(filters: MovieFilters = {}) {
+  const query = useInfiniteQuery({
+    queryKey: ['movies', filters], initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => { const params = movieParams(filters, pageParam); return api<MovieListPage>(`/api/movies${params.size ? `?${params}` : ''}`); },
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    placeholderData: keepPreviousData
+  });
+  const data = query.data && { items: query.data.pages.flatMap((page) => page.items), total: query.data.pages[0]?.total ?? 0 };
+  return { ...query, data };
 }
 export function useMovieFilterOptions() { return useQuery({ queryKey: ['movie-filter-options'], queryFn: () => api<MovieFilterOptions>('/api/movies/filter-options') }); }
 export function useMovie(id: string | undefined) { return useQuery({ queryKey: ['movie', id], enabled: Boolean(id), queryFn: () => api<Movie>(`/api/movies/${id}`) }); }
@@ -15,7 +29,26 @@ export function useMatchCandidates(id: string | undefined, enabled: boolean) {
 export function useMovieActions() {
   const client = useQueryClient(); const { show } = useToast();
   const refresh = (id?: number) => { client.invalidateQueries({ queryKey: ['movies'] }); client.invalidateQueries({ queryKey: ['movie'] }); client.invalidateQueries({ queryKey: ['movie-filter-options'] }); if (id !== undefined) client.invalidateQueries({ queryKey: ['movie-candidates', String(id)] }); };
-  const watch = useMutation({ mutationFn: ({ id, watched }: { id: number; watched: boolean }) => api(`/api/movies/${id}/watch-state`, { method: 'PUT', body: JSON.stringify({ watched }) }), onSuccess: (_data, variables) => { refresh(); show(variables.watched ? 'Marked as watched.' : 'Marked as unwatched.', 'success'); }, onError: (error) => show(error.message, 'error') });
+  const watch = useMutation({
+    mutationFn: ({ id, watched }: { id: number; watched: boolean; silent?: boolean }) => api<Movie>(`/api/movies/${id}/watch-state`, { method: 'PUT', body: JSON.stringify({ watched }) }),
+    onMutate: async ({ id, watched }) => {
+      await client.cancelQueries({ queryKey: ['movies'] }); await client.cancelQueries({ queryKey: ['movie'] });
+      const previousMovieLists = client.getQueriesData<MovieListData>({ queryKey: ['movies'] }); const previousMovies = client.getQueriesData<Movie>({ queryKey: ['movie'] });
+      client.setQueriesData<MovieListData>({ queryKey: ['movies'] }, (data) => data && ({ ...data, pages: data.pages.map((page) => ({ ...page, items: page.items.map((movie) => movie.id === id ? { ...movie, watched } : movie) })) }));
+      client.setQueriesData<Movie>({ queryKey: ['movie'] }, (movie) => movie?.id === id ? { ...movie, watched } : movie);
+      return { previousMovieLists, previousMovies };
+    },
+    onError: (error, _variables, context) => {
+      context?.previousMovieLists.forEach(([key, data]) => client.setQueryData(key, data)); context?.previousMovies.forEach(([key, data]) => client.setQueryData(key, data)); show(error.message, 'error');
+    },
+    onSuccess: (movie, variables) => {
+      client.setQueriesData<Movie>({ queryKey: ['movie'] }, (current) => current?.id === movie.id ? movie : current);
+      if (!variables.silent) show(variables.watched ? 'Marked as watched.' : 'Marked as unwatched.', 'success', {
+        action: { label: 'Undo', onClick: () => watch.mutate({ id: movie.id, watched: !variables.watched, silent: true }) }
+      });
+    },
+    onSettled: () => { void client.invalidateQueries({ queryKey: ['movies'], refetchType: 'active' }); void client.invalidateQueries({ queryKey: ['movie'], refetchType: 'active' }); }
+  });
   const rematch = useMutation({ mutationFn: ({ id, title }: { id: number; title?: string }) => api<Movie>(`/api/movies/${id}/rematch`, { method: 'POST', body: JSON.stringify({ title }) }), onSuccess: (data, variables) => {
     refresh(variables.id);
     if (data.metadataStatus === 'suggested') show('Found suggestions — pick one below.', 'success');

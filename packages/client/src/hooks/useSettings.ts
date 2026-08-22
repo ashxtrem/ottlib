@@ -8,8 +8,9 @@ export function useFolders() { return useQuery({ queryKey: ['folders'], queryFn:
 export function useSettingsActions() {
   const client = useQueryClient(); const { show } = useToast(); const refresh = () => client.invalidateQueries({ queryKey: ['settings'] });
   const update = useMutation({ mutationFn: (settings: UpdateSettings) => api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }), onSuccess: () => { refresh(); show('Settings saved.', 'success'); }, onError: (error) => show(error.message, 'error') });
+  const testTmdbKey = useMutation({ mutationFn: (tmdbApiKey: string) => api<{ valid: true }>('/api/settings/tmdb/test', { method: 'POST', body: JSON.stringify({ tmdbApiKey }) }), onSuccess: () => show('TMDb key is valid.', 'success'), onError: (error) => show(error.message, 'error') });
   const addFolder = useMutation({ mutationFn: (path: string) => api<Folder>('/api/folders', { method: 'POST', body: JSON.stringify({ path }) }), onSuccess: () => { client.invalidateQueries({ queryKey: ['folders'] }); show('Scan folder added.', 'success'); }, onError: (error) => show(error.message, 'error') });
   const pickFolder = useMutation({ mutationFn: () => api<{ path: string | null }>('/api/folders/select', { method: 'POST' }), onError: (error) => show(error.message, 'error') });
   const removeFolder = useMutation({ mutationFn: (id: number) => api<void>(`/api/folders/${id}`, { method: 'DELETE' }), onSuccess: () => { client.invalidateQueries({ queryKey: ['folders'] }); show('Scan folder removed.', 'success'); }, onError: (error) => show(error.message, 'error') });
-  return { update, addFolder, pickFolder, removeFolder };
+  return { update, testTmdbKey, addFolder, pickFolder, removeFolder };
 }

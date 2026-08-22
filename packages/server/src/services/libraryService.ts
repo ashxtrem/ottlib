@@ -1,4 +1,4 @@
-import type { Movie, ShelfMembership } from '@ottlib/shared';
+import type { Movie, MovieListPage, ShelfMembership } from '@ottlib/shared';
 import { MovieRepository, type MovieListQuery } from '../repositories/movieRepository.js';
 import { ShelfMovieRepository } from '../repositories/shelfMovieRepository.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
@@ -6,8 +6,10 @@ import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
 export class LibraryService {
   public constructor(private readonly movies: MovieRepository, private readonly shelfMovies: ShelfMovieRepository, private readonly mediaTracks: MediaTrackRepository) {}
 
-  public list(deviceId: string | undefined, query: MovieListQuery): Movie[] {
-    return this.withShelves(this.movies.list(deviceId, query));
+  public listSummaries(deviceId: string | undefined, query: MovieListQuery): MovieListPage {
+    const page = this.movies.listSummaries(deviceId, query);
+    const memberships = this.shelfMovies.listMemberships(page.items.map((movie) => movie.id));
+    return { ...page, items: page.items.map((movie) => ({ ...movie, shelves: memberships.get(movie.id) ?? [] as ShelfMembership[] })) };
   }
 
   public get(id: number, deviceId?: string): Movie | undefined {
