@@ -8,6 +8,7 @@ import { ensureImdbId } from './migrations/004_imdb_id.js';
 import { shelvesMigration } from './migrations/005_shelves.js';
 import { ensureMediaProbeSchema } from './migrations/006_media_probe.js';
 import { ensureScanTitlesAdded } from './migrations/007_scan_titles_added.js';
+import { ensureRunKind } from './migrations/008_run_kind.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -22,5 +23,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   db.exec(shelvesMigration);
   ensureMediaProbeSchema(db);
   ensureScanTitlesAdded(db);
+  ensureRunKind(db);
   return db;
 }

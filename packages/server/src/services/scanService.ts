@@ -13,8 +13,8 @@ export class ScanService {
   public constructor(private readonly folders: FolderRepository, private readonly movies: MovieRepository, private readonly runs: ScanRunRepository, private readonly settings: SettingRepository, private readonly matcher: MetadataMatchService, private readonly mediaInfo: MediaInfoService) {}
 
   public start(): ScanRun {
-    const active = this.runs.active(); if (active) return active;
-    const run = this.runs.create(); void this.execute(run.id); return run;
+    const active = this.runs.active('scan'); if (active) return active;
+    const run = this.runs.create('scan'); void this.execute(run.id); return run;
   }
 
   private async execute(runId: number): Promise<void> {

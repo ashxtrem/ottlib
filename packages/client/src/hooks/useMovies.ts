@@ -22,6 +22,7 @@ export function useMovies(filters: MovieFilters = {}) {
   return { ...query, data };
 }
 export function useUnavailableMovieCount() { return useQuery({ queryKey: ['unavailable-movie-count'], queryFn: async () => (await api<MovieListPage>('/api/movies?availability=unavailable&limit=1')).total }); }
+export function useSuggestedMovieCount() { return useQuery({ queryKey: ['suggested-movie-count'], queryFn: async () => (await api<MovieListPage>('/api/movies?needsReview=true&limit=1')).total }); }
 export function useMovieFilterOptions() { return useQuery({ queryKey: ['movie-filter-options'], queryFn: () => api<MovieFilterOptions>('/api/movies/filter-options') }); }
 export function useMovie(id: string | undefined) { return useQuery({ queryKey: ['movie', id], enabled: Boolean(id), queryFn: () => api<Movie>(`/api/movies/${id}`) }); }
 export function useMatchCandidates(id: string | undefined, enabled: boolean) {

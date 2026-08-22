@@ -4,13 +4,13 @@ import type { ScanRun } from '@ottlib/shared';
 export class ScanRunRepository {
   public constructor(private readonly db: Database.Database) {}
 
-  public active(): ScanRun | undefined {
-    const row = this.db.prepare("SELECT * FROM scan_runs WHERE status = 'running' ORDER BY id DESC LIMIT 1").get();
+  public active(kind: ScanRun['kind']): ScanRun | undefined {
+    const row = this.db.prepare("SELECT * FROM scan_runs WHERE kind = ? AND status = 'running' ORDER BY id DESC LIMIT 1").get(kind);
     return row ? this.map(row) : undefined;
   }
 
-  public latest(): ScanRun | undefined {
-    const row = this.db.prepare('SELECT * FROM scan_runs ORDER BY id DESC LIMIT 1').get();
+  public latest(kind: ScanRun['kind']): ScanRun | undefined {
+    const row = this.db.prepare('SELECT * FROM scan_runs WHERE kind = ? ORDER BY id DESC LIMIT 1').get(kind);
     return row ? this.map(row) : undefined;
   }
 
@@ -18,10 +18,10 @@ export class ScanRunRepository {
     this.db.prepare("UPDATE scan_runs SET status = 'failed', finished_at = CURRENT_TIMESTAMP, error_summary = COALESCE(error_summary, 'Scan interrupted by server restart') WHERE status = 'running'").run();
   }
 
-  public list(limit = 20): ScanRun[] { return (this.db.prepare('SELECT * FROM scan_runs ORDER BY id DESC LIMIT ?').all(limit) as any[]).map(this.map); }
+  public list(limit = 20, kind: ScanRun['kind'] = 'scan'): ScanRun[] { return (this.db.prepare('SELECT * FROM scan_runs WHERE kind = ? ORDER BY id DESC LIMIT ?').all(kind, limit) as any[]).map(this.map); }
 
-  public create(): ScanRun {
-    const result = this.db.prepare("INSERT INTO scan_runs (status) VALUES ('running')").run();
+  public create(kind: ScanRun['kind']): ScanRun {
+    const result = this.db.prepare("INSERT INTO scan_runs (kind, status) VALUES (?, 'running')").run(kind);
     return this.get(Number(result.lastInsertRowid))!;
   }
 
@@ -37,7 +37,7 @@ export class ScanRunRepository {
   public get(id: number): ScanRun | undefined { const row = this.db.prepare('SELECT * FROM scan_runs WHERE id = ?').get(id); return row ? this.map(row) : undefined; }
 
   private map = (row: any): ScanRun => ({
-    id: row.id, status: row.status, startedAt: row.started_at, finishedAt: row.finished_at,
+    id: row.id, kind: row.kind ?? 'scan', status: row.status, startedAt: row.started_at, finishedAt: row.finished_at,
     filesFound: row.files_found, filesProcessed: row.files_processed, titlesAdded: row.titles_added, errorSummary: row.error_summary
   });
 }

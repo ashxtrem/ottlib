@@ -5,10 +5,11 @@ import type { MovieRepository } from '../repositories/movieRepository.js';
 import type { SettingRepository } from '../repositories/settingRepository.js';
 import { MetadataMatchService } from './metadataMatchService.js';
 import type { PosterCacheService } from './posterCacheService.js';
+import type { ScanRunRepository } from '../repositories/scanRunRepository.js';
 
 vi.mock('../providers/metadata/metadataProviders.js', () => ({ createMetadataProviders: vi.fn() }));
 
-function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFilename = 'Example.2024.mkv') {
+function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFilename = 'Example.2024.mkv', runs?: ScanRunRepository) {
   const provider: MetadataProvider = {
     name: 'tmdb',
     searchCandidates: vi.fn().mockResolvedValue([{ id: '42', title: 'Example', year: 2024, score, mediaType }]),
@@ -25,7 +26,7 @@ function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFi
   };
   const cache = { cache: vi.fn().mockResolvedValue(null) };
   vi.mocked(createMetadataProviders).mockReturnValue([provider]);
-  const service = new MetadataMatchService(movies as unknown as MovieRepository, { get: vi.fn() } as unknown as SettingRepository, cache as unknown as PosterCacheService);
+  const service = new MetadataMatchService(movies as unknown as MovieRepository, { get: vi.fn() } as unknown as SettingRepository, cache as unknown as PosterCacheService, runs);
   return { service, movies, provider };
 }
 
@@ -74,5 +75,17 @@ describe('MetadataMatchService automatic scan acceptance', () => {
 
     await expect(service.backfillAutoAccept()).resolves.toEqual({ accepted: 1, stillNeedsReview: 1 });
     expect(movies.applyMetadata).toHaveBeenCalledOnce();
+  });
+
+  it('runs the backfill in the background and records individual failures', async () => {
+    const run = { id: 17, kind: 'auto-accept' as const, status: 'running' as const, startedAt: '2026-01-01T00:00:00.000Z', finishedAt: null, filesFound: 0, filesProcessed: 0, titlesAdded: 0, errorSummary: null };
+    const runs = { active: vi.fn(), create: vi.fn().mockReturnValue(run), progress: vi.fn(), finish: vi.fn(), latest: vi.fn() } as unknown as ScanRunRepository;
+    const { service, movies, provider } = createSubject(0.9, 'movie', 'First.mkv', runs);
+    movies.listSuggestedMetadataTargets.mockReturnValue([{ id: 1, title: 'First', year: 2024, rawFilename: 'First.mkv' }, { id: 2, title: 'Second', year: 2024, rawFilename: 'Second.mkv' }]);
+    provider.getDetails = vi.fn().mockRejectedValueOnce(new Error('Temporary provider failure')).mockResolvedValue({ providerId: '42', title: 'Example', year: 2024, overview: 'Overview', posterUrl: null, backdropUrl: null, genres: [], cast: [], rating: null, runtime: null, imdbId: null });
+
+    expect(service.startBackfillAutoAccept()).toEqual(run);
+    await vi.waitFor(() => expect(runs.finish).toHaveBeenCalledWith(17, 'completed', expect.stringContaining('1 title could not be accepted')));
+    expect(runs.progress).toHaveBeenLastCalledWith(17, 2, 2, 1);
   });
 });

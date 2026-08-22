@@ -40,7 +40,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     try { done(null, JSON.parse(text)); } catch (error) { done(error as Error); }
   });
   const movies = new MovieRepository(db); const folders = new FolderRepository(db); const settings = new SettingRepository(db); const watches = new WatchStateRepository(db); const runs = new ScanRunRepository(db); const shelfRecords = new ShelfRepository(db); const shelfMovies = new ShelfMovieRepository(db); const mediaTracks = new MediaTrackRepository(db); runs.failAbandonedRuns();
-  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath));
+  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
   const scanner = new ScanService(folders, movies, runs, settings, metadata, new MediaInfoService(movies, mediaTracks, new MediaProbeService())); const scheduler = new SchedulerService(settings, scanner); const playback = new PlaybackService(movies);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   registerLibraryRoutes(app, movies, watches, metadata, library); registerShelfRoutes(app, shelves); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));

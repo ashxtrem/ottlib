@@ -2,8 +2,10 @@ import type { MetadataCandidate } from '../providers/metadata/MetadataProvider.j
 import type { MatchCandidate } from '@ottlib/shared';
 import { createMetadataProviders } from '../providers/metadata/metadataProviders.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
+import { ScanRunRepository } from '../repositories/scanRunRepository.js';
 import { SettingRepository } from '../repositories/settingRepository.js';
 import { PosterCacheService } from './posterCacheService.js';
+import type { ScanRun } from '@ottlib/shared';
 
 export const autoAcceptScoreThreshold = 0.75;
 
@@ -14,6 +16,10 @@ export function extractImdbId(input: string): string | null {
 
 export type AcceptOptions = { season?: number; episode?: number };
 export type SuggestOptions = { autoAccept?: boolean };
+type AutoAcceptOutcome = { accepted: true } | { accepted: false; error?: string };
+type SuggestedTarget = { id: number; title: string; rawFilename: string };
+
+const autoAcceptConcurrency = 4;
 
 function detectSeasonEpisode(filename: string): AcceptOptions | null {
   const match = filename.match(/s(\d{1,2})[\s._-]?e(\d{1,3})/i) ?? filename.match(/\b(\d{1,2})x(\d{2,3})\b/i) ?? filename.match(/season\s?(\d{1,2})\s?episode\s?(\d{1,3})/i);
@@ -21,7 +27,7 @@ function detectSeasonEpisode(filename: string): AcceptOptions | null {
 }
 
 export class MetadataMatchService {
-  public constructor(private readonly movies: MovieRepository, private readonly settings: SettingRepository, private readonly cache: PosterCacheService) {}
+  public constructor(private readonly movies: MovieRepository, private readonly settings: SettingRepository, private readonly cache: PosterCacheService, private readonly runs?: ScanRunRepository) {}
 
   public async suggest(movieId: number, searchTitle?: string, options: SuggestOptions = {}): Promise<void> {
     const target = this.movies.metadataTarget(movieId); if (!target) return;
@@ -43,16 +49,53 @@ export class MetadataMatchService {
   }
 
   public countAutoAcceptableSuggestions(): number {
-    return this.movies.listSuggestedMetadataTargets().filter((target) => this.autoAcceptCandidate(target.id, target.rawFilename) !== undefined).length;
+    return this.autoAcceptTargets().length;
+  }
+
+  public startBackfillAutoAccept(): ScanRun {
+    if (!this.runs) throw new Error('Auto-accept runs are unavailable');
+    const active = this.runs.active('auto-accept'); if (active) return active;
+    const targets = this.autoAcceptTargets(); const run = this.runs.create('auto-accept');
+    this.runs.progress(run.id, targets.length, 0, 0); void this.executeBackfill(run.id, targets); return run;
+  }
+
+  public backfillAutoAcceptStatus(): ScanRun | { status: 'idle' } {
+    if (!this.runs) return { status: 'idle' };
+    return this.runs.active('auto-accept') ?? this.runs.latest('auto-accept') ?? { status: 'idle' };
   }
 
   public async backfillAutoAccept(): Promise<{ accepted: number; stillNeedsReview: number }> {
-    const targets = this.movies.listSuggestedMetadataTargets();
-    let accepted = 0;
-    for (const target of targets) {
-      if (await this.autoAcceptTopCandidate(target.id, target.rawFilename)) accepted += 1;
-    }
+    const { accepted } = await this.acceptTargets(this.autoAcceptTargets());
     return { accepted, stillNeedsReview: this.movies.countSuggestedMetadataTargets() };
+  }
+
+  private autoAcceptTargets(): SuggestedTarget[] {
+    return this.movies.listSuggestedMetadataTargets().filter((target) => this.autoAcceptCandidate(target.id, target.rawFilename) !== undefined);
+  }
+
+  private async executeBackfill(runId: number, targets: SuggestedTarget[]): Promise<void> {
+    if (!this.runs) return;
+    try {
+      const { failures } = await this.acceptTargets(targets, (processed, acceptedCount) => this.runs?.progress(runId, targets.length, processed, acceptedCount));
+      const summary = failures.length ? `${failures.length} ${failures.length === 1 ? 'title could' : 'titles could'} not be accepted.\n${failures.slice(0, 5).join('\n')}` : null;
+      this.runs.finish(runId, 'completed', summary);
+    } catch (error) {
+      this.runs.finish(runId, 'failed', error instanceof Error ? error.message : 'Automatic acceptance failed');
+    }
+  }
+
+  private async acceptTargets(targets: SuggestedTarget[], onProgress?: (processed: number, accepted: number) => void): Promise<{ accepted: number; failures: string[] }> {
+    let next = 0; let processed = 0; let accepted = 0; const failures: string[] = [];
+    const worker = async () => {
+      while (next < targets.length) {
+        const target = targets[next++]; const result = await this.autoAcceptTopCandidate(target.id, target.rawFilename);
+        if (result.accepted) accepted += 1;
+        else if (result.error) failures.push(`${target.title}: ${result.error}`);
+        processed += 1; onProgress?.(processed, accepted);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(autoAcceptConcurrency, targets.length) }, worker));
+    return { accepted, failures };
   }
 
   private autoAcceptCandidate(movieId: number, rawFilename: string) {
@@ -63,10 +106,14 @@ export class MetadataMatchService {
     return { candidate, episode: episode ?? {} };
   }
 
-  private async autoAcceptTopCandidate(movieId: number, rawFilename: string): Promise<boolean> {
-    const match = this.autoAcceptCandidate(movieId, rawFilename); if (!match) return false;
-    try { return await this.accept(movieId, match.candidate.id, match.episode) === 'ok'; }
-    catch { return false; /* Keep saved suggestions available for review if automatic acceptance cannot complete. */ }
+  private async autoAcceptTopCandidate(movieId: number, rawFilename: string): Promise<AutoAcceptOutcome> {
+    const match = this.autoAcceptCandidate(movieId, rawFilename); if (!match) return { accepted: false };
+    try {
+      const result = await this.accept(movieId, match.candidate.id, match.episode);
+      return result === 'ok' ? { accepted: true } : { accepted: false, error: 'Saved candidate is no longer available' };
+    } catch (error) {
+      return { accepted: false, error: error instanceof Error ? error.message : 'Metadata lookup failed' };
+    }
   }
 
   public async accept(movieId: number, candidateId: number, options: AcceptOptions = {}): Promise<'ok' | 'not-found' | 'needs-episode'> {
