@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { api } from '../hooks/apiClient';
 import { useIsLocalClient } from '../hooks/useIsLocalClient';
 import { useToast } from '../hooks/useToast';
+import { focusRing, pressable } from './interactionStyles';
 
-const buttonClassName = 'inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground transition-colors hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60';
+const buttonClassName = `inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground transition-[background-color,transform] duration-fast ease-emphasis hover:bg-surface-raised ${focusRing} ${pressable} disabled:cursor-not-allowed disabled:opacity-60`;
 
 export function RevealInFolderButton({ movieId }: { movieId: number }) {
   const [error, setError] = useState<string>();

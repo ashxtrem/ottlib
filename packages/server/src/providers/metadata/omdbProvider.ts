@@ -19,7 +19,8 @@ export class OmdbProvider implements MetadataProvider {
 
   public async getDetails(providerId: string): Promise<MovieMetadata | null> {
     const response = await fetch(`https://www.omdbapi.com/?${new URLSearchParams({ apikey: this.apiKey, i: providerId, plot: 'full' })}`, { signal: AbortSignal.timeout(externalRequestTimeoutMs) });
-    if (!response.ok) return null; const item = await response.json() as any; if (item.Response === 'False') return null;
+    const item = await response.json() as any;
+    if (!response.ok || item.Response === 'False') throw new Error(`OMDb metadata lookup failed (${response.status}): ${item.Error ?? 'Unknown provider error'}`);
     return { providerId, title: item.Title, year: Number.parseInt(item.Year, 10) || null, overview: item.Plot === 'N/A' ? null : item.Plot,
       posterUrl: item.Poster === 'N/A' ? null : item.Poster, backdropUrl: null, genres: item.Genre === 'N/A' ? [] : item.Genre.split(', '),
       cast: item.Actors === 'N/A' ? [] : item.Actors.split(', '), rating: Number.parseFloat(item.imdbRating) || null, runtime: Number.parseInt(item.Runtime, 10) || null,
@@ -36,7 +37,12 @@ export class OmdbProvider implements MetadataProvider {
 
   public async getByImdbId(imdbId: string): Promise<MetadataCandidate | null> {
     const response = await fetch(`https://www.omdbapi.com/?${new URLSearchParams({ apikey: this.apiKey, i: imdbId })}`, { signal: AbortSignal.timeout(externalRequestTimeoutMs) });
-    if (!response.ok) return null; const item = await response.json() as any; if (item.Response === 'False') return null;
+    const item = await response.json() as any;
+    if (!response.ok || item.Response === 'False') throw new Error(`OMDb IMDb lookup failed (${response.status}): ${item.Error ?? 'Unknown provider error'}`);
+    if (item.Type === 'episode' && item.seriesID && item.Season && item.Episode) {
+      const show = await this.getDetails(item.seriesID);
+      if (show) return { id: item.seriesID, title: show.title, year: show.year, score: 1, mediaType: 'tv', season: Number(item.Season), episode: Number(item.Episode) };
+    }
     return { id: imdbId, title: item.Title, year: Number.parseInt(item.Year, 10) || null, score: 1, mediaType: item.Type === 'series' ? 'tv' : 'movie' };
   }
 }

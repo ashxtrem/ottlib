@@ -6,7 +6,7 @@ const callbacks = { onSearchChange: vi.fn(), onAvailabilityChange: vi.fn(), onGe
 
 describe('LibraryFilters', () => {
   it('counts every non-default filter', () => {
-    expect(countActiveFilters({ search: 'Arrival', availability: 'unavailable', genre: 'Sci-Fi', actor: '', quality: '4K', audioLanguage: 'hin', minRating: 8, watched: false, sort: 'year', needsReview: true })).toBe(8);
+    expect(countActiveFilters({ search: 'Arrival', availability: 'unavailable', mediaType: 'tv', genre: 'Sci-Fi', actor: '', quality: '4K', audioLanguage: 'hin', minRating: 8, watched: false, sort: 'year', needsReview: true })).toBe(9);
   });
 
   it('renders only search and the filter trigger by default', () => {

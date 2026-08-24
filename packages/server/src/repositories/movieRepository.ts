@@ -2,24 +2,26 @@ import type Database from 'better-sqlite3';
 import { formatResolution, type MatchCandidate, type MediaInfo, type Movie, type MovieListItem, type MovieListPage } from '@ottlib/shared';
 
 interface MovieRow {
-  id: number; canonical_path: string; folder_path: string; raw_filename: string; parsed_title: string; parsed_year: number | null;
+  id: number; canonical_path: string; folder_path: string; raw_filename: string; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null;
   title_override: string | null; overview: string | null; poster_file: string | null; backdrop_file: string | null;
   genres_json: string; cast_json: string; rating: number | null; runtime: number | null; metadata_status: Movie['metadataStatus'];
   metadata_source: string | null; imdb_id: string | null; missing: number; added_at: string; watched: number;
+  metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; size: number;
   media_probe_status: string; container_format: string | null; duration_ms: number | null; video_width: number | null; video_height: number | null;
   video_codec: string | null; video_profile: string | null; video_bit_rate: number | null; hdr_format: string | null;
 }
 
 interface MovieListItemRow {
-  id: number; parsed_title: string; parsed_year: number | null; title_override: string | null; poster_file: string | null;
+  id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
 }
 
 export interface ScannedMovie { folderId: number; path: string; filename: string; title: string; year: number | null; size: number; mtimeMs: number; seenAt: string }
 export type ProbedMediaInfo = Omit<MediaInfo, 'tracks'>;
 export interface PlaybackMovie { id: number; path: string; folderPath: string; filename: string; missing: boolean }
-export interface MetadataTarget { id: number; title: string; year: number | null; rawFilename: string }
-export interface MovieListQuery { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; cursor?: string; limit?: number }
+export interface TorrentMovieMatch { id: number; missing: boolean }
+export interface MetadataTarget { id: number; title: string; year: number | null; rawFilename: string; metadataSource: string | null; providerId: string | null; mediaType: 'movie' | 'tv' | null; imdbId: string | null }
+export interface MovieListQuery { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; mediaType?: 'movie' | 'tv'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; cursor?: string; limit?: number }
 export interface MovieFilterOptions { genres: string[]; actors: string[]; resolutions: string[]; audioLanguages: string[] }
 
 type MovieSort = 'title' | 'year' | 'added' | 'quality';
@@ -92,18 +94,64 @@ export class MovieRepository {
     return row && { id: row.id, path: row.canonical_path, folderPath: row.folder_path, filename: row.raw_filename, missing: Boolean(row.missing) };
   }
 
+  public findForTorrentMatch(title: string, year: number | null): TorrentMovieMatch | undefined {
+    const sql = year === null
+      ? `SELECT id, missing FROM movies WHERE LOWER(TRIM(COALESCE(title_override, metadata_title, parsed_title))) = LOWER(TRIM(?)) ORDER BY missing ASC, id ASC LIMIT 1`
+      : `SELECT id, missing FROM movies WHERE LOWER(TRIM(COALESCE(title_override, metadata_title, parsed_title))) = LOWER(TRIM(?) ) AND COALESCE(metadata_year, parsed_year) = ? ORDER BY missing ASC, id ASC LIMIT 1`;
+    const row = this.db.prepare(sql).get(...(year === null ? [title] : [title, year])) as TorrentMovieMatch | undefined;
+    return row ? { ...row, missing: Boolean(row.missing) } : undefined;
+  }
+
+  public findDuplicateIds(id: number): number[] {
+    const anchor = this.db.prepare(`SELECT imdb_id, metadata_media_type, season, episode,
+      COALESCE(title_override, metadata_title, parsed_title) AS title, COALESCE(metadata_year, parsed_year) AS year
+      FROM movies WHERE id = ?`).get(id) as { imdb_id: string | null; metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; title: string; year: number | null } | undefined;
+    if (!anchor) return [];
+
+    if (anchor.imdb_id?.trim()) {
+      const episodeClause = anchor.metadata_media_type === 'tv' && anchor.season !== null && anchor.episode !== null
+        ? ' AND season = ? AND episode = ?' : '';
+      const rows = this.db.prepare(`SELECT id FROM movies WHERE imdb_id = ? AND missing = 0 AND id != ?${episodeClause} ORDER BY id`).all(
+        anchor.imdb_id, id, ...(episodeClause ? [anchor.season, anchor.episode] : [])
+      ) as Array<{ id: number }>;
+      return rows.map((row) => row.id);
+    }
+
+    const yearClause = anchor.year === null ? ' AND COALESCE(metadata_year, parsed_year) IS NULL' : ' AND COALESCE(metadata_year, parsed_year) = ?';
+    const rows = this.db.prepare(`SELECT id FROM movies WHERE LOWER(TRIM(COALESCE(title_override, metadata_title, parsed_title))) = LOWER(TRIM(?))${yearClause}
+      AND missing = 0 AND id != ? ORDER BY id`).all(anchor.title, ...(anchor.year === null ? [] : [anchor.year]), id) as Array<{ id: number }>;
+    return rows.map((row) => row.id);
+  }
+
   public metadataTarget(id: number): MetadataTarget | undefined {
-    const row = this.db.prepare('SELECT id, COALESCE(title_override, parsed_title) AS title, parsed_year, raw_filename FROM movies WHERE id = ?').get(id) as any;
-    return row && { id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename };
+    const row = this.db.prepare('SELECT id, COALESCE(title_override, parsed_title) AS title, parsed_year, raw_filename, metadata_source, provider_id, metadata_media_type, imdb_id FROM movies WHERE id = ?').get(id) as any;
+    return row && { id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename, metadataSource: row.metadata_source, providerId: row.provider_id, mediaType: row.metadata_media_type, imdbId: row.imdb_id };
   }
 
   public listSuggestedMetadataTargets(): MetadataTarget[] {
-    const rows = this.db.prepare("SELECT id, COALESCE(title_override, parsed_title) AS title, parsed_year, raw_filename FROM movies WHERE metadata_status = 'suggested'").all() as any[];
-    return rows.map((row) => ({ id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename }));
+    const rows = this.db.prepare("SELECT id, COALESCE(title_override, parsed_title) AS title, parsed_year, raw_filename, metadata_source, provider_id, metadata_media_type, imdb_id FROM movies WHERE metadata_status = 'suggested'").all() as any[];
+    return rows.map((row) => ({ id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename, metadataSource: row.metadata_source, providerId: row.provider_id, mediaType: row.metadata_media_type, imdbId: row.imdb_id }));
   }
 
   public countSuggestedMetadataTargets(): number {
     return (this.db.prepare("SELECT COUNT(*) AS count FROM movies WHERE metadata_status = 'suggested'").get() as { count: number }).count;
+  }
+
+  public listMetadataRefreshTargets(ids?: number[]): MetadataTarget[] {
+    const idClause = ids?.length ? ` AND id IN (${ids.map(() => '?').join(', ')})` : '';
+    const rows = this.db.prepare(`SELECT id, COALESCE(title_override, parsed_title) AS title, parsed_year, raw_filename, metadata_source, provider_id, metadata_media_type, imdb_id FROM movies WHERE missing = 0${idClause}`).all(...(ids ?? [])) as any[];
+    return rows.map((row) => ({ id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename, metadataSource: row.metadata_source, providerId: row.provider_id, mediaType: row.metadata_media_type, imdbId: row.imdb_id }));
+  }
+
+  public listMatchedWithoutMediaType(): MetadataTarget[] {
+    const rows = this.db.prepare(`SELECT id, COALESCE(title_override, parsed_title) AS title, parsed_year, raw_filename, metadata_source, provider_id, metadata_media_type, imdb_id FROM movies
+      WHERE missing = 0 AND metadata_status = 'matched' AND metadata_media_type IS NULL
+      AND (imdb_id IS NOT NULL OR (metadata_source IS NOT NULL AND provider_id IS NOT NULL))`).all() as any[];
+    return rows.map((row) => ({ id: row.id, title: row.title, year: row.parsed_year, rawFilename: row.raw_filename, metadataSource: row.metadata_source, providerId: row.provider_id, mediaType: row.metadata_media_type, imdbId: row.imdb_id }));
+  }
+
+  public setMetadataMediaType(id: number, mediaType: 'movie' | 'tv'): void {
+    this.db.prepare('UPDATE movies SET metadata_media_type = ? WHERE id = ?').run(mediaType, id);
   }
 
   public upsertScanned(movie: ScannedMovie): { id: number; inserted: boolean; needsMatch: boolean; needsProbe: boolean } {
@@ -112,8 +160,9 @@ export class MovieRepository {
     this.db.prepare(`INSERT INTO movies (folder_id, canonical_path, raw_filename, parsed_title, parsed_year, size, mtime_ms, last_seen_at, metadata_status, missing)
       VALUES (@folderId, @path, @filename, @title, @year, @size, @mtimeMs, @seenAt, 'pending', 0)
       ON CONFLICT(canonical_path) DO UPDATE SET folder_id = excluded.folder_id, raw_filename = excluded.raw_filename,
-      parsed_title = CASE WHEN movies.metadata_status = 'matched' THEN movies.parsed_title ELSE excluded.parsed_title END,
-      parsed_year = CASE WHEN movies.metadata_status = 'matched' THEN movies.parsed_year ELSE excluded.parsed_year END,
+      parsed_title = excluded.parsed_title, parsed_year = excluded.parsed_year,
+      metadata_title = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.metadata_title END,
+      metadata_year = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.metadata_year END,
       size = excluded.size, mtime_ms = excluded.mtime_ms,
       last_seen_at = excluded.last_seen_at, missing = 0,
       metadata_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.metadata_status END,
@@ -153,42 +202,46 @@ export class MovieRepository {
     this.clearCandidates(id);
   }
 
-  public saveCandidates(movieId: number, candidates: Array<{ provider: string; providerId: string; title: string; year: number | null; score: number; mediaType: 'movie' | 'tv' }>): void {
+  public saveCandidates(movieId: number, candidates: Array<{ provider: string; providerId: string; title: string; year: number | null; score: number; mediaType: 'movie' | 'tv'; season?: number; episode?: number }>): void {
     const insert = this.db.transaction((rows: typeof candidates) => {
       this.db.prepare('DELETE FROM movie_match_candidates WHERE movie_id = ?').run(movieId);
-      const stmt = this.db.prepare('INSERT INTO movie_match_candidates (movie_id, provider, provider_id, title, year, score, media_type, rank) VALUES (@movieId, @provider, @providerId, @title, @year, @score, @mediaType, @rank)');
-      rows.forEach((row, index) => stmt.run({ ...row, movieId, rank: index }));
-      this.db.prepare("UPDATE movies SET metadata_status = 'suggested', metadata_error = NULL WHERE id = ?").run(movieId);
+      const stmt = this.db.prepare('INSERT INTO movie_match_candidates (movie_id, provider, provider_id, title, year, score, media_type, season, episode, rank) VALUES (@movieId, @provider, @providerId, @title, @year, @score, @mediaType, @season, @episode, @rank)');
+      rows.forEach((row, index) => stmt.run({ ...row, season: row.season ?? null, episode: row.episode ?? null, movieId, rank: index }));
+      const topMatch = rows[0];
+      this.db.prepare("UPDATE movies SET metadata_title = ?, metadata_year = ?, metadata_status = 'suggested', metadata_error = NULL WHERE id = ?").run(topMatch.title, topMatch.year, movieId);
     });
     insert(candidates);
   }
 
   public getCandidates(movieId: number): MatchCandidate[] {
-    const rows = this.db.prepare('SELECT id, provider, provider_id AS providerId, title, year, score, media_type AS mediaType FROM movie_match_candidates WHERE movie_id = ? ORDER BY rank').all(movieId) as MatchCandidate[];
-    return rows;
+    const rows = this.db.prepare('SELECT id, provider, provider_id AS providerId, title, year, score, media_type AS mediaType, season, episode FROM movie_match_candidates WHERE movie_id = ? ORDER BY rank').all(movieId) as MatchCandidate[];
+    return rows.map((row) => ({ ...row, season: row.season ?? undefined, episode: row.episode ?? undefined }));
   }
 
-  public getCandidate(movieId: number, candidateId: number): { provider: string; providerId: string; mediaType: 'movie' | 'tv' } | undefined {
-    const row = this.db.prepare('SELECT provider, provider_id AS providerId, media_type AS mediaType FROM movie_match_candidates WHERE movie_id = ? AND id = ?').get(movieId, candidateId) as any;
-    return row;
+  public getCandidate(movieId: number, candidateId: number): { provider: string; providerId: string; mediaType: 'movie' | 'tv'; season?: number; episode?: number } | undefined {
+    const row = this.db.prepare('SELECT provider, provider_id AS providerId, media_type AS mediaType, season, episode FROM movie_match_candidates WHERE movie_id = ? AND id = ?').get(movieId, candidateId) as any;
+    return row && { ...row, season: row.season ?? undefined, episode: row.episode ?? undefined };
   }
 
   public clearCandidates(movieId: number): void {
     this.db.prepare('DELETE FROM movie_match_candidates WHERE movie_id = ?').run(movieId);
   }
 
-  public applyMetadata(id: number, metadata: { source: string; providerId: string; title: string; year: number | null; overview: string | null; posterFile: string | null; backdropFile: string | null; genres: string[]; cast: string[]; rating: number | null; runtime: number | null; imdbId: string | null }): void {
-    const apply = this.db.transaction((values: typeof metadata & { id: number }) => {
+  public applyMetadata(id: number, metadata: { source: string; providerId: string; mediaType?: 'movie' | 'tv'; season?: number | null; episode?: number | null; title: string; year: number | null; overview: string | null; posterFile: string | null; backdropFile: string | null; genres: string[]; cast: string[]; rating: number | null; runtime: number | null; imdbId: string | null }): void {
+    const apply = this.db.transaction((values: Omit<typeof metadata, 'mediaType'> & { mediaType: 'movie' | 'tv' | null; id: number }) => {
       this.db.prepare(`UPDATE movies SET metadata_status = 'matched', metadata_source = @source, provider_id = @providerId,
-      parsed_title = @title, parsed_year = @year, overview = @overview, poster_file = @posterFile, backdrop_file = @backdropFile,
+      metadata_media_type = COALESCE(@mediaType, metadata_media_type), season = @season, episode = @episode, metadata_title = @title, metadata_year = @year, overview = @overview, poster_file = @posterFile, backdrop_file = @backdropFile,
       genres_json = @genres, cast_json = @cast, rating = @rating, runtime = @runtime, imdb_id = @imdbId, matched_at = CURRENT_TIMESTAMP, metadata_error = NULL WHERE id = @id`).run({ ...values, genres: JSON.stringify(values.genres), cast: JSON.stringify(values.cast) });
       this.db.prepare('DELETE FROM movie_match_candidates WHERE movie_id = ?').run(values.id);
     });
-    apply({ ...metadata, id });
+    apply({ ...metadata, mediaType: metadata.mediaType ?? null, season: metadata.season ?? null, episode: metadata.episode ?? null, id });
   }
 
   public markUnmatched(id: number, error: string | null = null): void {
-    this.db.prepare("UPDATE movies SET metadata_status = ?, metadata_error = ? WHERE id = ?").run(error ? 'error' : 'unmatched', error, id);
+    this.db.prepare(error
+      ? "UPDATE movies SET metadata_status = 'error', metadata_error = ? WHERE id = ?"
+      : "UPDATE movies SET metadata_status = 'unmatched', metadata_title = NULL, metadata_year = NULL, metadata_error = NULL WHERE id = ?"
+    ).run(...(error ? [error, id] : [id]));
     this.clearCandidates(id);
   }
 
@@ -198,16 +251,17 @@ export class MovieRepository {
   }
 
   private summarySelectSql(): string {
-    return `SELECT m.id, m.parsed_title, m.parsed_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
+    return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
       m.missing, m.video_height, m.hdr_format, COALESCE(ws.watched, 0) AS watched FROM movies m LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = ?`;
   }
 
   private filters(query: MovieListQuery): { clauses: string[]; values: unknown[] } {
     const clauses = ['1 = 1']; const values: unknown[] = [];
     if (query.availability) { clauses.push('m.missing = ?'); values.push(Number(query.availability === 'unavailable')); }
+    if (query.mediaType) { clauses.push('m.metadata_media_type = ?'); values.push(query.mediaType); }
     if (query.search?.trim()) {
       const search = query.search.trim().toLowerCase(); const imdbId = search.match(/tt\d{5,}/)?.[0] ?? search;
-      clauses.push('(LOWER(COALESCE(m.title_override, m.parsed_title)) LIKE ? OR LOWER(m.imdb_id) LIKE ?)'); values.push(`%${search}%`, `%${imdbId}%`);
+      clauses.push('(LOWER(COALESCE(m.title_override, m.metadata_title, m.parsed_title)) LIKE ? OR LOWER(m.imdb_id) LIKE ?)'); values.push(`%${search}%`, `%${imdbId}%`);
     }
     if (query.watched !== undefined) { clauses.push('COALESCE(ws.watched, 0) = ?'); values.push(Number(query.watched)); }
     if (query.genre) { clauses.push('EXISTS (SELECT 1 FROM json_each(m.genres_json) WHERE LOWER(value) LIKE ?)'); values.push(`%${query.genre.toLowerCase()}%`); }
@@ -220,10 +274,10 @@ export class MovieRepository {
   }
 
   private sort(value: string | undefined): { name: MovieSort; orderBy: string } {
-    if (value === 'year') return { name: 'year', orderBy: 'm.parsed_year DESC, COALESCE(m.title_override, m.parsed_title) COLLATE NOCASE ASC, m.id ASC' };
+    if (value === 'year') return { name: 'year', orderBy: 'COALESCE(m.metadata_year, m.parsed_year) DESC, COALESCE(m.title_override, m.metadata_title, m.parsed_title) COLLATE NOCASE ASC, m.id ASC' };
     if (value === 'added') return { name: 'added', orderBy: 'm.added_at DESC, m.id DESC' };
-    if (value === 'quality') return { name: 'quality', orderBy: 'm.video_height DESC, COALESCE(m.title_override, m.parsed_title) COLLATE NOCASE ASC, m.id ASC' };
-    return { name: 'title', orderBy: 'COALESCE(m.title_override, m.parsed_title) COLLATE NOCASE ASC, m.id ASC' };
+    if (value === 'quality') return { name: 'quality', orderBy: 'm.video_height DESC, COALESCE(m.title_override, m.metadata_title, m.parsed_title) COLLATE NOCASE ASC, m.id ASC' };
+    return { name: 'title', orderBy: 'COALESCE(m.title_override, m.metadata_title, m.parsed_title) COLLATE NOCASE ASC, m.id ASC' };
   }
 
   private addQualityClause(clauses: string[], values: unknown[], quality: string): void {
@@ -244,7 +298,8 @@ export class MovieRepository {
   }
 
   private addCursorClause(clauses: string[], values: unknown[], cursor: MovieListCursor): void {
-    const title = 'COALESCE(m.title_override, m.parsed_title)';
+    const title = 'COALESCE(m.title_override, m.metadata_title, m.parsed_title)';
+    const year = 'COALESCE(m.metadata_year, m.parsed_year)';
     if (cursor.sort === 'title') {
       clauses.push(`(${title} COLLATE NOCASE > ? COLLATE NOCASE OR (${title} COLLATE NOCASE = ? COLLATE NOCASE AND m.id > ?))`);
       values.push(cursor.title, cursor.title, cursor.id); return;
@@ -261,10 +316,10 @@ export class MovieRepository {
       values.push(cursor.height, cursor.height, cursor.title, cursor.title, cursor.id); return;
     }
     if (cursor.year === null) {
-      clauses.push(`m.parsed_year IS NULL AND (${title} COLLATE NOCASE > ? COLLATE NOCASE OR (${title} COLLATE NOCASE = ? COLLATE NOCASE AND m.id > ?))`);
+      clauses.push(`${year} IS NULL AND (${title} COLLATE NOCASE > ? COLLATE NOCASE OR (${title} COLLATE NOCASE = ? COLLATE NOCASE AND m.id > ?))`);
       values.push(cursor.title, cursor.title, cursor.id); return;
     }
-    clauses.push(`(m.parsed_year IS NULL OR m.parsed_year < ? OR (m.parsed_year = ? AND (${title} COLLATE NOCASE > ? COLLATE NOCASE OR (${title} COLLATE NOCASE = ? COLLATE NOCASE AND m.id > ?))))`);
+    clauses.push(`(${year} IS NULL OR ${year} < ? OR (${year} = ? AND (${title} COLLATE NOCASE > ? COLLATE NOCASE OR (${title} COLLATE NOCASE = ? COLLATE NOCASE AND m.id > ?))))`);
     values.push(cursor.year, cursor.year, cursor.title, cursor.title, cursor.id);
   }
 
@@ -282,17 +337,17 @@ export class MovieRepository {
   }
 
   private encodeCursor(sort: MovieSort, row: MovieListItemRow): string {
-    const title = row.title_override ?? row.parsed_title;
-    const cursor: MovieListCursor = sort === 'title' ? { sort, title, id: row.id } : sort === 'year' ? { sort, year: row.parsed_year, title, id: row.id } : sort === 'added' ? { sort, addedAt: row.added_at, id: row.id } : { sort, height: row.video_height, title, id: row.id };
+    const title = row.title_override ?? row.metadata_title ?? row.parsed_title;
+    const cursor: MovieListCursor = sort === 'title' ? { sort, title, id: row.id } : sort === 'year' ? { sort, year: row.metadata_year ?? row.parsed_year, title, id: row.id } : sort === 'added' ? { sort, addedAt: row.added_at, id: row.id } : { sort, height: row.video_height, title, id: row.id };
     return Buffer.from(JSON.stringify(cursor)).toString('base64url');
   }
 
   private map = (row: MovieRow): Movie => ({
-    id: row.id, title: row.title_override ?? row.parsed_title, year: row.parsed_year, rawFilename: row.raw_filename, filePath: row.canonical_path,
+    id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year, rawFilename: row.raw_filename, filePath: row.canonical_path,
     titleOverride: row.title_override, overview: row.overview, posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     backdropUrl: row.backdrop_file ? `/media/backdrops/${encodeURIComponent(row.backdrop_file)}` : null,
     genres: JSON.parse(row.genres_json), cast: JSON.parse(row.cast_json), rating: row.rating, runtime: row.runtime,
-    imdbId: row.imdb_id, metadataStatus: row.metadata_status, metadataSource: row.metadata_source,
+    imdbId: row.imdb_id, metadataStatus: row.metadata_status, metadataSource: row.metadata_source, mediaType: row.metadata_media_type, season: row.season, episode: row.episode, fileSizeBytes: row.size,
     mediaInfo: row.media_probe_status === 'completed' ? {
       container: row.container_format, durationMs: row.duration_ms, width: row.video_width, height: row.video_height,
       videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: []
@@ -301,7 +356,7 @@ export class MovieRepository {
   });
 
   private mapListItem = (row: MovieListItemRow): MovieListItem => ({
-    id: row.id, title: row.title_override ?? row.parsed_title, year: row.parsed_year,
+    id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format,
     watched: Boolean(row.watched), missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []

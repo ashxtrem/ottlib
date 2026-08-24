@@ -31,6 +31,14 @@ import { registerScanRoutes } from './routes/scan.js';
 import { registerSettingsRoutes } from './routes/settings.js';
 import { registerStreamRoutes } from './routes/stream.js';
 import { registerShelfRoutes } from './routes/shelves.js';
+import { registerTorrentRoutes } from './routes/torrents.js';
+import { QbittorrentClient } from './providers/torrent/qbittorrentClient.js';
+import { QbittorrentSearch } from './providers/torrent/qbittorrentSearch.js';
+import { QbittorrentTorrents } from './providers/torrent/qbittorrentTorrents.js';
+import { TorrentSearchService } from './services/torrentSearchService.js';
+import { TorrentHandoffService } from './services/torrentHandoffService.js';
+import { TorrentConnectionService } from './services/torrentConnectionService.js';
+import { TorrentDownloadService } from './services/torrentDownloadService.js';
 
 export function buildApp(db: Database.Database, appDataPath: string, port: number) {
   const app = Fastify({ logger: true, trustProxy: false });
@@ -43,8 +51,10 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
   const scanner = new ScanService(folders, movies, runs, settings, metadata, new MediaInfoService(movies, mediaTracks, new MediaProbeService())); const scheduler = new SchedulerService(settings, scanner); const playback = new PlaybackService(movies);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
+  const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
   registerLibraryRoutes(app, movies, watches, metadata, library); registerShelfRoutes(app, shelves); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback);
+  registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads);
   app.get('/api/server-info', async () => new ServerInfoService(port).get());
   app.register(fastifyStatic, { root: appDataPath, prefix: '/media/', decorateReply: false });
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');
@@ -52,7 +62,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     app.register(fastifyStatic, { root: clientDist, prefix: '/' });
     app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
-  scheduler.refresh(); app.addHook('onClose', () => scheduler.stop());
+  scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
   app.setErrorHandler((error, _request, reply) => reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }

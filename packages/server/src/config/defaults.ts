@@ -1,9 +1,22 @@
 export const defaultExtensions = ['mp4', 'mkv', 'avi', 'mov', 'm4v', 'wmv', 'flv', 'webm'];
 export const defaultIgnoredPatterns = ['.git', '@eaDir', 'sample', 'samples', 'extra', 'extras'];
 export const externalRequestTimeoutMs = 15_000;
+export const releaseQualityTagPatterns = {
+  resolution: /\b(?:2160p|4k|1440p|1080p|720p|480p)\b/i,
+  source: /\b(?:blu[ -]?ray|brrip|web[ .-]?dl|webrip|hdtv|dvdrip|remux|hdrip)\b/i,
+  codec: /\b(?:x265|hevc|h\.?(?:265)|x264|h\.?(?:264)|av1|xvid)\b/i
+} as const;
+export const releaseTags = new RegExp(`${releaseQualityTagPatterns.resolution.source}|${releaseQualityTagPatterns.source.source}|${releaseQualityTagPatterns.codec.source}|\\b(?:aac|dts|atmos|truehd|dual[ .-]?audio|multi|proper|repack|extended|unrated|limited)\\b`, 'gi');
+export const episodeTags = /\b(?:s\d{1,2}\s?e\d{1,3}|\d{1,2}x\d{2,3}|season\s?\d{1,2}(?:\s?episode\s?\d{1,3})?|episode\s?\d{1,3})\b/gi;
+export const releaseYearUpperBoundOffset = 1;
 export const defaultSettings = {
   tmdbApiKey: '',
   omdbApiKey: '',
+  qbittorrentUrl: '',
+  qbittorrentUsername: '',
+  qbittorrentPassword: '',
+  qbittorrentCategory: 'ottlib',
+  qbittorrentSavePath: '',
   extensions: defaultExtensions,
   ignoredPatterns: defaultIgnoredPatterns,
   excludedFolders: [],

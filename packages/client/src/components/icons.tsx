@@ -28,6 +28,14 @@ export function SearchIcon(props: SVGProps<SVGSVGElement>) {
   return <Icon {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></Icon>;
 }
 
+export function DownloadIcon(props: SVGProps<SVGSVGElement>) {
+  return <Icon {...props}><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></Icon>;
+}
+
+export function RefreshIcon(props: SVGProps<SVGSVGElement>) {
+  return <Icon {...props}><path d="M20 11a8 8 0 1 0 2 5.5" /><path d="M20 4v7h-7" /></Icon>;
+}
+
 export function DragHandleIcon(props: SVGProps<SVGSVGElement>) {
   return <Icon {...props}><path d="M8 6h.01M8 12h.01M8 18h.01M16 6h.01M16 12h.01M16 18h.01" strokeWidth="3" /></Icon>;
 }

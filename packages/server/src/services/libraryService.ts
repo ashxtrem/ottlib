@@ -21,6 +21,10 @@ export class LibraryService {
     return this.withShelves(this.movies.listByIds(ids, deviceId));
   }
 
+  public listDuplicates(id: number, deviceId?: string): Movie[] {
+    return this.listByIds(this.movies.findDuplicateIds(id), deviceId);
+  }
+
   private withShelves(movies: Movie[]): Movie[] {
     const memberships = this.shelfMovies.listMemberships(movies.map((movie) => movie.id));
     const tracks = this.mediaTracks.listByMovieIds(movies.map((movie) => movie.id));

@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS movies (
   parsed_title TEXT NOT NULL,
   parsed_year INTEGER,
   title_override TEXT,
+  metadata_title TEXT,
+  metadata_year INTEGER,
   size INTEGER NOT NULL,
   mtime_ms INTEGER NOT NULL,
   last_seen_at TEXT NOT NULL,

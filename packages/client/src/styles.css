@@ -4,6 +4,14 @@
 
 @layer base {
   :root {
+    --motion-instant: 90ms;
+    --motion-fast: 150ms;
+    --motion-base: 220ms;
+    --motion-slow: 300ms;
+    --motion-slower: 400ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --ease-emphasis: cubic-bezier(0.34, 1.56, 0.64, 1);
     --color-canvas: 248 250 252;
     --color-overlay: 15 23 42;
     --color-surface: 255 255 255;
@@ -74,4 +82,46 @@
 
   body { @apply min-h-screen bg-canvas text-foreground antialiased; }
   button, input { font: inherit; }
+  :where(a, button, input, select, textarea, [role='menuitem']):focus-visible {
+    outline: 2px solid rgb(var(--color-accent));
+    outline-offset: 2px;
+    transition: outline-color var(--motion-instant) var(--ease-standard);
+  }
+
+  details[open] > dl { animation: rise-in var(--motion-base) var(--ease-standard) both; }
+
+  .shimmer { position: relative; overflow: hidden; }
+  .shimmer::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+    background: linear-gradient(90deg, transparent, rgb(var(--color-surface) / .55), transparent);
+    animation: shimmer 1400ms linear 200ms infinite;
+  }
+
+  dialog[open]::backdrop { animation: fade-in var(--motion-base) var(--ease-standard) both; }
+  dialog[open] > [data-modal-panel] { animation: sheet-in var(--motion-slow) var(--ease-standard) both; }
+
+  @media (min-width: 640px) {
+    dialog[open] > [data-modal-panel] { animation: pop-in var(--motion-base) var(--ease-standard) both; }
+  }
+
+  ::view-transition-old(root) { animation: fade-in var(--motion-instant) var(--ease-exit) reverse both; }
+  ::view-transition-new(root) { animation: rise-in var(--motion-base) var(--ease-standard) both; }
+  ::view-transition-group(poster) { animation-duration: 260ms; animation-timing-function: var(--ease-standard); }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --motion-instant: 1ms;
+      --motion-fast: 1ms;
+      --motion-base: 1ms;
+      --motion-slow: 1ms;
+      --motion-slower: 1ms;
+    }
+
+    .shimmer::after { animation: none; }
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) { animation-duration: 1ms !important; }
+  }
 }

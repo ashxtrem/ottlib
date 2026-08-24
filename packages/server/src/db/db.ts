@@ -9,6 +9,10 @@ import { shelvesMigration } from './migrations/005_shelves.js';
 import { ensureMediaProbeSchema } from './migrations/006_media_probe.js';
 import { ensureScanTitlesAdded } from './migrations/007_scan_titles_added.js';
 import { ensureRunKind } from './migrations/008_run_kind.js';
+import { ensureMetadataDisplayFields } from './migrations/009_metadata_display.js';
+import { ensureCandidateEpisode } from './migrations/010_candidate_episode.js';
+import { ensureMetadataMediaType } from './migrations/011_metadata_media_type.js';
+import { ensureEpisodeColumns } from './migrations/012_episode_columns.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -24,5 +28,9 @@ export function createDatabase(appDataPath: string): Database.Database {
   ensureMediaProbeSchema(db);
   ensureScanTitlesAdded(db);
   ensureRunKind(db);
+  ensureMetadataDisplayFields(db);
+  ensureCandidateEpisode(db);
+  ensureMetadataMediaType(db);
+  ensureEpisodeColumns(db);
   return db;
 }

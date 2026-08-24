@@ -17,7 +17,7 @@ export class ShelfMovieRepository {
   }
 
   public listCoverMovies(shelfId: number, limit = 4): ShelfCoverMovie[] {
-    const rows = this.db.prepare(`SELECT m.id, COALESCE(m.title_override, m.parsed_title) AS title, m.poster_file
+    const rows = this.db.prepare(`SELECT m.id, COALESCE(m.title_override, m.metadata_title, m.parsed_title) AS title, m.poster_file
       FROM shelf_movies sm JOIN movies m ON m.id = sm.movie_id
       WHERE sm.shelf_id = ? ORDER BY sm.position, sm.movie_id LIMIT ?`).all(shelfId, limit) as CoverRow[];
     return rows.map((row) => ({ id: row.id, title: row.title, posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null }));

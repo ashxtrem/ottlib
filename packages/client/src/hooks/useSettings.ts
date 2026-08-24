@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import type { AutoAcceptBackfillStatus, Folder, ScanRun, Settings, UpdateSettings } from '@ottlib/shared';
+import type { AutoAcceptBackfillStatus, Folder, ScanRun, Settings, TorrentConnectionStatus, UpdateSettings } from '@ottlib/shared';
 import { api } from './apiClient';
 import { useToast } from './useToast';
 
@@ -32,10 +32,11 @@ export function useAutoAcceptBackfill() {
 }
 export function useSettingsActions() {
   const client = useQueryClient(); const { show } = useToast(); const refresh = () => client.invalidateQueries({ queryKey: ['settings'] });
-  const update = useMutation({ mutationFn: (settings: UpdateSettings) => api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }), onSuccess: () => { refresh(); show('Settings saved.', 'success'); }, onError: (error) => show(error.message, 'error') });
+  const update = useMutation({ mutationFn: (settings: UpdateSettings) => api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(settings) }), onSuccess: () => { refresh(); void client.invalidateQueries({ queryKey: ['qbittorrent-connection'] }); show('Settings saved.', 'success'); }, onError: (error) => show(error.message, 'error') });
   const testTmdbKey = useMutation({ mutationFn: (tmdbApiKey: string) => api<{ valid: true }>('/api/settings/tmdb/test', { method: 'POST', body: JSON.stringify({ tmdbApiKey }) }), onSuccess: () => show('TMDb key is valid.', 'success'), onError: (error) => show(error.message, 'error') });
+  const testQbittorrent = useMutation({ mutationFn: () => api<TorrentConnectionStatus>('/api/torrents/connection/test', { method: 'POST' }), onSuccess: (result) => { void client.invalidateQueries({ queryKey: ['qbittorrent-connection'] }); show(result.message, result.status === 'connected' ? 'success' : 'info'); }, onError: (error) => show(error.message, 'error') });
   const addFolder = useMutation({ mutationFn: (path: string) => api<Folder>('/api/folders', { method: 'POST', body: JSON.stringify({ path }) }), onSuccess: () => { client.invalidateQueries({ queryKey: ['folders'] }); show('Scan folder added.', 'success'); }, onError: (error) => show(error.message, 'error') });
   const pickFolder = useMutation({ mutationFn: () => api<{ path: string | null }>('/api/folders/select', { method: 'POST' }), onError: (error) => show(error.message, 'error') });
   const removeFolder = useMutation({ mutationFn: (id: number) => api<void>(`/api/folders/${id}`, { method: 'DELETE' }), onSuccess: () => { client.invalidateQueries({ queryKey: ['folders'] }); show('Scan folder removed.', 'success'); }, onError: (error) => show(error.message, 'error') });
-  return { update, testTmdbKey, addFolder, pickFolder, removeFolder };
+  return { update, testTmdbKey, testQbittorrent, addFolder, pickFolder, removeFolder };
 }

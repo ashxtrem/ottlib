@@ -49,7 +49,12 @@ export class TmdbProvider implements MetadataProvider {
     const movie = found.movie_results?.[0]; if (movie) return { id: String(movie.id), title: movie.title, year: movie.release_date ? Number(movie.release_date.slice(0, 4)) : null, score: 1, mediaType: 'movie' };
     const show = found.tv_results?.[0]; if (show) return { id: String(show.id), title: show.name, year: show.first_air_date ? Number(show.first_air_date.slice(0, 4)) : null, score: 1, mediaType: 'tv' };
     const episode = found.tv_episode_results?.[0];
-    if (episode) { const parentShow = await this.getDetails(String(episode.show_id), 'tv'); if (parentShow) return { id: String(episode.show_id), title: parentShow.title, year: parentShow.year, score: 1, mediaType: 'tv' }; }
+    if (episode) {
+      const parentShow = await this.getDetails(String(episode.show_id), 'tv');
+      if (parentShow && Number.isInteger(episode.season_number) && Number.isInteger(episode.episode_number)) {
+        return { id: String(episode.show_id), title: parentShow.title, year: parentShow.year, score: 1, mediaType: 'tv', season: episode.season_number, episode: episode.episode_number };
+      }
+    }
     return null;
   }
 

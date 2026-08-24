@@ -1,11 +1,50 @@
 import type { Config } from 'tailwindcss';
 export default {
   darkMode: 'class',
+  future: { hoverOnlyWhenSupported: true },
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       fontFamily: {
         display: ['Georgia', 'Cambria', '"Times New Roman"', 'serif'],
+      },
+      transitionDuration: {
+        instant: 'var(--motion-instant)',
+        fast: 'var(--motion-fast)',
+        base: 'var(--motion-base)',
+        slow: 'var(--motion-slow)',
+        slower: 'var(--motion-slower)',
+      },
+      transitionTimingFunction: {
+        standard: 'var(--ease-standard)',
+        exit: 'var(--ease-exit)',
+        emphasis: 'var(--ease-emphasis)',
+      },
+      keyframes: {
+        'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
+        'rise-in': { from: { opacity: '0', transform: 'translate3d(0,8px,0)' }, to: { opacity: '1', transform: 'none' } },
+        'pop-in': { from: { opacity: '0', transform: 'scale(.94)' }, to: { opacity: '1', transform: 'none' } },
+        'sheet-in': { from: { transform: 'translate3d(0,100%,0)' }, to: { transform: 'none' } },
+        'sheet-out': { from: { transform: 'none' }, to: { transform: 'translate3d(0,16px,0)' } },
+        'modal-out': { from: { opacity: '1', transform: 'scale(1)' }, to: { opacity: '0', transform: 'scale(.96)' } },
+        'toast-in': { from: { opacity: '0', transform: 'translate3d(-12px,0,0) scale(.97)' }, to: { opacity: '1', transform: 'none' } },
+        'toast-out': { from: { opacity: '1', transform: 'none' }, to: { opacity: '0', transform: 'translate3d(-8px,0,0)' } },
+        'toast-countdown': { from: { transform: 'scaleX(1)' }, to: { transform: 'scaleX(0)' } },
+        shimmer: { from: { transform: 'translate3d(-100%,0,0)' }, to: { transform: 'translate3d(100%,0,0)' } },
+        'draw-check': { from: { strokeDashoffset: '24' }, to: { strokeDashoffset: '0' } },
+      },
+      animation: {
+        'fade-in': 'fade-in var(--motion-base) var(--ease-standard) both',
+        'rise-in': 'rise-in var(--motion-base) var(--ease-standard) both',
+        'pop-in': 'pop-in var(--motion-fast) var(--ease-emphasis) both',
+        'sheet-in': 'sheet-in var(--motion-slow) var(--ease-standard) both',
+        'sheet-out': 'sheet-out var(--motion-fast) var(--ease-exit) both',
+        'modal-out': 'modal-out var(--motion-fast) var(--ease-exit) both',
+        'toast-in': 'toast-in var(--motion-base) var(--ease-standard) both',
+        'toast-out': 'toast-out var(--motion-fast) var(--ease-exit) both',
+        'toast-countdown': 'toast-countdown var(--toast-timeout, 4s) linear both',
+        shimmer: 'shimmer 1400ms linear infinite',
+        'draw-check': 'draw-check var(--motion-base) var(--ease-standard) both',
       },
       colors: {
         canvas: 'rgb(var(--color-canvas) / <alpha-value>)',

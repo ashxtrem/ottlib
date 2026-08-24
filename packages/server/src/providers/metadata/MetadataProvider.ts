@@ -1,5 +1,5 @@
 export type MediaType = 'movie' | 'tv';
-export interface MetadataCandidate { id: string; title: string; year: number | null; score: number; mediaType: MediaType }
+export interface MetadataCandidate { id: string; title: string; year: number | null; score: number; mediaType: MediaType; season?: number; episode?: number }
 export interface MovieMetadata {
   providerId: string; title: string; year: number | null; overview: string | null; posterUrl: string | null; backdropUrl: string | null;
   genres: string[]; cast: string[]; rating: number | null; runtime: number | null; imdbId: string | null;

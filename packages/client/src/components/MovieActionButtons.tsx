@@ -1,8 +1,10 @@
 import type { Movie } from '@ottlib/shared';
+import { Link } from 'react-router-dom';
 import { PlayButton } from './PlayButton';
 import { RevealInFolderButton } from './RevealInFolderButton';
+import { focusRing, pressable } from './interactionStyles';
 
-const secondaryButtonClassName = 'inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground transition-colors hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60';
+const secondaryButtonClassName = `inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground transition-[background-color,transform] duration-fast ease-emphasis hover:bg-surface-raised ${focusRing} ${pressable} disabled:cursor-not-allowed disabled:opacity-60`;
 
 type MovieActionButtonsProps = {
   imdbUrl: string;
@@ -17,9 +19,10 @@ export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onToggleWa
 
   return <div className="space-y-2">
     <PlayButton movie={movie} />
+    <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>
     <div className="flex flex-wrap items-center gap-2">
       <RevealInFolderButton movieId={movie.id} />
-      <a href={imdbUrl} target="_blank" rel="noopener noreferrer" title="View on IMDb" aria-label="View on IMDb" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-imdb-hover/70 text-imdb-hover hover:bg-imdb-hover/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-imdb-hover">
+      <a href={imdbUrl} target="_blank" rel="noopener noreferrer" title="View on IMDb" aria-label="View on IMDb" className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border border-imdb-hover/70 text-imdb-hover transition-[background-color,transform] duration-fast ease-emphasis hover:bg-imdb-hover/10 ${pressable} ${focusRing} focus-visible:outline-imdb-hover`}>
         <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 3h16v18H4V3Zm2 2v14h12V5H6Zm2 2h2v10H8V7Zm3.5 0H14v10h-2.5V7Zm4 0H16v10h-1.5V7Z" /></svg>
         <span className="sr-only">View on IMDb</span>
       </a>

@@ -15,6 +15,17 @@ describe('PosterCard watch state', () => {
     const markup = render(false);
     expect(markup).toContain('Mark Arrival as watched');
     expect(markup).toContain('opacity-100');
+    expect(markup).toContain('absolute bottom-3 right-3');
+  });
+
+  it('places selection and watch controls at opposing bottom corners', () => {
+    const markup = renderToStaticMarkup(<MemoryRouter><PosterCard movie={movie} selected onSelectedChange={vi.fn()} onToggleWatched={vi.fn()} /></MemoryRouter>);
+
+    expect(markup).toContain('absolute bottom-3 left-3');
+    expect(markup).toContain('absolute bottom-3 right-3');
+    expect(markup).toContain('flex h-full flex-col');
+    expect(markup).toContain('flex flex-1 flex-col');
+    expect(markup).not.toContain('right-3 top-7');
   });
 
   it('shows a check treatment and dimmed poster for watched titles', () => {
@@ -33,5 +44,13 @@ describe('PosterCard watch state', () => {
   it('marks unavailable titles on the poster image', () => {
     const markup = renderToStaticMarkup(<MemoryRouter><PosterCard movie={{ ...movie, missing: true }} onToggleWatched={vi.fn()} /></MemoryRouter>);
     expect(markup).toContain('Unavailable');
+  });
+
+  it('wraps long titles using a smaller two-line caption', () => {
+    const markup = renderToStaticMarkup(<MemoryRouter><PosterCard movie={{ ...movie, title: 'Absolutely Anything With An Extra Long Subtitle' }} onToggleWatched={vi.fn()} /></MemoryRouter>);
+
+    expect(markup).toContain('line-clamp-2');
+    expect(markup).toContain('text-sm');
+    expect(markup).not.toContain('truncate font-medium text-foreground');
   });
 });

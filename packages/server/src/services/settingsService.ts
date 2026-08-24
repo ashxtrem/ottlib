@@ -7,14 +7,15 @@ import { TmdbProvider } from '../providers/metadata/tmdbProvider.js';
 const mask = (value: string) => value ? `••••${value.slice(-4)}` : '';
 export class SettingsService {
   public constructor(private readonly settings: SettingRepository, private readonly scheduler: SchedulerService) {}
-  public get(): Settings { const value = this.settings.get(); return { ...value, tmdbApiKey: mask(value.tmdbApiKey), omdbApiKey: mask(value.omdbApiKey) }; }
+  public get(): Settings { const value = this.settings.get(); return { ...value, tmdbApiKey: mask(value.tmdbApiKey), omdbApiKey: mask(value.omdbApiKey), qbittorrentPassword: mask(value.qbittorrentPassword) }; }
   public update(update: UpdateSettings): Settings {
     const safe = { ...update };
     if (safe.tmdbApiKey?.startsWith('••••')) delete safe.tmdbApiKey;
     if (safe.omdbApiKey?.startsWith('••••')) delete safe.omdbApiKey;
+    if (safe.qbittorrentPassword?.startsWith('••••')) delete safe.qbittorrentPassword;
     if (safe.scheduleCron !== undefined && !this.validateSchedule(safe.scheduleCron).valid) throw new Error('Schedule must be a valid cron expression');
     const result = this.settings.update(safe); this.scheduler.refresh();
-    return { ...result, tmdbApiKey: mask(result.tmdbApiKey), omdbApiKey: mask(result.omdbApiKey) };
+    return { ...result, tmdbApiKey: mask(result.tmdbApiKey), omdbApiKey: mask(result.omdbApiKey), qbittorrentPassword: mask(result.qbittorrentPassword) };
   }
 
   public validateSchedule(scheduleCron: string): ScheduleValidationResult {

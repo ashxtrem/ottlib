@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export * from './torrent.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -22,6 +23,13 @@ export function formatResolution(height: number | null | undefined): string | nu
   if (height! >= 1080) return '1080p';
   if (height! >= 720) return '720p';
   return `${height}p`;
+}
+
+export function formatBytes(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '—';
+  const bytes: number = value;
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']; const index = Math.min(Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** index).toFixed(index > 1 ? 1 : 0)} ${units[index]}`;
 }
 
 export function formatMediaLanguage(language: string | null | undefined): string {
@@ -80,6 +88,10 @@ export const movieSchema = z.object({
   imdbId: z.string().nullable(),
   metadataStatus: z.enum(['pending', 'suggested', 'matched', 'unmatched', 'error']),
   metadataSource: z.string().nullable(),
+  mediaType: z.enum(['movie', 'tv']).nullable(),
+  season: z.number().int().positive().nullable(),
+  episode: z.number().int().positive().nullable(),
+  fileSizeBytes: z.number().int().nonnegative(),
   mediaInfo: mediaInfoSchema.nullable(),
   watched: z.boolean(),
   missing: z.boolean(),
@@ -115,7 +127,7 @@ export const folderSchema = z.object({
 
 export const scanRunSchema = z.object({
   id: z.number().int(),
-  kind: z.enum(['scan', 'auto-accept']),
+  kind: z.enum(['scan', 'auto-accept', 'metadata-refresh', 'metadata-type-backfill']),
   status: z.enum(['running', 'completed', 'failed']),
   startedAt: z.string(),
   finishedAt: z.string().nullable(),
@@ -128,6 +140,11 @@ export const scanRunSchema = z.object({
 export const settingsSchema = z.object({
   tmdbApiKey: z.string(),
   omdbApiKey: z.string(),
+  qbittorrentUrl: z.string(),
+  qbittorrentUsername: z.string(),
+  qbittorrentPassword: z.string(),
+  qbittorrentCategory: z.string(),
+  qbittorrentSavePath: z.string(),
   extensions: z.array(z.string()),
   ignoredPatterns: z.array(z.string()),
   excludedFolders: z.array(z.string()),
@@ -143,6 +160,7 @@ export const createFolderSchema = z.object({ path: z.string().min(1) });
 export const moviePatchSchema = z.object({ titleOverride: z.string().trim().min(1).nullable() });
 export const imdbLookupSchema = z.object({ imdbId: z.string().trim().min(1) });
 export const rematchSchema = z.object({ title: z.string().trim().min(1).optional() });
+export const metadataRefreshSchema = z.object({ movieIds: z.array(z.number().int().positive()).min(1).optional() });
 export const watchStateSchema = z.object({ watched: z.boolean() });
 export const movieFilterOptionsSchema = z.object({
   genres: z.array(z.string()),
@@ -167,7 +185,15 @@ export const matchCandidateSchema = z.object({
   title: z.string(),
   year: z.number().int().nullable(),
   score: z.number(),
-  mediaType: z.enum(['movie', 'tv'])
+  mediaType: z.enum(['movie', 'tv']),
+  season: z.number().int().positive().optional(),
+  episode: z.number().int().positive().optional()
+});
+export const manualMatchCandidateSchema = matchCandidateSchema.omit({ id: true });
+export const acceptManualCandidateSchema = z.object({
+  candidate: manualMatchCandidateSchema.pick({ provider: true, providerId: true, mediaType: true, season: true, episode: true }),
+  season: z.number().int().positive().optional(),
+  episode: z.number().int().positive().optional()
 });
 export const acceptCandidateSchema = z.object({ season: z.number().int().positive().optional(), episode: z.number().int().positive().optional() });
 export const autoAcceptBackfillStatusSchema = z.object({ eligible: z.number().int().nonnegative() });
@@ -199,6 +225,7 @@ export type Settings = z.infer<typeof settingsSchema>;
 export type UpdateSettings = z.infer<typeof updateSettingsSchema>;
 export type ScheduleValidationResult = z.infer<typeof scheduleValidationResultSchema>;
 export type MatchCandidate = z.infer<typeof matchCandidateSchema>;
+export type ManualMatchCandidate = z.infer<typeof manualMatchCandidateSchema>;
 export type AutoAcceptBackfillStatus = z.infer<typeof autoAcceptBackfillStatusSchema>;
 export type MovieFilterOptions = z.infer<typeof movieFilterOptionsSchema>;
 export type ShelfCoverMovie = z.infer<typeof shelfCoverMovieSchema>;

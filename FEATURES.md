@@ -12,6 +12,7 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 - [x] Manual title override + re-match — fix a bad auto-match from the movie detail page
 - [x] Unmatched movies still listed — never hidden just because metadata lookup failed
 - [x] Missing-file detection — soft-marks movies whose files disappear from disk, without deleting history; a failed/disconnected scan root doesn't wipe existing records
+- [x] Duplicate copy comparison — counts other copies of a title and provides a read-only technical comparison table
 
 ## Scanning & Automation
 - [x] Manual "rescan now" trigger
@@ -42,6 +43,11 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 - [x] Rescan schedule (cron) configuration
 - [x] Server info panel — shows LAN IP:port to type into your phone
 - [x] Port/app-data path config (bootstrap-level, restart required)
+
+## Torrent Search
+- [x] qBittorrent WebUI connection settings — masked password, connection test, and Python/search-plugin health guidance
+- [x] Search enabled qBittorrent movie plugins — release quality tags, engine-aware deduplication, library ownership/missing-file badges, and result sorting
+- [x] One-click qBittorrent handoff — supports magnet and HTTP(S) torrent URLs with configurable category and save path
 
 ## Out of scope for v1
 - No user accounts/auth (single trusted LAN)

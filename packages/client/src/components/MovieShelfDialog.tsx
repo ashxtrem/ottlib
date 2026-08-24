@@ -20,12 +20,10 @@ export function MovieShelfDialog({ open, movie, shelves, saving, onClose, onSave
     setSelectedIds(initialIds);
     setNewShelfName('');
   }, [open, initialIds]);
-  if (!open) return null;
-
   const selected = new Set(selectedIds);
   const toggle = (id: number) => setSelectedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
 
-  return <Modal open title="Manage shelves" onClose={onClose} footer={<><button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-foreground/90 hover:bg-surface-raised">Cancel</button><button type="button" onClick={() => onSave({ shelfIds: selectedIds, newShelfName: newShelfName.trim() || undefined })} disabled={saving} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-60">{saving ? 'Saving…' : 'Save shelves'}</button></>}>
+  return <Modal open={open} title="Manage shelves" onClose={onClose} footer={<><button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-foreground/90 hover:bg-surface-raised">Cancel</button><button type="button" onClick={() => onSave({ shelfIds: selectedIds, newShelfName: newShelfName.trim() || undefined })} disabled={saving} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-60">{saving ? 'Saving…' : 'Save shelves'}</button></>}>
     <div className="space-y-4 p-5">
       <p className="text-sm text-muted">Choose where <span className="font-medium text-foreground">{movie.title}</span> belongs.</p>
       <div className="max-h-60 space-y-2 overflow-y-auto">{shelves.length ? shelves.map((shelf) => <label key={shelf.id} className="flex cursor-pointer items-center justify-between rounded-lg bg-field px-3 py-2 text-sm"><span className="flex items-center gap-3"><input type="checkbox" checked={selected.has(shelf.id)} onChange={() => toggle(shelf.id)} className="accent-accent" />{shelf.name}</span><span className="text-subtle">{shelf.movieCount}</span></label>) : <p className="text-sm text-muted">No shelves exist yet.</p>}</div>
