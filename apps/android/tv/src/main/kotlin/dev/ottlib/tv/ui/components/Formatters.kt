@@ -13,6 +13,13 @@ fun formatPosition(ms: Long): String {
     return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
 }
 
+/** Signed seek offset: `+10s`, `−45s`, `+1:20`, `+1:02:03`. */
+fun formatOffset(ms: Long): String {
+    val sign = if (ms < 0) "−" else "+"
+    val abs = kotlin.math.abs(ms)
+    return if (abs < 60_000) "$sign${abs / 1_000}s" else sign + formatPosition(abs)
+}
+
 /** `1h 56m` from TMDb runtime minutes, falling back to the probed duration. */
 fun formatRuntime(runtimeMinutes: Int?, durationMs: Long?): String? {
     val minutes = runtimeMinutes?.takeIf { it > 0 } ?: durationMs?.takeIf { it > 0 }?.let { (it / 60_000).toInt().coerceAtLeast(1) } ?: return null

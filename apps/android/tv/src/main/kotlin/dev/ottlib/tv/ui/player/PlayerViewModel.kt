@@ -6,13 +6,18 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import dev.ottlib.core.data.PictureModeStore
+import dev.ottlib.core.data.TrackChoiceStore
 import dev.ottlib.core.data.PlaybackPreferences
+import dev.ottlib.core.model.PictureMode
+import dev.ottlib.core.model.TrackChoice
 import dev.ottlib.core.model.Movie
 import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
 import dev.ottlib.core.player.ProgressReporter
-import dev.ottlib.core.player.TrackPreferences
+import dev.ottlib.core.player.TrackMemory
+import dev.ottlib.core.player.PlayerSettings
 import dev.ottlib.core.player.hasOnlyUnsupportedAudio
 import dev.ottlib.core.player.hasOnlyUnsupportedVideo
 import dev.ottlib.core.player.toMediaItem
@@ -29,10 +34,13 @@ import kotlinx.coroutines.launch
 
 sealed interface PlayerUiState {
     data object Loading : PlayerUiState
-    data class Ready(val player: ExoPlayer, val title: String) : PlayerUiState
+    data class Ready(val player: ExoPlayer, val title: String, val controls: PlayerControls) : PlayerUiState
     data class Failed(val message: String) : PlayerUiState
     data object Ended : PlayerUiState
 }
+
+/** Remote behaviour for this session, from the viewer's settings. */
+data class PlayerControls(val skipBackMs: Long, val skipForwardMs: Long, val showPictureHint: Boolean)
 
 /** Something the viewer must decide about; playback is paused while it is shown. */
 sealed interface PlaybackProblem {
@@ -46,6 +54,8 @@ class PlayerViewModel(
     private val api: OttlibApi,
     private val playerFactory: OttlibPlayerFactory,
     private val preferences: PlaybackPreferences,
+    private val pictureModes: PictureModeStore,
+    private val trackChoices: TrackChoiceStore,
     private val watchNext: WatchNextPublisher,
     private val backgroundScope: CoroutineScope,
     private val movieId: Long,
@@ -55,9 +65,13 @@ class PlayerViewModel(
     val uiState: StateFlow<PlayerUiState> = state.asStateFlow()
     private val currentProblem = MutableStateFlow<PlaybackProblem?>(null)
     val problem: StateFlow<PlaybackProblem?> = currentProblem.asStateFlow()
+    private val picture = MutableStateFlow(PictureMode.Fit)
+    /** The confirmed picture mode (panel previews are applied to the view without changing this). */
+    val pictureMode: StateFlow<PictureMode> = picture.asStateFlow()
 
     private var player: ExoPlayer? = null
     private var reporter: ProgressReporter? = null
+    private var trackMemory: TrackMemory? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
 
@@ -95,21 +109,51 @@ class PlayerViewModel(
                 val source = api.playbackSource(movieId)
                 val loaded = details.await().also { movie = it }
                 val settings = preferences.current()
-                val exo = playerFactory.create(TrackPreferences(settings.audioLanguage, settings.subtitleLanguage))
+                picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
+                val skipBackMs = settings.skipBackSeconds * 1_000L
+                val skipForwardMs = settings.skipForwardSeconds * 1_000L
+                val exo = playerFactory.create(PlayerSettings(settings.audioLanguage, settings.subtitleLanguage, skipBackMs, skipForwardMs))
                 exo.addListener(listener)
+                // Before prepare(), so the first track list is seen and the title's remembered tracks are restored.
+                trackMemory = TrackMemory(exo, trackChoices.get(movieId), ::rememberTracks).also { it.start() }
                 exo.setMediaItem(source.toMediaItem(movieId, loaded.title) { api.resolve(it)!! }, if (fromStart) 0 else source.resumePositionMs ?: 0)
                 exo.prepare()
                 exo.playWhenReady = true
                 reporter = ProgressReporter(exo, viewModelScope, backgroundScope, source.durationMs ?: loaded.mediaInfo?.durationMs) { position, duration -> save(position, duration) }
                     .also { it.start() }
                 player = exo
-                state.value = PlayerUiState.Ready(exo, loaded.title)
+                state.value = PlayerUiState.Ready(exo, loaded.title, PlayerControls(skipBackMs, skipForwardMs, showPictureHint = !settings.pictureHintShown))
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
                 state.value = PlayerUiState.Failed(error.userMessage())
             }
         }
+    }
+
+    /** Keeps [mode] for this session, and for this title on future plays when [rememberForTitle]. */
+    fun choosePictureMode(mode: PictureMode, rememberForTitle: Boolean) {
+        picture.value = mode
+        backgroundScope.launch { pictureModes.set(movieId, if (rememberForTitle) mode else null) }
+    }
+
+    /** Remembered for this title; with "follow last choice" on, also becomes the language default for new titles. */
+    private fun rememberTracks(choice: TrackChoice) {
+        backgroundScope.launch {
+            trackChoices.set(movieId, choice)
+            val settings = preferences.current()
+            if (!settings.languagesFollowLastChoice) return@launch
+            choice.audio?.language?.let { preferences.setAudioLanguage(it) }
+            val subtitleLanguage = choice.subtitle?.language
+            when {
+                choice.subtitlesOff -> preferences.setSubtitleLanguage(null)
+                subtitleLanguage != null -> preferences.setSubtitleLanguage(subtitleLanguage)
+            }
+        }
+    }
+
+    fun pictureHintSeen() {
+        backgroundScope.launch { preferences.markPictureHintShown() }
     }
 
     fun dismissProblem(resume: Boolean) {
@@ -134,6 +178,7 @@ class PlayerViewModel(
 
     override fun onCleared() {
         reporter?.stop()
+        trackMemory?.stop()
         player?.run {
             removeListener(listener)
             release()

@@ -6,6 +6,7 @@ import dev.ottlib.core.data.ConnectionManager
 import dev.ottlib.core.data.DeviceIdentity
 import dev.ottlib.core.data.PlaybackPreferences
 import dev.ottlib.core.data.PlaybackSettings
+import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.model.ServerInfo
 import dev.ottlib.core.network.OttlibApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,10 @@ class SettingsViewModel(
 
     fun setAudioLanguage(language: String?) { viewModelScope.launch { preferences.setAudioLanguage(language) } }
     fun setSubtitleLanguage(language: String?) { viewModelScope.launch { preferences.setSubtitleLanguage(language) } }
+    fun setSkipBackSeconds(seconds: Int) { viewModelScope.launch { preferences.setSkipBackSeconds(seconds) } }
+    fun setSkipForwardSeconds(seconds: Int) { viewModelScope.launch { preferences.setSkipForwardSeconds(seconds) } }
+    fun setDefaultPictureMode(mode: PictureMode) { viewModelScope.launch { preferences.setDefaultPictureMode(mode) } }
+    fun setLanguagesFollowLastChoice(enabled: Boolean) { viewModelScope.launch { preferences.setLanguagesFollowLastChoice(enabled) } }
 
     fun changeServer(onDone: () -> Unit) {
         viewModelScope.launch {

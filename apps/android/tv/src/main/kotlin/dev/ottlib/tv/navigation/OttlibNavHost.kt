@@ -27,11 +27,16 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
     val activeServer by appContainer().connection.activeServer.collectAsStateWithLifecycle()
     val pendingMovieId by deepLinkMovieId.collectAsStateWithLifecycle()
 
-    LaunchedEffect(activeServer, pendingMovieId) {
-        val movieId = pendingMovieId ?: return@LaunchedEffect
-        if (activeServer == null) return@LaunchedEffect
-        deepLinkMovieId.value = null
-        nav.navigate(Routes.details(movieId))
+    // A movie link (Watch Next row) opens once a server is connected. On a cold start the Connect screen's own
+    // "go Home and clear the back stack" runs after connecting, so the link is opened from onConnected instead.
+    val openPendingMovie = {
+        deepLinkMovieId.value?.let { movieId ->
+            deepLinkMovieId.value = null
+            nav.navigate(Routes.details(movieId))
+        }
+    }
+    LaunchedEffect(pendingMovieId) {
+        if (pendingMovieId != null && activeServer != null && nav.currentDestination?.route != Routes.CONNECT) openPendingMovie()
     }
 
     val openMovie: (Long) -> Unit = { nav.navigate(Routes.details(it)) }
@@ -41,7 +46,10 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
         composable(Routes.CONNECT, arguments = listOf(navArgument("auto") { type = NavType.BoolType; defaultValue = true })) { entry ->
             ConnectScreen(
                 autoConnect = entry.arguments?.getBoolean("auto") ?: true,
-                onConnected = { nav.navigate(Routes.HOME) { popUpTo(nav.graph.id) { inclusive = true } } },
+                onConnected = {
+                    nav.navigate(Routes.HOME) { popUpTo(nav.graph.id) { inclusive = true } }
+                    openPendingMovie()
+                },
             )
         }
         composable(Routes.HOME) { HomeScreen(onOpenMovie = openMovie, onNavigate = navigateTop) }

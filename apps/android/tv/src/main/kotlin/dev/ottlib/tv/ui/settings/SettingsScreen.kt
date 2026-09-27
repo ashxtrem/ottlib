@@ -19,6 +19,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import dev.ottlib.core.data.PlaybackSettings
+import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.languageName
 import dev.ottlib.tv.BuildConfig
 import dev.ottlib.tv.appContainer
@@ -29,7 +31,7 @@ import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.components.TopNavigation
 import dev.ottlib.tv.ui.theme.OttlibColors
 
-private enum class SettingsDialog { Audio, Subtitles }
+private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Picture }
 
 @Composable
 fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onChangeServer: () -> Unit) {
@@ -69,8 +71,38 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onChangeServer: () -> U
                 headlineContent = { Text("Subtitles") },
                 supportingContent = { Text(playback.subtitleLanguage?.let(::languageName) ?: "Off (forced subtitles still show)") },
             )
+            ListItem(
+                selected = false,
+                onClick = { viewModel.setLanguagesFollowLastChoice(!playback.languagesFollowLastChoice) },
+                headlineContent = { Text("New titles use my last track choice") },
+                supportingContent = {
+                    Text(
+                        if (playback.languagesFollowLastChoice) "Changing audio or subtitles during playback also updates the languages above"
+                        else "Track changes are remembered for that title only",
+                    )
+                },
+                trailingContent = { Text(if (playback.languagesFollowLastChoice) "On" else "Off", color = if (playback.languagesFollowLastChoice) OttlibColors.Accent else OttlibColors.Muted) },
+            )
+            ListItem(
+                selected = false,
+                onClick = { dialog = SettingsDialog.SkipBack },
+                headlineContent = { Text("Skip back") },
+                supportingContent = { Text("${playback.skipBackSeconds} seconds  ·  ← on the remote") },
+            )
+            ListItem(
+                selected = false,
+                onClick = { dialog = SettingsDialog.SkipForward },
+                headlineContent = { Text("Skip forward") },
+                supportingContent = { Text("${playback.skipForwardSeconds} seconds  ·  → on the remote (hold to go faster)") },
+            )
+            ListItem(
+                selected = false,
+                onClick = { dialog = SettingsDialog.Picture },
+                headlineContent = { Text("Default picture") },
+                supportingContent = { Text("${playback.defaultPictureMode.label}  ·  ${playback.defaultPictureMode.description}") },
+            )
             Text(
-                "You can switch audio and subtitle tracks during playback from the player's settings button.",
+                "During playback, hold OK for picture options. Audio and subtitle tracks are in the player's settings and CC buttons; your choice is remembered for each title.",
                 style = MaterialTheme.typography.bodySmall,
                 color = OttlibColors.Muted,
                 modifier = Modifier.padding(start = 16.dp),
@@ -86,9 +118,14 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onChangeServer: () -> U
     when (dialog) {
         SettingsDialog.Audio -> ChoiceDialog("Preferred audio language", listOf(Choice<String?>("File default", null)) + languageChoices, playback.audioLanguage, onSelect = viewModel::setAudioLanguage, onDismiss = { dialog = null })
         SettingsDialog.Subtitles -> ChoiceDialog("Subtitles", listOf(Choice<String?>("Off", null)) + languageChoices, playback.subtitleLanguage, onSelect = viewModel::setSubtitleLanguage, onDismiss = { dialog = null })
+        SettingsDialog.SkipBack -> ChoiceDialog("Skip back", secondsChoices(PlaybackSettings.SKIP_BACK_CHOICES), playback.skipBackSeconds, onSelect = viewModel::setSkipBackSeconds, onDismiss = { dialog = null })
+        SettingsDialog.SkipForward -> ChoiceDialog("Skip forward", secondsChoices(PlaybackSettings.SKIP_FORWARD_CHOICES), playback.skipForwardSeconds, onSelect = viewModel::setSkipForwardSeconds, onDismiss = { dialog = null })
+        SettingsDialog.Picture -> ChoiceDialog("Default picture", PictureMode.entries.map { Choice("${it.label} — ${it.description}", it) }, playback.defaultPictureMode, onSelect = viewModel::setDefaultPictureMode, onDismiss = { dialog = null })
         null -> Unit
     }
 }
+
+private fun secondsChoices(values: List<Int>) = values.map { Choice("$it seconds", it) }
 
 @Composable
 private fun SectionTitle(text: String) {

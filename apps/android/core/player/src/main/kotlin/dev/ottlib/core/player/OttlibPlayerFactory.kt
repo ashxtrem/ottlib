@@ -17,12 +17,18 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 import okhttp3.OkHttpClient
 
-/** Language codes as the server reports them (`eng`, `hin`). Null subtitle language = off (forced subtitles still show). */
-data class TrackPreferences(val audioLanguage: String? = null, val subtitleLanguage: String? = null)
+/**
+ * Per-viewer player settings. Language codes as the server reports them (`eng`, `hin`); a null subtitle language
+ * means off (forced subtitles still show). Skip steps drive the ⏪/⏩ buttons and the seek bar.
+ */
+data class PlayerSettings(
+    val audioLanguage: String? = null,
+    val subtitleLanguage: String? = null,
+    val skipBackMs: Long = 10_000,
+    val skipForwardMs: Long = 10_000,
+)
 
 object PlayerDefaults {
-    const val SEEK_BACK_MS = 10_000L
-    const val SEEK_FORWARD_MS = 30_000L
     // Large LAN buffers smooth over Wi-Fi dips on high-bitrate 4K remuxes; bytes are still capped by the default target.
     const val MIN_BUFFER_MS = 30_000
     const val MAX_BUFFER_MS = 90_000
@@ -32,11 +38,11 @@ object PlayerDefaults {
 
 /** Builds the ExoPlayer used for direct play of files streamed from `/api/stream/:id`. */
 class OttlibPlayerFactory(private val context: Context, private val httpClient: OkHttpClient) {
-    fun create(preferences: TrackPreferences): ExoPlayer {
+    fun create(settings: PlayerSettings): ExoPlayer {
         val dataSource = DefaultDataSource.Factory(context, OkHttpDataSource.Factory(httpClient))
         // Platform decoders first; FFmpeg only for formats the device cannot decode (e.g. DTS, TrueHD).
         val renderers = NextRenderersFactory(context).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
-        val trackSelector = DefaultTrackSelector(context).apply { parameters = trackParameters(this, preferences) }
+        val trackSelector = DefaultTrackSelector(context).apply { parameters = trackParameters(this, settings) }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(PlayerDefaults.MIN_BUFFER_MS, PlayerDefaults.MAX_BUFFER_MS, PlayerDefaults.START_BUFFER_MS, PlayerDefaults.REBUFFER_MS)
             .build()
@@ -44,15 +50,15 @@ class OttlibPlayerFactory(private val context: Context, private val httpClient: 
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
-            .setSeekBackIncrementMs(PlayerDefaults.SEEK_BACK_MS)
-            .setSeekForwardIncrementMs(PlayerDefaults.SEEK_FORWARD_MS)
+            .setSeekBackIncrementMs(settings.skipBackMs)
+            .setSeekForwardIncrementMs(settings.skipForwardMs)
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
             .setHandleAudioBecomingNoisy(true)
             .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS)
             .build()
     }
 
-    private fun trackParameters(selector: DefaultTrackSelector, preferences: TrackPreferences) = selector.buildUponParameters().apply {
+    private fun trackParameters(selector: DefaultTrackSelector, preferences: PlayerSettings) = selector.buildUponParameters().apply {
         setPreferredAudioLanguage(preferences.audioLanguage)
         if (preferences.subtitleLanguage == null) {
             setPreferredTextLanguage(null)

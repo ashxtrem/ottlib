@@ -26,10 +26,13 @@ private fun SubtitleSource.toConfiguration(resolve: (String) -> String): MediaIt
     return MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(url)))
         .setMimeType(mimeType)
         .setLanguage(language)
-        .setLabel("${title ?: language?.let(::languageName) ?: "Subtitles"} (external file)")
+        .setLabel("${title ?: language?.let(::languageName) ?: "Subtitles"} $EXTERNAL_SUBTITLE_SUFFIX")
         .setSelectionFlags(if (isForced) C.SELECTION_FLAG_FORCED else 0)
         .build()
 }
+
+/** Marks side-loaded subtitle files in track labels; also how [TrackMemory] tells them from embedded tracks. */
+internal const val EXTERNAL_SUBTITLE_SUFFIX = "(external file)"
 
 internal fun subtitleMimeType(codec: String?): String? = when (codec?.uppercase()) {
     "SRT" -> MimeTypes.APPLICATION_SUBRIP

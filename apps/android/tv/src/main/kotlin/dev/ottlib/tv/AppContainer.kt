@@ -3,8 +3,10 @@ package dev.ottlib.tv
 import android.content.Context
 import dev.ottlib.core.data.ConnectionManager
 import dev.ottlib.core.data.DeviceIdentity
+import dev.ottlib.core.data.PictureModeStore
 import dev.ottlib.core.data.PlaybackPreferences
 import dev.ottlib.core.data.ServerStore
+import dev.ottlib.core.data.TrackChoiceStore
 import dev.ottlib.core.discovery.ServerDiscovery
 import dev.ottlib.core.network.DeviceIdInterceptor
 import dev.ottlib.core.network.OttlibApi
@@ -23,6 +25,8 @@ class AppContainer(context: Context) {
 
     val deviceIdentity = DeviceIdentity(context)
     val playbackPreferences = PlaybackPreferences(context)
+    val pictureModes = PictureModeStore(context)
+    val trackChoices = TrackChoiceStore(context)
 
     val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)

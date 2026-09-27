@@ -43,6 +43,8 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 - [x] Built-in Media3 player — direct play of the existing byte-range stream, FFmpeg audio fallback (DTS/TrueHD), side-loaded external SRT/ASS/VTT subtitles, audio/subtitle track switching, ←/→ seek shortcuts
 - [x] Resume position — per-device progress saved while playing; auto-marked watched at 92%; "Continue watching" on Home and in the Android TV Watch Next row
 - [x] Preferred audio and subtitle language
+- [x] Remote skip controls — adjustable skip back/forward (default 10s/10s), quick taps add up into one seek, holding → / ← accelerates, ⏩/⏪ media keys
+- [x] Picture modes — Fit, Zoom (pan & scan), Stretch, Smart fill (half trim, half stretch), forced 16:9 / 4:3 / 2.39:1; hold OK during playback, live preview, remembered per title; subtitles stay on screen in Zoom
 - [x] "Play in another app" escape hatch for formats the built-in player can't handle
 
 ## Settings
