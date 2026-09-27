@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import type { ScanRun } from '@ottlib/shared';
+import type { ScanRun, ServerInfo } from '@ottlib/shared';
 import { useAutoAcceptBackfill, useFolders, useSettings, useSettingsActions } from '../hooks/useSettings';
 import { useTheme } from '../hooks/useTheme';
 import { api } from '../hooks/apiClient';
@@ -28,7 +28,7 @@ export function SettingsPage() {
   const metadataRefresh = useMetadataRefresh();
   const { preference, setPreference } = useTheme();
   const { show } = useToast();
-  const serverInfo = useQuery({ queryKey: ['server-info'], queryFn: () => api<{ port: number; addresses: string[] }>('/api/server-info') });
+  const serverInfo = useQuery({ queryKey: ['server-info'], queryFn: () => api<ServerInfo>('/api/server-info') });
   const movieCount = useQuery({ queryKey: ['available-movie-count'], queryFn: () => api<{ total: number }>('/api/movies?availability=available&limit=1') });
   const scanFolderInput = useRef<HTMLInputElement>(null);
   const excludedFoldersInput = useRef<HTMLTextAreaElement>(null);

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { deviceIdSchema } from '@ottlib/shared';
 import { PlaybackService } from '../services/playbackService.js';
 
 function isLoopback(address: string | undefined): boolean { return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'; }
@@ -11,5 +12,9 @@ export function registerPlaybackRoutes(app: FastifyInstance, playback: PlaybackS
   app.post('/api/movies/:id/reveal', async (request, reply) => {
     if (!isLoopback(request.socket.remoteAddress)) return reply.code(403).send({ error: 'Folder reveal is only available from localhost' });
     try { await playback.reveal(Number((request.params as any).id)); return reply.code(204).send(); } catch (error) { return reply.code(404).send({ error: error instanceof Error ? error.message : 'Movie file is unavailable' }); }
+  });
+  app.get('/api/movies/:id/playback', async (request, reply) => {
+    const device = deviceIdSchema.safeParse(request.headers['x-device-id']);
+    try { return await playback.source(Number((request.params as any).id), device.success ? device.data : undefined); } catch (error) { return reply.code(404).send({ error: error instanceof Error ? error.message : 'Movie file is unavailable' }); }
   });
 }

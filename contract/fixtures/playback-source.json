@@ -1,0 +1,17 @@
+{
+  "kind": "direct",
+  "streamUrl": "/api/stream/1",
+  "mimeType": "video/x-matroska",
+  "durationMs": 6960000,
+  "resumePositionMs": null,
+  "subtitles": [
+    {
+      "url": "/api/movies/1/subtitles/10001",
+      "language": "eng",
+      "codec": "SRT",
+      "title": null,
+      "isForced": false,
+      "isHearingImpaired": false
+    }
+  ]
+}

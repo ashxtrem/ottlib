@@ -8,4 +8,9 @@ export class WatchStateRepository {
       VALUES (?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(movie_id, device_id) DO UPDATE SET watched = excluded.watched, updated_at = excluded.updated_at`).run(movieId, deviceId, Number(watched));
   }
+
+  public get(movieId: number, deviceId: string): boolean {
+    const row = this.db.prepare('SELECT watched FROM movie_watch_state WHERE movie_id = ? AND device_id = ?').get(movieId, deviceId) as { watched: number } | undefined;
+    return Boolean(row?.watched);
+  }
 }

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { acceptCandidateSchema, acceptManualCandidateSchema, deviceIdSchema, imdbLookupSchema, metadataRefreshSchema, moviePatchSchema, rematchSchema, watchStateSchema } from '@ottlib/shared';
 import { MetadataMatchService } from '../services/metadataMatchService.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
-import { WatchStateRepository } from '../repositories/watchStateRepository.js';
+import { PlaybackProgressService } from '../services/playbackProgressService.js';
 import { LibraryService } from '../services/libraryService.js';
 
 function deviceId(headers: Record<string, unknown>): string | undefined { const parsed = deviceIdSchema.safeParse(headers['x-device-id']); return parsed.success ? parsed.data : undefined; }
@@ -14,7 +14,7 @@ function limit(value: string | undefined): number {
   const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : 48;
 }
 
-export function registerLibraryRoutes(app: FastifyInstance, movies: MovieRepository, watches: WatchStateRepository, matcher: MetadataMatchService, library: LibraryService): void {
+export function registerLibraryRoutes(app: FastifyInstance, movies: MovieRepository, progress: PlaybackProgressService, matcher: MetadataMatchService, library: LibraryService): void {
   app.get('/api/movies', async (request) => {
     const query = request.query as { search?: string; watched?: string; availability?: string; mediaType?: string; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: string; needsReview?: string; cursor?: string; limit?: string };
     const availability = query.availability === 'available' || query.availability === 'unavailable' ? query.availability : undefined;
@@ -40,7 +40,7 @@ export function registerLibraryRoutes(app: FastifyInstance, movies: MovieReposit
   });
   app.put('/api/movies/:id/watch-state', async (request, reply) => {
     const id = Number((request.params as any).id); const idHeader = deviceId(request.headers); if (!idHeader) return reply.code(400).send({ error: 'X-Device-Id must be a UUID' });
-    if (!movies.get(id)) return reply.code(404).send({ error: 'Movie not found' }); watches.set(id, idHeader, watchStateSchema.parse(request.body).watched); return library.get(id, idHeader);
+    if (!movies.get(id)) return reply.code(404).send({ error: 'Movie not found' }); progress.setWatched(id, idHeader, watchStateSchema.parse(request.body).watched); return library.get(id, idHeader);
   });
   app.post('/api/movies/:id/rematch', async (request, reply) => {
     const id = Number((request.params as any).id); if (!movies.get(id)) return reply.code(404).send({ error: 'Movie not found' });

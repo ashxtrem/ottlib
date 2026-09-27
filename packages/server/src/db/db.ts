@@ -13,6 +13,7 @@ import { ensureMetadataDisplayFields } from './migrations/009_metadata_display.j
 import { ensureCandidateEpisode } from './migrations/010_candidate_episode.js';
 import { ensureMetadataMediaType } from './migrations/011_metadata_media_type.js';
 import { ensureEpisodeColumns } from './migrations/012_episode_columns.js';
+import { playbackProgressMigration } from './migrations/013_playback_progress.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -32,5 +33,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   ensureCandidateEpisode(db);
   ensureMetadataMediaType(db);
   ensureEpisodeColumns(db);
+  db.exec(playbackProgressMigration);
   return db;
 }

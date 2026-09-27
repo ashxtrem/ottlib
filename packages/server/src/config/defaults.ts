@@ -28,3 +28,17 @@ export const mimeTypes: Record<string, string> = {
   mp4: 'video/mp4', mkv: 'video/x-matroska', avi: 'video/x-msvideo', mov: 'video/quicktime',
   m4v: 'video/x-m4v', wmv: 'video/x-ms-wmv', flv: 'video/x-flv', webm: 'video/webm'
 };
+
+/** Text subtitle formats a native player can side-load, keyed by lower-case file extension. */
+export const subtitleMimeTypes: Record<string, string> = {
+  srt: 'application/x-subrip', ass: 'text/x-ssa', ssa: 'text/x-ssa', vtt: 'text/vtt'
+};
+
+export const playbackProgressRules = {
+  /** Positions before this are treated as an accidental open and not saved. */
+  minimumPositionMs: 120_000,
+  /** At or beyond this fraction of the duration the title counts as watched and progress is cleared. */
+  watchedFraction: 0.92
+} as const;
+
+export const discoveryServiceType = 'ottlib';

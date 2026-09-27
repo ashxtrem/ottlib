@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 const bootstrapSchema = z.object({
   port: z.number().int().min(1).max(65535).default(8081),
-  appDataPath: z.string().min(1).default('./data')
+  appDataPath: z.string().min(1).default('./data'),
+  /** Advertise the server over mDNS so TV/mobile clients can discover it. */
+  advertise: z.boolean().default(true)
 });
 
 export type BootstrapConfig = z.infer<typeof bootstrapSchema> & { absoluteAppDataPath: string };
