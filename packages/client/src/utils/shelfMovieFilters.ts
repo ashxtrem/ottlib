@@ -48,7 +48,7 @@ export function filterShelfMovies(movies: Movie[], filters: ShelfMovieFilters): 
 export function toShelfPosterItems(movies: Movie[]): MovieListItem[] {
   return movies.map((movie) => ({
     id: movie.id, title: movie.title, year: movie.year, posterUrl: movie.posterUrl, resolution: formatResolution(movie.mediaInfo?.height), hdrFormat: movie.mediaInfo?.hdrFormat ?? null,
-    watched: movie.watched, missing: movie.missing, metadataStatus: movie.metadataStatus, shelves: movie.shelves
+    watched: movie.watched, resumePositionMs: movie.resumePositionMs, durationMs: movie.mediaInfo?.durationMs ?? null, missing: movie.missing, metadataStatus: movie.metadataStatus, shelves: movie.shelves
   }));
 }
 

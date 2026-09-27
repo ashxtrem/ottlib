@@ -1,5 +1,6 @@
 import { z } from 'zod';
 export * from './torrent.js';
+export * from './playback.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -94,6 +95,7 @@ export const movieSchema = z.object({
   fileSizeBytes: z.number().int().nonnegative(),
   mediaInfo: mediaInfoSchema.nullable(),
   watched: z.boolean(),
+  resumePositionMs: z.number().int().nonnegative().nullable(),
   missing: z.boolean(),
   addedAt: z.string(),
   shelves: z.array(shelfMembershipSchema)
@@ -107,6 +109,8 @@ export const movieListItemSchema = z.object({
   resolution: z.string().nullable(),
   hdrFormat: z.string().nullable(),
   watched: z.boolean(),
+  resumePositionMs: z.number().int().nonnegative().nullable(),
+  durationMs: z.number().int().nullable(),
   missing: z.boolean(),
   metadataStatus: z.enum(['pending', 'suggested', 'matched', 'unmatched', 'error']),
   shelves: z.array(shelfMembershipSchema)

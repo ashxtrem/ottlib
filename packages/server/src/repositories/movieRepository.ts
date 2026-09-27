@@ -5,7 +5,7 @@ interface MovieRow {
   id: number; canonical_path: string; folder_path: string; raw_filename: string; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null;
   title_override: string | null; overview: string | null; poster_file: string | null; backdrop_file: string | null;
   genres_json: string; cast_json: string; rating: number | null; runtime: number | null; metadata_status: Movie['metadataStatus'];
-  metadata_source: string | null; imdb_id: string | null; missing: number; added_at: string; watched: number;
+  metadata_source: string | null; imdb_id: string | null; missing: number; added_at: string; watched: number; resume_position_ms: number | null;
   metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; size: number;
   media_probe_status: string; container_format: string | null; duration_ms: number | null; video_width: number | null; video_height: number | null;
   video_codec: string | null; video_profile: string | null; video_bit_rate: number | null; hdr_format: string | null;
@@ -14,6 +14,7 @@ interface MovieRow {
 interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
+  resume_position_ms: number | null; duration_ms: number | null;
 }
 
 export interface ScannedMovie { folderId: number; path: string; filename: string; title: string; year: number | null; size: number; mtimeMs: number; seenAt: string }
@@ -79,6 +80,11 @@ export class MovieRepository {
       const movie = byId.get(id);
       return movie ? [movie] : [];
     });
+  }
+
+  public listContinueWatching(deviceId: string, limit: number): MovieListItem[] {
+    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE pp.movie_id IS NOT NULL AND m.missing = 0 ORDER BY pp.updated_at DESC, m.id DESC LIMIT ?`).all(deviceId, limit) as MovieListItemRow[];
+    return rows.map(this.mapListItem);
   }
 
   public hasAll(ids: number[]): boolean {
@@ -246,13 +252,20 @@ export class MovieRepository {
   }
 
   private selectSql(): string {
-    return `SELECT m.*, f.path AS folder_path, COALESCE(ws.watched, 0) AS watched FROM movies m
-      JOIN folders f ON f.id = m.folder_id LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = ?`;
+    return `SELECT m.*, f.path AS folder_path, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}
+      JOIN folders f ON f.id = m.folder_id`;
   }
 
   private summarySelectSql(): string {
     return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.video_height, m.hdr_format, COALESCE(ws.watched, 0) AS watched FROM movies m LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = ?`;
+      m.missing, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
+  }
+
+  /** Binds the device id once (first `?`) and exposes it to both per-device joins. */
+  private deviceScopedJoins(): string {
+    return `(SELECT ? AS device_id) device CROSS JOIN movies m
+      LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = device.device_id
+      LEFT JOIN playback_progress pp ON pp.movie_id = m.id AND pp.device_id = device.device_id`;
   }
 
   private filters(query: MovieListQuery): { clauses: string[]; values: unknown[] } {
@@ -352,13 +365,14 @@ export class MovieRepository {
       container: row.container_format, durationMs: row.duration_ms, width: row.video_width, height: row.video_height,
       videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: []
     } : null,
-    watched: Boolean(row.watched), missing: Boolean(row.missing), addedAt: row.added_at, shelves: []
+    watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, missing: Boolean(row.missing), addedAt: row.added_at, shelves: []
   });
 
   private mapListItem = (row: MovieListItemRow): MovieListItem => ({
     id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format,
-    watched: Boolean(row.watched), missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []
+    watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, durationMs: row.duration_ms,
+    missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []
   });
 }

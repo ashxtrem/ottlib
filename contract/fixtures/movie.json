@@ -1,0 +1,71 @@
+{
+  "id": 1,
+  "title": "Arrival",
+  "year": 2016,
+  "rawFilename": "Arrival.2016.2160p.mkv",
+  "filePath": "D:\\Movies\\Arrival.2016.2160p.mkv",
+  "titleOverride": null,
+  "overview": "A linguist is recruited to talk to visitors.",
+  "posterUrl": "/media/posters/arrival.jpg",
+  "backdropUrl": "/media/backdrops/arrival-backdrop.jpg",
+  "genres": [
+    "Drama",
+    "Science Fiction"
+  ],
+  "cast": [
+    "Amy Adams",
+    "Jeremy Renner"
+  ],
+  "rating": 7.6,
+  "runtime": 116,
+  "imdbId": "tt2543164",
+  "metadataStatus": "matched",
+  "metadataSource": "tmdb",
+  "mediaType": "movie",
+  "season": null,
+  "episode": null,
+  "fileSizeBytes": 1000,
+  "mediaInfo": {
+    "container": "MKV",
+    "durationMs": 6960000,
+    "width": 3840,
+    "height": 2160,
+    "videoCodec": "HEVC",
+    "videoProfile": "Main 10",
+    "videoBitRate": 40000000,
+    "hdrFormat": "HDR10",
+    "tracks": [
+      {
+        "type": "audio",
+        "source": "embedded",
+        "order": 1,
+        "language": "eng",
+        "title": "Surround 5.1",
+        "codec": "E-AC-3",
+        "channels": 6,
+        "channelLayout": "5.1(side)",
+        "isDefault": true,
+        "isForced": false,
+        "isHearingImpaired": false
+      },
+      {
+        "type": "subtitle",
+        "source": "embedded",
+        "order": 2,
+        "language": "eng",
+        "title": null,
+        "codec": "PGS",
+        "channels": null,
+        "channelLayout": null,
+        "isDefault": false,
+        "isForced": false,
+        "isHearingImpaired": false
+      }
+    ]
+  },
+  "watched": false,
+  "resumePositionMs": null,
+  "missing": false,
+  "addedAt": "2026-01-01T00:00:00.000Z",
+  "shelves": []
+}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ottlib is a trusted-LAN server reached over plain HTTP by IP address. Android blocks cleartext by
+  default and domain-config cannot express IP ranges, so cleartext is allowed app-wide.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

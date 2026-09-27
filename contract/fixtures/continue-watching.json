@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "title": "Arrival",
+    "year": 2016,
+    "posterUrl": "/media/posters/arrival.jpg",
+    "resolution": "4K",
+    "hdrFormat": "HDR10",
+    "watched": false,
+    "resumePositionMs": 1830000,
+    "durationMs": 6960000,
+    "missing": false,
+    "metadataStatus": "matched",
+    "shelves": []
+  }
+]

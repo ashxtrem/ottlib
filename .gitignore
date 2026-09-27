@@ -6,7 +6,7 @@ dist/
 *.tsbuildinfo
 
 # App data (posters, backdrops, sqlite db)
-data/
+/data/
 
 # Local config / secrets
 config/config.json

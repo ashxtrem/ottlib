@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { MovieListItem } from '@ottlib/shared';
 import { PosterCard } from './PosterCard';
 
-const movie: MovieListItem = { id: 1, title: 'Arrival', year: 2016, posterUrl: null, resolution: null, hdrFormat: null, watched: false, missing: false, metadataStatus: 'matched', shelves: [] };
+const movie: MovieListItem = { id: 1, title: 'Arrival', year: 2016, posterUrl: null, resolution: null, hdrFormat: null, watched: false, resumePositionMs: null, durationMs: null, missing: false, metadataStatus: 'matched', shelves: [] };
 
 function render(watched: boolean) {
   return renderToStaticMarkup(<MemoryRouter><PosterCard movie={{ ...movie, watched }} onToggleWatched={vi.fn()} /></MemoryRouter>);
