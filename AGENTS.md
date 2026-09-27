@@ -53,6 +53,25 @@ interface MetadataProvider {
   - `dark:` variants available for dark mode.
 - Components stay presentational where possible; data fetching lives in hooks (`useMovies`, `useSettings`, etc.), not inline in page components.
 
+## Android TV client (`apps/android`)
+
+A Gradle project, separate from the npm workspaces. Same principles as above: small files, one responsibility each.
+
+```
+core/model      @Serializable DTOs mirroring packages/shared (pure JVM)
+core/network    OkHttp API client (pure JVM)
+core/data       DataStore-backed stores + ConnectionManager (Android library)
+core/discovery  mDNS server discovery via NsdManager (Android library)
+core/player     Media3 player factory, MediaItem mapping, progress reporting (Android library)
+tv              The app: Compose for TV screens, one ViewModel per screen, manual DI in AppContainer
+```
+
+- **Contract fixtures.** `packages/shared` stays the single source of truth for API shapes. Kotlin can't import zod, so `packages/server/src/routes/nativeClient.test.ts` writes real responses to `contract/fixtures/`, and `core/model`'s `ContractFixturesTest` decodes them strictly. When you change a response the TV app uses, update the fixtures (`npx vitest run -u` in `packages/server`) and the Kotlin DTO in the same change.
+- **Server-relative URLs.** The server returns paths (`/api/stream/1`, `/media/posters/x.jpg`); the app resolves them against the active server with `OttlibApi.resolve`. The app never builds stream URLs itself — it asks `GET /api/movies/:id/playback`.
+- **API version.** Bump `apiVersion` in `packages/shared/src/playback.ts` (and `SUPPORTED_API_VERSION` in `core/model`) only for breaking changes to endpoints the app uses.
+- **TV focus.** Every screen sets an initial focus and restores focus when returning from a child screen; single-line text fields hand ↑/↓ back to focus navigation.
+- **Build/test:** `./gradlew test :tv:assembleDebug` from `apps/android`.
+
 ## When adding a new feature
 
 1. Does it need a new pluggable strategy (another metadata source, another playback mechanism)? → add one file implementing the existing interface, register it, done.

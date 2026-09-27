@@ -9,6 +9,7 @@ OttLib is a self-hosted movie-library app for a trusted home network. Point it a
 - Browse a responsive poster grid; search, filter, sort, and mark titles watched per device.
 - Review duplicate copies and their technical details.
 - Play locally, hand off to a LAN player, open in Android media players, or stream with byte-range support.
+- Watch on Android TV / Google TV with a native app: remote-friendly browsing, a built-in player with resume, and automatic server discovery.
 - Schedule rescans and review scan progress/history.
 - Search enabled qBittorrent search plugins and hand selected releases back to qBittorrent.
 
@@ -54,13 +55,39 @@ Edit `config/config.json` before starting the server when you need a different p
 ```json
 {
   "port": 8081,
-  "appDataPath": "./data"
+  "appDataPath": "./data",
+  "advertise": true
 }
 ```
 
 Metadata keys, library folders, schedules, and qBittorrent credentials are managed in the Settings page rather than committed to the repository.
 
 For qBittorrent, enable **Tools → Options → Web UI**, create Web UI credentials, and then add its URL and credentials in OttLib's Settings page. Anyone on the trusted network who can access OttLib can use this integration.
+
+## Android TV app
+
+The TV client lives in `apps/android` (a Gradle project; the `tv` module is the app). It needs JDK 17 and the Android SDK (platform 36); the Gradle wrapper downloads everything else.
+
+```bash
+cd apps/android
+./gradlew :tv:assembleRelease
+```
+
+The release build is shrunk with R8 and signed with the debug key unless `apps/android/keystore.properties` exists. Use it on the TV: debug builds are noticeably slower on TV hardware.
+
+Install on a Google TV: enable **Developer options** (Settings → System → About → click *Android TV OS build* seven times), turn on **Wireless debugging** or **USB debugging**, then:
+
+```bash
+adb connect <tv-ip>:5555
+adb install -r --user 0 apps/android/tv/build/outputs/apk/release/tv-release.apk
+adb shell cmd package compile -m speed-profile -f dev.ottlib.tv
+```
+
+`--user 0` matters on TVs with a second user profile: without it the app can land in a profile the home screen doesn't show. The `compile` step applies the bundled Compose performance profiles right away; a sideloaded app otherwise runs unoptimised until Android's overnight maintenance, and scrolling stutters.
+
+On first launch the app lists Ottlib servers found on the network (mDNS, `_ottlib._tcp`), or you can type the address shown under **Settings → Server info** in the web app. Discovery answers on every real LAN adapter (virtual 169.254.x.x adapters are skipped); if the list stays empty, check that Windows Firewall allows Node.js inbound UDP. Set `"advertise": false` in `config/config.json` to turn discovery off.
+
+Playback uses Media3 (ExoPlayer) with an FFmpeg audio fallback for DTS/TrueHD. For anything the built-in player can't handle (for example styled ASS subtitles), use **Play in another app**.
 
 ## Scripts
 
@@ -78,6 +105,9 @@ packages/
   client/   React user interface
   server/   Fastify API, SQLite access, scanners, and provider integrations
   shared/   Types shared by client and server
+apps/
+  android/  Android TV client (Kotlin, Compose for TV, Media3)
+contract/   Server response fixtures the Android app is tested against
 config/     Bootstrap configuration example
 ```
 

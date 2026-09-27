@@ -36,6 +36,15 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 - [x] Android native playback — `intent://` link opens the file straight into VLC/MX Player's app chooser, with an in-browser fallback if no player claims it
 - [x] Byte-range streaming — real seeking/scrubbing support, `HEAD` support, proper `206`/`416` handling
 
+## Android TV App (`apps/android`)
+- [x] Server discovery over mDNS (`_ottlib._tcp`) with manual address fallback; reconnects to the last server on launch
+- [x] Remote-first browsing — Home rows (Continue watching, Recently added, Unwatched, shelves, genres), Library grid with sort/show/genre/type filters, Search
+- [x] Movie details — artwork, metadata, cast, video/audio/subtitle track summary, mark watched
+- [x] Built-in Media3 player — direct play of the existing byte-range stream, FFmpeg audio fallback (DTS/TrueHD), side-loaded external SRT/ASS/VTT subtitles, audio/subtitle track switching, ←/→ seek shortcuts
+- [x] Resume position — per-device progress saved while playing; auto-marked watched at 92%; "Continue watching" on Home and in the Android TV Watch Next row
+- [x] Preferred audio and subtitle language
+- [x] "Play in another app" escape hatch for formats the built-in player can't handle
+
 ## Settings
 - [x] Scan folder management — add/remove roots
 - [x] Extension & ignore-pattern management
@@ -51,6 +60,5 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 
 ## Out of scope for v1
 - No user accounts/auth (single trusted LAN)
-- No transcoding (direct file streaming only — can be added later if a format won't play)
-- No resume-position/"continue watching" tracking (just watched/unwatched)
-- No mobile app — Android access is via the phone's browser
+- No transcoding (direct file streaming only — planned as Phase 2 of the TV work, see `plans/ANDROID_TV_PLAN.md`)
+- No phone/iOS app yet — phones use the browser (the Android TV app is the first native client)

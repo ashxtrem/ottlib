@@ -1,0 +1,86 @@
+import java.util.Properties
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+// Optional release signing: create apps/android/keystore.properties (git-ignored) with
+// storeFile, storePassword, keyAlias, keyPassword. Without it, release builds use the debug key.
+val keystoreProperties = Properties().apply {
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
+}
+
+android {
+    namespace = "dev.ottlib.tv"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "dev.ottlib.tv"
+        minSdk = 28
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
+        // Chromecast with Google TV runs a 32-bit userland; x86_64 is for the emulator.
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64") }
+    }
+
+    signingConfigs {
+        if (keystoreProperties.isNotEmpty()) create("release") {
+            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+        }
+    }
+
+    buildTypes {
+        release {
+            // R8 matters for Compose frame times on low-end TV chips; JNI and serializer keeps are in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+        }
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin { jvmToolchain(17) }
+
+dependencies {
+    implementation(project(":core:data"))
+    implementation(project(":core:discovery"))
+    implementation(project(":core:player"))
+
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material.icons)
+    implementation(libs.compose.ui.tooling.preview)
+    debugImplementation(libs.compose.ui.tooling)
+    implementation(libs.tv.material)
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.tvprovider)
+    implementation(libs.media3.ui)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+    implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(libs.junit)
+}
