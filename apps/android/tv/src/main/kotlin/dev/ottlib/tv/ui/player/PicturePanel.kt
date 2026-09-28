@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -24,6 +23,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.Icon
@@ -32,8 +32,8 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import dev.ottlib.core.model.PictureMode
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.tryRequestFocus
-import dev.ottlib.tv.ui.theme.OttlibColors
 
 /**
  * Side sheet opened by holding OK during playback. Focusing an option previews it on the live video; OK keeps it,

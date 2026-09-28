@@ -18,6 +18,8 @@ kotlin { jvmToolchain(17) }
 dependencies {
     api(project(":core:model"))
     api(libs.media3.exoplayer)
+    // PlayerView, for PictureModeController (both apps draw video through it).
+    api(libs.media3.ui)
     implementation(libs.media3.datasource.okhttp)
     // Prebuilt FFmpeg decoders for Media3: software fallback for DTS / TrueHD audio and MPEG-4 ASP video.
     implementation(libs.nextlib.media3ext)

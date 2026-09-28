@@ -5,18 +5,17 @@ import android.content.Context
 import android.net.Uri
 import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
-
-/** What the launcher shows for an in-progress title. [posterUrl] must be absolute. */
-data class WatchNextEntry(val movieId: Long, val title: String, val posterUrl: String?, val positionMs: Long, val durationMs: Long)
+import dev.ottlib.core.presentation.ContinueWatchingEntry
+import dev.ottlib.core.presentation.ContinueWatchingPublisher
 
 /**
  * Mirrors in-progress titles into the Android TV "Watch Next" row, keyed by movie id. Best effort:
  * launchers that don't expose the TV provider simply ignore it. Call from a background thread.
  */
-class WatchNextPublisher(context: Context) {
+class WatchNextPublisher(context: Context) : ContinueWatchingPublisher {
     private val resolver = context.applicationContext.contentResolver
 
-    fun upsert(entry: WatchNextEntry) = safely {
+    override fun upsert(entry: ContinueWatchingEntry) = safely {
         val program = WatchNextProgram.Builder()
             .setType(TvContractCompat.WatchNextPrograms.TYPE_MOVIE)
             .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
@@ -34,7 +33,7 @@ class WatchNextPublisher(context: Context) {
         else resolver.update(TvContractCompat.buildWatchNextProgramUri(existing), program.toContentValues(), null, null)
     }
 
-    fun remove(movieId: Long) = safely {
+    override fun remove(movieId: Long) = safely {
         programId(movieId)?.let { resolver.delete(TvContractCompat.buildWatchNextProgramUri(it), null, null) }
     }
 

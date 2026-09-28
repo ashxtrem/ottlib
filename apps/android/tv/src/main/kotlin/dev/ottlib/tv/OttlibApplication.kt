@@ -1,22 +1,23 @@
 package dev.ottlib.tv
 
 import android.app.Application
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.allowRgb565
 import coil3.request.crossfade
+import dev.ottlib.core.presentation.AppContainer
+import dev.ottlib.core.presentation.AppContainerOwner
+import dev.ottlib.tv.watchnext.WatchNextPublisher
 
-class OttlibApplication : Application(), SingletonImageLoader.Factory {
-    lateinit var container: AppContainer
+class OttlibApplication : Application(), AppContainerOwner, SingletonImageLoader.Factory {
+    override lateinit var container: AppContainer
         private set
 
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer(this)
+        container = AppContainer(this, continueWatching = WatchNextPublisher(this))
     }
 
     /** Posters and backdrops are served by the Ottlib server over the same client (and device header). */
@@ -27,6 +28,3 @@ class OttlibApplication : Application(), SingletonImageLoader.Factory {
         .allowRgb565(true)
         .build()
 }
-
-@Composable
-fun appContainer(): AppContainer = (LocalContext.current.applicationContext as OttlibApplication).container

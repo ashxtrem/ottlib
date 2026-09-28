@@ -35,7 +35,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
-import dev.ottlib.tv.ui.theme.OttlibColors
+import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.theme.OttlibColors
 
 val PosterWidth: Dp = 124.dp
 private val posterShape = RoundedCornerShape(10.dp)

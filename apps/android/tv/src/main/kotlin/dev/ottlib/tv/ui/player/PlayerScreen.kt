@@ -12,8 +12,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dev.ottlib.tv.appContainer
-import dev.ottlib.tv.playback.openInExternalPlayer
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.openInExternalPlayer
+import dev.ottlib.core.presentation.player.PlayerUiState
+import dev.ottlib.core.presentation.player.PlayerViewModel
 import dev.ottlib.tv.ui.components.ErrorMessage
 import dev.ottlib.tv.ui.components.LoadingMessage
 
@@ -21,7 +23,7 @@ import dev.ottlib.tv.ui.components.LoadingMessage
 fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit) {
     val container = appContainer()
     val viewModel = viewModel(key = "player-$movieId-$fromStart") {
-        PlayerViewModel(container.api, container.playerFactory, container.playbackPreferences, container.pictureModes, container.trackChoices, container.watchNext, container.appScope, movieId, fromStart)
+        PlayerViewModel(container.api, container.playerFactory, container.playbackPreferences, container.pictureModes, container.trackChoices, container.continueWatching, container.appScope, movieId, fromStart)
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val problem by viewModel.problem.collectAsStateWithLifecycle()

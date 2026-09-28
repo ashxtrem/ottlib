@@ -10,7 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import dev.ottlib.tv.appContainer
+import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.connect.ConnectScreen
 import dev.ottlib.tv.ui.details.DetailsScreen

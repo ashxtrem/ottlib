@@ -13,7 +13,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.size.Size
-import dev.ottlib.tv.ui.theme.OttlibColors
+import dev.ottlib.core.presentation.theme.OttlibColors
 
 /**
  * Full-screen artwork behind a screen, faded into the canvas so text on top stays readable.

@@ -10,6 +10,7 @@ OttLib is a self-hosted movie-library app for a trusted home network. Point it a
 - Review duplicate copies and their technical details.
 - Play locally, hand off to a LAN player, open in Android media players, or stream with byte-range support.
 - Watch on Android TV / Google TV with a native app: remote-friendly browsing, a built-in player with resume, and automatic server discovery.
+- Watch on Android phones and foldables with a touch app: layouts that follow the window (Galaxy Z Fold cover and inner screens), swipe gestures, picture-in-picture, and Flex mode.
 - Schedule rescans and review scan progress/history.
 - Search enabled qBittorrent search plugins and hand selected releases back to qBittorrent.
 
@@ -89,6 +90,25 @@ On first launch the app lists Ottlib servers found on the network (mDNS, `_ottli
 
 Playback uses Media3 (ExoPlayer) with an FFmpeg audio fallback for DTS/TrueHD. For anything the built-in player can't handle (for example styled ASS subtitles), use **Play in another app**.
 
+## Android phone app
+
+The phone and foldable client is the `mobile` module of the same Gradle project. It shares the API client, player setup and screen logic with the TV app; only the screens differ.
+
+```bash
+cd apps/android
+./gradlew :mobile:assembleRelease
+adb install -r apps/android/mobile/build/outputs/apk/release/mobile-release.apk
+```
+
+Layouts follow the window, not the device: on a Galaxy Z Fold the cover screen gets a bottom bar and a single-column details page, the inner screen a navigation rail and two panes, and folding or unfolding mid-video doesn't interrupt playback. In the player:
+
+- Tap to show or hide the controls; double-tap the left or right third to skip (taps add up).
+- Swipe up or down on the left half for brightness, on the right half for volume; swipe sideways to seek.
+- Pinch to switch between Fit and Zoom; the picture button has every picture mode (Smart fill, forced 16:9 / 4:3 / 2.39:1).
+- Leaving the app while a video plays shrinks it into picture-in-picture. Half-folded like a laptop (Flex mode), the video sits above the fold with the controls below.
+
+Resume positions and watched state are per device, as on the TV. The phone must be on the same network as the server.
+
 ## Scripts
 
 | Command | Description |
@@ -106,7 +126,7 @@ packages/
   server/   Fastify API, SQLite access, scanners, and provider integrations
   shared/   Types shared by client and server
 apps/
-  android/  Android TV client (Kotlin, Compose for TV, Media3)
+  android/  Android TV and phone clients (Kotlin, Compose, Media3)
 contract/   Server response fixtures the Android app is tested against
 config/     Bootstrap configuration example
 ```

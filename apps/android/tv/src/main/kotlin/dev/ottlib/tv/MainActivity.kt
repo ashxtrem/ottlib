@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.navigation.OttlibNavHost
-import dev.ottlib.tv.ui.theme.OttlibColors
 import dev.ottlib.tv.ui.theme.OttlibTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 

@@ -20,8 +20,9 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import dev.ottlib.core.presentation.player.PlaybackProblem
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.tryRequestFocus
-import dev.ottlib.tv.ui.theme.OttlibColors
 
 /** Asks the viewer what to do when the built-in player can't play something. */
 @Composable

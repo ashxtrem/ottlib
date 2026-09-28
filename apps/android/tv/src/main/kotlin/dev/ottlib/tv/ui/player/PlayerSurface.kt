@@ -31,7 +31,9 @@ import androidx.media3.ui.PlayerView
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.ottlib.core.model.PictureMode
+import dev.ottlib.core.player.PictureModeController
 import dev.ottlib.core.player.SeekAccumulator
+import dev.ottlib.core.presentation.player.PlayerControls
 import dev.ottlib.tv.InterceptKeys
 import kotlinx.coroutines.delay
 

@@ -1,5 +1,6 @@
 package dev.ottlib.tv.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,11 +8,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,27 +24,29 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import dev.ottlib.tv.appContainer
+import dev.ottlib.core.presentation.LoadState
+import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.formatRemaining
+import dev.ottlib.core.presentation.home.FocusTarget
+import dev.ottlib.core.presentation.home.HomeRow
+import dev.ottlib.core.presentation.home.HomeViewModel
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.DefaultScroll
 import dev.ottlib.tv.ui.components.EmptyMessage
 import dev.ottlib.tv.ui.components.ErrorMessage
-import dev.ottlib.tv.ui.components.LoadState
 import dev.ottlib.tv.ui.components.LoadingMessage
 import dev.ottlib.tv.ui.components.PivotScroll
-import dev.ottlib.tv.ui.components.PosterItem
 import dev.ottlib.tv.ui.components.PosterRow
 import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.components.TopNavigation
-import dev.ottlib.tv.ui.components.formatRemaining
 import dev.ottlib.tv.ui.components.tryRequestFocus
-import dev.ottlib.tv.ui.theme.OttlibColors
 
 /** Distance from the top of the rows list to the focused poster: room for the row title above it. */
 private val RowPivot = 60.dp
