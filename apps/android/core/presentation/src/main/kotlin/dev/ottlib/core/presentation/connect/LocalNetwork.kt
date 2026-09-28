@@ -1,4 +1,4 @@
-package dev.ottlib.tv.ui.connect
+package dev.ottlib.core.presentation.connect
 
 import android.content.Context
 import android.net.ConnectivityManager

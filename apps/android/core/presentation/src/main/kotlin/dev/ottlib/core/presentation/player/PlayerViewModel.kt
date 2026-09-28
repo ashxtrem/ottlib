@@ -1,4 +1,4 @@
-package dev.ottlib.tv.ui.player
+package dev.ottlib.core.presentation.player
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,23 +7,23 @@ import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import dev.ottlib.core.data.PictureModeStore
-import dev.ottlib.core.data.TrackChoiceStore
 import dev.ottlib.core.data.PlaybackPreferences
-import dev.ottlib.core.model.PictureMode
-import dev.ottlib.core.model.TrackChoice
+import dev.ottlib.core.data.TrackChoiceStore
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.model.PlaybackProgressUpdate
+import dev.ottlib.core.model.TrackChoice
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
+import dev.ottlib.core.player.PlayerSettings
 import dev.ottlib.core.player.ProgressReporter
 import dev.ottlib.core.player.TrackMemory
-import dev.ottlib.core.player.PlayerSettings
 import dev.ottlib.core.player.hasOnlyUnsupportedAudio
 import dev.ottlib.core.player.hasOnlyUnsupportedVideo
 import dev.ottlib.core.player.toMediaItem
-import dev.ottlib.tv.ui.components.userMessage
-import dev.ottlib.tv.watchnext.WatchNextEntry
-import dev.ottlib.tv.watchnext.WatchNextPublisher
+import dev.ottlib.core.presentation.ContinueWatchingEntry
+import dev.ottlib.core.presentation.ContinueWatchingPublisher
+import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -56,7 +56,7 @@ class PlayerViewModel(
     private val preferences: PlaybackPreferences,
     private val pictureModes: PictureModeStore,
     private val trackChoices: TrackChoiceStore,
-    private val watchNext: WatchNextPublisher,
+    private val continueWatching: ContinueWatchingPublisher,
     private val backgroundScope: CoroutineScope,
     private val movieId: Long,
     private val fromStart: Boolean,
@@ -137,6 +137,11 @@ class PlayerViewModel(
         backgroundScope.launch { pictureModes.set(movieId, if (rememberForTitle) mode else null) }
     }
 
+    /** Changes the picture for this session only, leaving any remembered choice for the title alone (pinch to zoom). */
+    fun usePictureModeForSession(mode: PictureMode) {
+        picture.value = mode
+    }
+
     /** Remembered for this title; with "follow last choice" on, also becomes the language default for new titles. */
     private fun rememberTracks(choice: TrackChoice) {
         backgroundScope.launch {
@@ -170,8 +175,8 @@ class PlayerViewModel(
         val result = api.saveProgress(movieId, PlaybackProgressUpdate(positionMs, durationMs))
         val current = movie ?: return
         val resume = result.resumePositionMs
-        if (resume != null) watchNext.upsert(WatchNextEntry(movieId, current.title, api.resolve(current.posterUrl), resume, durationMs))
-        else watchNext.remove(movieId)
+        if (resume != null) continueWatching.upsert(ContinueWatchingEntry(movieId, current.title, api.resolve(current.posterUrl), resume, durationMs))
+        else continueWatching.remove(movieId)
     }
 
     private fun audioCodecs(): String = movie?.mediaInfo?.tracks?.filter { it.isAudio }?.mapNotNull { it.codec }?.distinct()?.joinToString(", ")?.ifEmpty { null } ?: "unknown codec"

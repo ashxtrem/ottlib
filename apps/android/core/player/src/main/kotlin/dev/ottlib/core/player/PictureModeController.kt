@@ -1,4 +1,4 @@
-package dev.ottlib.tv.ui.player
+package dev.ottlib.core.player
 
 import android.view.View
 import android.view.ViewGroup
@@ -10,7 +10,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import dev.ottlib.core.model.PictureMode
-import dev.ottlib.core.player.PictureGeometry
+
 
 /**
  * Applies a [PictureMode] to Media3's PlayerView. Geometry only: the hardware video path (HDR, Dolby Vision,

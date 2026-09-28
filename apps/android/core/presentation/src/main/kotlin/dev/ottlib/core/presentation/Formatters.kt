@@ -1,4 +1,4 @@
-package dev.ottlib.tv.ui.components
+package dev.ottlib.core.presentation
 
 import dev.ottlib.core.model.MediaTrack
 import dev.ottlib.core.model.Movie

@@ -22,14 +22,15 @@ import androidx.tv.material3.Text
 import dev.ottlib.core.data.PlaybackSettings
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.languageName
+import dev.ottlib.core.presentation.Choice
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.settings.SettingsViewModel
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.BuildConfig
-import dev.ottlib.tv.appContainer
-import dev.ottlib.tv.ui.components.Choice
 import dev.ottlib.tv.ui.components.ChoiceDialog
 import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.components.TopNavigation
-import dev.ottlib.tv.ui.theme.OttlibColors
 
 private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Picture }
 

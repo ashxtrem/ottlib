@@ -24,9 +24,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import dev.ottlib.tv.ui.theme.OttlibColors
+import dev.ottlib.core.presentation.Choice
+import dev.ottlib.core.presentation.theme.OttlibColors
 
-data class Choice<T>(val label: String, val value: T)
 
 /** A single-choice list in a dialog; focus starts on the current selection. */
 @Composable

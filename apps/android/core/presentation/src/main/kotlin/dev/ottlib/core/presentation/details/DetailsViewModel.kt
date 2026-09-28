@@ -1,12 +1,12 @@
-package dev.ottlib.tv.ui.details
+package dev.ottlib.core.presentation.details
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ottlib.core.model.Movie
 import dev.ottlib.core.network.OttlibApi
-import dev.ottlib.tv.ui.components.LoadState
-import dev.ottlib.tv.ui.components.userMessage
-import dev.ottlib.tv.watchnext.WatchNextPublisher
+import dev.ottlib.core.presentation.ContinueWatchingPublisher
+import dev.ottlib.core.presentation.LoadState
+import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 class DetailsViewModel(
     private val api: OttlibApi,
-    private val watchNext: WatchNextPublisher,
+    private val continueWatching: ContinueWatchingPublisher,
     private val backgroundScope: CoroutineScope,
     val movieId: Long,
 ) : ViewModel() {
@@ -44,13 +44,13 @@ class DetailsViewModel(
     fun toggleWatched() = mutate {
         val current = (state.value as? LoadState.Loaded)?.value ?: return@mutate
         val updated = api.setWatched(movieId, !current.watched)
-        if (updated.watched) backgroundScope.launch { watchNext.remove(movieId) }
+        if (updated.watched) backgroundScope.launch { continueWatching.remove(movieId) }
         state.value = LoadState.Loaded(updated)
     }
 
     fun clearProgress() = mutate {
         api.clearProgress(movieId)
-        backgroundScope.launch { watchNext.remove(movieId) }
+        backgroundScope.launch { continueWatching.remove(movieId) }
         state.value = LoadState.Loaded(api.movie(movieId))
     }
 

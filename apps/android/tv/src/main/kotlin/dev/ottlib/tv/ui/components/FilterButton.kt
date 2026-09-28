@@ -9,7 +9,7 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import dev.ottlib.tv.ui.theme.OttlibColors
+import dev.ottlib.core.presentation.theme.OttlibColors
 
 /** A pill showing `Label: value`; opens a chooser when clicked. Highlighted when the filter is not at its default. */
 @Composable

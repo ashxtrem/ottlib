@@ -1,14 +1,14 @@
-package dev.ottlib.tv.ui.home
+package dev.ottlib.core.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.network.MovieSort
 import dev.ottlib.core.network.OttlibApi
-import dev.ottlib.tv.ui.components.LoadState
-import dev.ottlib.tv.ui.components.PosterItem
-import dev.ottlib.tv.ui.components.toPosterItem
-import dev.ottlib.tv.ui.components.userMessage
+import dev.ottlib.core.presentation.LoadState
+import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.toPosterItem
+import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

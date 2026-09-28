@@ -62,6 +62,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:discovery"))
     implementation(project(":core:player"))
+    implementation(project(":core:presentation"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

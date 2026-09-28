@@ -12,6 +12,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.unit.dp
+import dev.ottlib.core.presentation.PosterItem
 
 /**
  * A poster grid that asks for more items when focus gets within two rows of the end. [focusRequester]

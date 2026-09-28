@@ -1,4 +1,4 @@
-package dev.ottlib.tv.ui.connect
+package dev.ottlib.core.presentation.connect
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

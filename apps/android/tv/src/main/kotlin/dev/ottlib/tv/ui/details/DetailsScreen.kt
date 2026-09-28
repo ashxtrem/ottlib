@@ -34,23 +34,24 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import dev.ottlib.core.model.Movie
-import dev.ottlib.tv.appContainer
-import dev.ottlib.tv.playback.openInExternalPlayer
+import dev.ottlib.core.presentation.LoadState
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.describe
+import dev.ottlib.core.presentation.details.DetailsViewModel
+import dev.ottlib.core.presentation.formatPosition
+import dev.ottlib.core.presentation.metaLine
+import dev.ottlib.core.presentation.openInExternalPlayer
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.AmbientBackdrop
 import dev.ottlib.tv.ui.components.ErrorMessage
-import dev.ottlib.tv.ui.components.LoadState
 import dev.ottlib.tv.ui.components.LoadingMessage
 import dev.ottlib.tv.ui.components.ScreenPadding
-import dev.ottlib.tv.ui.components.describe
-import dev.ottlib.tv.ui.components.formatPosition
-import dev.ottlib.tv.ui.components.metaLine
 import dev.ottlib.tv.ui.components.tryRequestFocus
-import dev.ottlib.tv.ui.theme.OttlibColors
 
 @Composable
 fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onBack: () -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.watchNext, container.appScope, movieId) }
+    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId) }
     val state by viewModel.movie.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {

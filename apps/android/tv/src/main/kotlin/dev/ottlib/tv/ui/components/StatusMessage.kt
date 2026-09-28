@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import dev.ottlib.tv.ui.theme.OttlibColors
+import dev.ottlib.core.presentation.theme.OttlibColors
 
 @Composable
 fun LoadingMessage(text: String = "Loading…", modifier: Modifier = Modifier) {

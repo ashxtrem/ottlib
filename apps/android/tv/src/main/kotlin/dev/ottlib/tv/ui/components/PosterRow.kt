@@ -12,7 +12,8 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import dev.ottlib.tv.ui.theme.OttlibColors
+import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.theme.OttlibColors
 
 /** A titled horizontal row of posters; D-pad focus returns to the last focused poster when re-entering the row. */
 @Composable

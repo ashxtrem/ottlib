@@ -1,4 +1,4 @@
-package dev.ottlib.tv.playback
+package dev.ottlib.core.presentation
 
 import android.content.ActivityNotFoundException
 import android.content.Context

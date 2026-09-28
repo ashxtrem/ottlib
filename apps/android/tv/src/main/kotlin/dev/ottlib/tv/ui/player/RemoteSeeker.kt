@@ -8,8 +8,8 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import dev.ottlib.core.player.SeekAccumulator
 import dev.ottlib.core.player.SeekDirection
-import dev.ottlib.tv.ui.components.formatOffset
-import dev.ottlib.tv.ui.components.formatPosition
+import dev.ottlib.core.presentation.formatOffset
+import dev.ottlib.core.presentation.formatPosition
 import kotlin.math.max
 
 /** Transient on-screen feedback for remote shortcuts; [id] makes repeated identical hints restart their timer. */

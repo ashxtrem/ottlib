@@ -1,4 +1,4 @@
-package dev.ottlib.tv.ui.components
+package dev.ottlib.core.presentation
 
 import android.util.Log
 import dev.ottlib.core.network.ApiException

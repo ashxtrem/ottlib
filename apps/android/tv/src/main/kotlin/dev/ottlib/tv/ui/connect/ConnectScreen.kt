@@ -31,12 +31,14 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.ottlib.core.discovery.DiscoveredServer
-import dev.ottlib.tv.appContainer
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.connect.ConnectViewModel
+import dev.ottlib.core.presentation.connect.localSubnetPrefix
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.LoadingMessage
 import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TvTextField
 import dev.ottlib.tv.ui.components.tryRequestFocus
-import dev.ottlib.tv.ui.theme.OttlibColors
 
 @Composable
 fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {

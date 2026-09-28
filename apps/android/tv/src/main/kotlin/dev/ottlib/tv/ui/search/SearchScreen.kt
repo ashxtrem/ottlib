@@ -15,9 +15,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dev.ottlib.tv.appContainer
+import dev.ottlib.core.presentation.LoadState
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.search.SearchViewModel
 import dev.ottlib.tv.ui.components.EmptyMessage
-import dev.ottlib.tv.ui.components.LoadState
 import dev.ottlib.tv.ui.components.LoadingMessage
 import dev.ottlib.tv.ui.components.PosterGrid
 import dev.ottlib.tv.ui.components.ScreenPadding

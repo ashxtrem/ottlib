@@ -1,4 +1,4 @@
-package dev.ottlib.tv.ui.settings
+package dev.ottlib.core.presentation.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

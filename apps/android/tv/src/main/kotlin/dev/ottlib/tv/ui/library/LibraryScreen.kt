@@ -22,8 +22,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.ottlib.core.network.MovieSort
-import dev.ottlib.tv.appContainer
-import dev.ottlib.tv.ui.components.Choice
+import dev.ottlib.core.presentation.Choice
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.library.LibraryChoices
+import dev.ottlib.core.presentation.library.LibraryViewModel
+import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.ChoiceDialog
 import dev.ottlib.tv.ui.components.EmptyMessage
 import dev.ottlib.tv.ui.components.ErrorMessage
@@ -34,13 +37,12 @@ import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.components.TopNavigation
 import dev.ottlib.tv.ui.components.tryRequestFocus
-import dev.ottlib.tv.ui.theme.OttlibColors
 
 private enum class LibraryDialog { Sort, Watched, Genre, Type }
 
-private val sortChoices = listOf(Choice("Title", MovieSort.Title), Choice("Recently added", MovieSort.Added), Choice("Year", MovieSort.Year), Choice("Quality", MovieSort.Quality))
-private val watchedChoices: List<Choice<Boolean?>> = listOf(Choice("All", null), Choice("Unwatched", false), Choice("Watched", true))
-private val typeChoices: List<Choice<String?>> = listOf(Choice("All", null), Choice("Movies", "movie"), Choice("TV episodes", "tv"))
+private val sortChoices = LibraryChoices.sort
+private val watchedChoices = LibraryChoices.watched
+private val typeChoices = LibraryChoices.type
 
 @Composable
 fun LibraryScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Unit) {

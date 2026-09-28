@@ -1,13 +1,14 @@
-package dev.ottlib.tv.ui.search
+package dev.ottlib.core.presentation.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.network.OttlibApi
-import dev.ottlib.tv.ui.components.LoadState
-import dev.ottlib.tv.ui.components.PosterItem
-import dev.ottlib.tv.ui.components.toPosterItem
-import dev.ottlib.tv.ui.components.userMessage
+import dev.ottlib.core.presentation.LoadState
+import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.toPosterItem
+import dev.ottlib.core.presentation.userMessage
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,11 +17,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 /** Null results mean "nothing typed yet". */
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
