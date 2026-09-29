@@ -1,0 +1,11 @@
+{
+  "id": 1,
+  "kind": "scan",
+  "status": "running",
+  "startedAt": "2026-01-01 00:00:00",
+  "finishedAt": null,
+  "filesFound": 658,
+  "filesProcessed": 120,
+  "titlesAdded": 0,
+  "errorSummary": null
+}

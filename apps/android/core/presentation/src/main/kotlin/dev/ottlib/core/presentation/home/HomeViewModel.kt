@@ -7,6 +7,8 @@ import dev.ottlib.core.network.MovieSort
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.sync.LibrarySync
+import dev.ottlib.core.presentation.sync.SyncOutcome
 import dev.ottlib.core.presentation.toPosterItem
 import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.CancellationException
@@ -23,13 +25,17 @@ data class HomeRow(val key: String, val title: String, val items: List<PosterIte
 /** Which poster had focus, so returning from a movie puts focus back where the user was. */
 data class FocusTarget(val rowKey: String, val itemId: Long)
 
-class HomeViewModel(private val api: OttlibApi) : ViewModel() {
+class HomeViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewModel() {
     private val state = MutableStateFlow<LoadState<List<HomeRow>>>(LoadState.Loading)
     val rows: StateFlow<LoadState<List<HomeRow>>> = state.asStateFlow()
     var lastFocus: FocusTarget? = null
     private var resumedOnce = false
 
-    init { load() }
+    init {
+        load()
+        // A finished sync may have added titles: show them without the viewer having to leave and come back.
+        viewModelScope.launch { sync.outcomes.collect { if (it is SyncOutcome.Done) load() } }
+    }
 
     fun load() {
         viewModelScope.launch {

@@ -86,6 +86,8 @@ adb shell cmd package compile -m speed-profile -f dev.ottlib.tv
 
 `--user 0` matters on TVs with a second user profile: without it the app can land in a profile the home screen doesn't show. The `compile` step applies the bundled Compose performance profiles right away; a sideloaded app otherwise runs unoptimised until Android's overnight maintenance, and scrolling stutters.
 
+**Sync** (top right of the navigation bar) asks the server to rescan its library folders, so files you add on the PC show up in the app. It only finds new and removed files; it does not refresh metadata (do that from the web app). It follows the scan and reports "Library synced: N new titles" (or "Library is up to date").
+
 On first launch the app lists Ottlib servers found on the network (mDNS, `_ottlib._tcp`), or you can type the address shown under **Settings → Server info** in the web app. Discovery answers on every real LAN adapter (virtual 169.254.x.x adapters are skipped); if the list stays empty, check that Windows Firewall allows Node.js inbound UDP. Set `"advertise": false` in `config/config.json` to turn discovery off.
 
 Playback uses Media3 (ExoPlayer) with an FFmpeg audio fallback for DTS/TrueHD. For anything the built-in player can't handle (for example styled ASS subtitles), use **Play in another app**.
@@ -106,6 +108,8 @@ Layouts follow the window, not the device: on a Galaxy Z Fold the cover screen g
 - Swipe up or down on the left half for brightness, on the right half for volume; swipe sideways to seek.
 - Pinch to switch between Fit and Zoom; the picture button has every picture mode (Smart fill, forced 16:9 / 4:3 / 2.39:1).
 - Leaving the app while a video plays shrinks it into picture-in-picture. Half-folded like a laptop (Flex mode), the video sits above the fold with the controls below.
+
+The sync button (top bar of Home and Library) rescans the server's library folders for new and removed files, the same as **Sync** on the TV; metadata is not refreshed.
 
 Resume positions and watched state are per device, as on the TV. The phone must be on the same network as the server.
 

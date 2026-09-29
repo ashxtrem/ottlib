@@ -61,7 +61,7 @@ private val RowCacheWindow = LazyLayoutCacheWindow(ahead = 320.dp, behind = 320.
 @Composable
 fun HomeScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { HomeViewModel(container.api) }
+    val viewModel = viewModel { HomeViewModel(container.api, container.librarySync) }
     val state by viewModel.rows.collectAsStateWithLifecycle()
     var focused by remember { mutableStateOf<PosterItem?>(null) }
 

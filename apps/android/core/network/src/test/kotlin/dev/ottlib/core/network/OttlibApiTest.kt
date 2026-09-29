@@ -7,7 +7,9 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -36,6 +38,32 @@ class OttlibApiTest {
         assertEquals("/api/movies/7/progress", request.path)
         assertEquals("""{"positionMs":1830000,"durationMs":6960000}""", request.body.readUtf8())
         assertEquals(1_830_000L, result.resumePositionMs)
+    }
+
+    @Test
+    fun startsAScanWithAnEmptyPostAndFollowsItsStatus() = runTest {
+        server.enqueue(MockResponse().setBody("""{"id":7,"kind":"scan","status":"running","startedAt":"a","finishedAt":null,"filesFound":10,"filesProcessed":2,"titlesAdded":0,"errorSummary":null}"""))
+        server.enqueue(MockResponse().setBody("""{"id":7,"kind":"scan","status":"completed","startedAt":"a","finishedAt":"b","filesFound":10,"filesProcessed":10,"titlesAdded":2,"errorSummary":null}"""))
+        val started = api.startScan()
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/api/scan", request.path)
+        assertEquals(0L, request.bodySize)
+        assertNull("an empty body must not claim to be JSON", request.getHeader("Content-Type"))
+        assertTrue(started.isRunning)
+
+        val finished = api.scanStatus()
+        assertEquals("/api/scan/status", server.takeRequest().path)
+        assertFalse(finished.isRunning)
+        assertEquals(2, finished.titlesAdded)
+    }
+
+    @Test
+    fun readsTheIdleStatusOfAServerThatNeverScanned() = runTest {
+        server.enqueue(MockResponse().setBody("""{"status":"idle"}"""))
+        val status = api.scanStatus()
+        assertFalse(status.isRunning)
+        assertEquals("idle", status.status)
     }
 
     @Test

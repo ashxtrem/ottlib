@@ -29,6 +29,7 @@ import dev.ottlib.core.presentation.home.HomeViewModel
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.mobile.ui.components.EmptyMessage
 import dev.ottlib.mobile.ui.components.ErrorMessage
+import dev.ottlib.mobile.ui.components.LibrarySyncAction
 import dev.ottlib.mobile.ui.components.LoadingMessage
 import dev.ottlib.mobile.ui.components.PosterCard
 import dev.ottlib.mobile.ui.components.WindowWidth
@@ -40,7 +41,7 @@ import dev.ottlib.mobile.ui.components.windowWidth
 @Composable
 fun HomeScreen(onOpenMovie: (Long) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { HomeViewModel(container.api) }
+    val viewModel = viewModel { HomeViewModel(container.api, container.librarySync) }
     val state by viewModel.rows.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
@@ -48,7 +49,7 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit) {
     }
     val width = windowWidth()
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Ottlib", fontWeight = FontWeight.Bold, color = OttlibColors.Accent) }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Ottlib", fontWeight = FontWeight.Bold, color = OttlibColors.Accent) }, actions = { LibrarySyncAction() }) }) { padding ->
         val content = Modifier.padding(padding)
         when (val current = state) {
             LoadState.Loading -> LoadingMessage(modifier = content)

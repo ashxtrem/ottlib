@@ -11,6 +11,7 @@ import dev.ottlib.core.discovery.ServerDiscovery
 import dev.ottlib.core.network.DeviceIdInterceptor
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
+import dev.ottlib.core.presentation.sync.LibrarySync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,4 +41,5 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
     val connection = ConnectionManager(ServerStore(context)) { api.serverInfo(it) }
     val discovery = ServerDiscovery(context)
     val playerFactory = OttlibPlayerFactory(context, httpClient)
+    val librarySync = LibrarySync(appScope, api::startScan, api::scanStatus)
 }

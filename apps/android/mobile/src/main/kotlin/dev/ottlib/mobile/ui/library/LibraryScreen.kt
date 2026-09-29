@@ -34,6 +34,7 @@ import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.mobile.ui.components.ChoiceDialog
 import dev.ottlib.mobile.ui.components.EmptyMessage
 import dev.ottlib.mobile.ui.components.ErrorMessage
+import dev.ottlib.mobile.ui.components.LibrarySyncAction
 import dev.ottlib.mobile.ui.components.LoadingMessage
 import dev.ottlib.mobile.ui.components.PosterGrid
 import dev.ottlib.mobile.ui.components.gutter
@@ -45,7 +46,7 @@ private enum class LibraryDialog { Sort, Watched, Genre, Type }
 @Composable
 fun LibraryScreen(onOpenMovie: (Long) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { LibraryViewModel(container.api) }
+    val viewModel = viewModel { LibraryViewModel(container.api, container.librarySync) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var dialog by rememberSaveable { mutableStateOf<LibraryDialog?>(null) }
     val filters = state.filters
@@ -54,7 +55,10 @@ fun LibraryScreen(onOpenMovie: (Long) -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Library") },
-                actions = { state.total?.let { Text("$it titles", style = MaterialTheme.typography.labelLarge, color = OttlibColors.Muted, modifier = Modifier.padding(end = 16.dp)) } },
+                actions = {
+                    state.total?.let { Text("$it titles", style = MaterialTheme.typography.labelLarge, color = OttlibColors.Muted) }
+                    LibrarySyncAction()
+                },
             )
         },
     ) { padding ->

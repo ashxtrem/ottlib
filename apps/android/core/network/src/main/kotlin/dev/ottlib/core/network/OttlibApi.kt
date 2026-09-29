@@ -7,6 +7,7 @@ import dev.ottlib.core.model.MovieListPage
 import dev.ottlib.core.model.PlaybackProgressResult
 import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.model.PlaybackSource
+import dev.ottlib.core.model.ScanStatus
 import dev.ottlib.core.model.ServerInfo
 import dev.ottlib.core.model.ShelfDetail
 import dev.ottlib.core.model.ShelfSummary
@@ -45,6 +46,14 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
         client.newCall(Request.Builder().url(url("/api/movies/$id/progress")).delete().build()).awaitBody()
     }
 
+    /**
+     * Starts a library scan on the server — finds new files and notices removed ones, the same as the web app's Scan
+     * button — or returns the scan already running. Refreshing metadata for existing titles is a separate server action
+     * and is not started here.
+     */
+    suspend fun startScan(): ScanStatus = post(url("/api/scan"))
+    suspend fun scanStatus(): ScanStatus = get(url("/api/scan/status"))
+
     /** Turns a server-relative path (`/media/posters/x.jpg`, `/api/stream/1`) into an absolute URL on the active server. */
     fun resolve(path: String?): String? = path?.let { baseUrl()?.resolve(it)?.toString() }
 
@@ -52,6 +61,10 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
 
     private suspend inline fun <reified T> get(url: HttpUrl): T =
         OttlibJson.decodeFromString(client.newCall(Request.Builder().url(url).get().build()).awaitBody())
+
+    /** A POST with no body and no content type, exactly as the web client sends it (Fastify rejects an empty JSON body). */
+    private suspend inline fun <reified T> post(url: HttpUrl): T =
+        OttlibJson.decodeFromString(client.newCall(Request.Builder().url(url).post(ByteArray(0).toRequestBody()).build()).awaitBody())
 
     private suspend inline fun <reified T> send(method: String, url: HttpUrl, json: String): T =
         OttlibJson.decodeFromString(client.newCall(Request.Builder().url(url).method(method, json.toRequestBody(jsonType)).build()).awaitBody())

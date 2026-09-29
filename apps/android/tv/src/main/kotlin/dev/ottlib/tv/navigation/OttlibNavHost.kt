@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.sync.SyncOutcomeToasts
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.connect.ConnectScreen
 import dev.ottlib.tv.ui.details.DetailsScreen
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 @Composable
 fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
     val nav = rememberNavController()
+    SyncOutcomeToasts()
     val activeServer by appContainer().connection.activeServer.collectAsStateWithLifecycle()
     val pendingMovieId by deepLinkMovieId.collectAsStateWithLifecycle()
 

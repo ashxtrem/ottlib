@@ -4,6 +4,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -27,6 +28,9 @@ class ContractFixturesTest {
         "shelf-detail" to ShelfDetail.serializer(),
         "playback-source" to PlaybackSource.serializer(),
         "progress-result" to PlaybackProgressResult.serializer(),
+        "scan-status-idle" to ScanStatus.serializer(),
+        "scan-status-running" to ScanStatus.serializer(),
+        "scan-status-completed" to ScanStatus.serializer(),
     )
 
     @Test
@@ -43,6 +47,16 @@ class ContractFixturesTest {
             runCatching { strict.decodeFromString(serializer, file.readText()) }
                 .onFailure { throw AssertionError("$name.json no longer matches its Kotlin model: ${it.message}", it) }
         }
+    }
+
+    @Test
+    fun scanStatusTellsRunningFromFinished() {
+        fun status(name: String) = strict.decodeFromString(ScanStatus.serializer(), File(fixtures, "$name.json").readText())
+        assertFalse(status("scan-status-idle").isRunning)
+        assertTrue(status("scan-status-running").isRunning)
+        assertEquals(120, status("scan-status-running").filesProcessed)
+        assertFalse(status("scan-status-completed").isRunning)
+        assertEquals(3, status("scan-status-completed").titlesAdded)
     }
 
     @Test

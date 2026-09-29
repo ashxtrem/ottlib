@@ -2,11 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, playbackProgressResultSchema, playbackSourceSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import { buildApp } from '../app.js';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
+import { ScanRunRepository } from '../repositories/scanRunRepository.js';
 
 // Endpoints used by the native (Android TV) client. Responses are written to /contract/fixtures, which the
 // Kotlin tests decode strictly — a shape change here fails there. Refresh fixtures with `npx vitest run -u`.
@@ -41,6 +42,7 @@ function fixture() {
 function stable(value: unknown, media: string): unknown {
   return JSON.parse(JSON.stringify(value, (key, field) => {
     if (['addedAt', 'createdAt', 'updatedAt'].includes(key)) return '2026-01-01T00:00:00.000Z';
+    if (['startedAt', 'finishedAt'].includes(key) && typeof field === 'string') return '2026-01-01 00:00:00';
     if (key === 'filePath' && typeof field === 'string') return field.replace(media, 'D:\\Movies');
     return field;
   }));
@@ -114,6 +116,29 @@ describe('native client endpoints', () => {
       const shelf = (await app.inject({ method: 'POST', url: '/api/shelves', payload: { name: 'Sci-Fi', movieIds: [1] } })).json() as { id: number };
       await snapshot('shelf-summaries', shelfSummarySchema.array().parse((await app.inject({ method: 'GET', url: '/api/shelves' })).json()), media);
       await snapshot('shelf-detail', shelfDetailSchema.parse((await app.inject({ method: 'GET', url: `/api/shelves/${shelf.id}`, headers })).json()), media);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('report the library scan the Sync button starts and follows', async () => {
+    const { app, db, media } = fixture();
+    try {
+      // Nothing has scanned yet: the endpoint answers with a bare status instead of a run.
+      const idle = (await app.inject({ method: 'GET', url: '/api/scan/status' })).json();
+      expect(idle).toEqual({ status: 'idle' });
+      await snapshot('scan-status-idle', idle, media);
+
+      const runs = new ScanRunRepository(db);
+      const run = runs.create('scan');
+      runs.progress(run.id, 658, 120, 0);
+      const running = scanRunSchema.parse((await app.inject({ method: 'GET', url: '/api/scan/status' })).json());
+      expect(running).toMatchObject({ status: 'running', filesFound: 658, filesProcessed: 120, finishedAt: null });
+      await snapshot('scan-status-running', running, media);
+
+      runs.progress(run.id, 658, 658, 3);
+      runs.finish(run.id, 'completed');
+      const completed = scanRunSchema.parse((await app.inject({ method: 'GET', url: '/api/scan/status' })).json());
+      expect(completed).toMatchObject({ status: 'completed', titlesAdded: 3, errorSummary: null });
+      await snapshot('scan-status-completed', completed, media);
     } finally { await app.close(); db.close(); }
   });
 });

@@ -60,5 +60,8 @@ fun TopNavigation(current: TopDestination, onNavigate: (TopDestination) -> Unit,
                 }
             }
         }
+        // Pushed to the far end: the tabs above are places to go, this is an action.
+        Spacer(Modifier.weight(1f))
+        LibrarySyncButton()
     }
 }

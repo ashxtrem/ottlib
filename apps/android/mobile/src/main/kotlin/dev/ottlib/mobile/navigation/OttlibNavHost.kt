@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.ottlib.core.presentation.sync.SyncOutcomeToasts
 import dev.ottlib.mobile.ui.connect.ConnectScreen
 import dev.ottlib.mobile.ui.details.DetailsScreen
 import dev.ottlib.mobile.ui.home.HomeScreen
@@ -26,6 +27,7 @@ import dev.ottlib.mobile.ui.settings.SettingsScreen
 @Composable
 fun OttlibNavHost() {
     val nav = rememberNavController()
+    SyncOutcomeToasts()
     val entry by nav.currentBackStackEntryAsState()
     val current = TopLevel.entries.firstOrNull { it.route == entry?.destination?.route }
     // Follows the window, not the device: a bottom bar on the Fold's cover screen, a rail when unfolded.

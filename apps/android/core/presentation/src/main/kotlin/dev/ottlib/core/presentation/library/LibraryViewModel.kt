@@ -6,6 +6,8 @@ import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.network.MovieSort
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.sync.LibrarySync
+import dev.ottlib.core.presentation.sync.SyncOutcome
 import dev.ottlib.core.presentation.toPosterItem
 import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.CancellationException
@@ -34,7 +36,7 @@ data class LibraryUiState(
 )
 
 /** The full library as a filterable, cursor-paged grid (same query parameters as the web library). */
-class LibraryViewModel(private val api: OttlibApi) : ViewModel() {
+class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewModel() {
     private val state = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = state.asStateFlow()
     private var page: Job? = null
@@ -42,8 +44,21 @@ class LibraryViewModel(private val api: OttlibApi) : ViewModel() {
     var lastFocusedId: Long? = null
 
     init {
-        viewModelScope.launch { runCatching { api.filterOptions().genres }.onSuccess { genres -> state.update { it.copy(genres = genres) } } }
+        loadGenres()
         reload()
+        // A finished sync may have added titles (and genres): refresh the grid and the genre choices.
+        viewModelScope.launch {
+            sync.outcomes.collect {
+                if (it is SyncOutcome.Done) {
+                    loadGenres()
+                    reload()
+                }
+            }
+        }
+    }
+
+    private fun loadGenres() {
+        viewModelScope.launch { runCatching { api.filterOptions().genres }.onSuccess { genres -> state.update { it.copy(genres = genres) } } }
     }
 
     fun setFilters(filters: LibraryFilters) {
