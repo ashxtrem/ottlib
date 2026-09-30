@@ -1,0 +1,4 @@
+# Launchers ship inside the server bundles: shell scripts must stay LF, batch files CRLF.
+*.sh text eol=lf
+*.command text eol=lf
+*.bat text eol=crlf
