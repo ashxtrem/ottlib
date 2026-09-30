@@ -1,3 +1,4 @@
+import { sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseReleaseName, parseTitle } from './titleParser.js';
 
@@ -14,7 +15,7 @@ describe('parseTitle', () => {
     ['D:\\Shows\\01 Police Squad A Substantial Gift - Comedy 1982 Eng Subs 1080p [H264-mp4].mp4', { title: 'Police Squad A Substantial Gift', year: 1982 }],
     ['D:\\Shows\\03 Police Squad The Butler Did It - Comedy 1982 Eng Subs 1080p [H264-mp4].mp4', { title: 'Police Squad The Butler Did It', year: 1982 }],
     ['D:\\Movies\\300.2006.1080p.BluRay.x264.mkv', { title: '300', year: 2006 }]
-  ])('parses %s', (path, expected) => expect(parseTitle(path)).toEqual(expected));
+  ])('parses %s', (path, expected) => expect(parseTitle(path.replaceAll('\\', sep))).toEqual(expected));
 });
 
 describe('parseReleaseName', () => {

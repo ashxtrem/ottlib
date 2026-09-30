@@ -43,7 +43,7 @@ function stable(value: unknown, media: string): unknown {
   return JSON.parse(JSON.stringify(value, (key, field) => {
     if (['addedAt', 'createdAt', 'updatedAt'].includes(key)) return '2026-01-01T00:00:00.000Z';
     if (['startedAt', 'finishedAt'].includes(key) && typeof field === 'string') return '2026-01-01 00:00:00';
-    if (key === 'filePath' && typeof field === 'string') return field.replace(media, 'D:\\Movies');
+    if (key === 'filePath' && typeof field === 'string') return field.replace(media, 'D:\\Movies').replaceAll('/', '\\');
     return field;
   }));
 }
