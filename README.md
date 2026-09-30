@@ -31,6 +31,10 @@ Optional integrations:
 - An OMDb API key as an additional metadata fallback
 - qBittorrent with its Web UI and search plugins enabled for torrent search and handoff
 
+## Installing
+
+Download the latest [release](https://github.com/ashxtrem/ottlib/releases): a server bundle for Windows, Linux or macOS (extract and run `start.bat` / `start.sh`), plus the Android TV and phone APKs. See [docs/releasing.md](docs/releasing.md) for details. To run from source instead, follow the steps below.
+
 ## Getting started
 
 ```bash

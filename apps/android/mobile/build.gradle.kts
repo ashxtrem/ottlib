@@ -20,18 +20,21 @@ android {
         applicationId = "dev.ottlib.mobile"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // The release workflow passes these from the git tag (see .github/workflows/release.yml).
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
+        versionName = (findProperty("versionName") as String?) ?: "0.1.0"
         // Phones and foldables are 64-bit; x86_64 is for the emulator.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
     signingConfigs {
-        if (keystoreProperties.isNotEmpty()) create("release") {
-            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
-            storePassword = keystoreProperties.getProperty("storePassword")
-            keyAlias = keystoreProperties.getProperty("keyAlias")
-            keyPassword = keystoreProperties.getProperty("keyPassword")
+        // keystore.properties for local builds; the ANDROID_KEYSTORE_* env vars for CI.
+        val storePath = System.getenv("ANDROID_KEYSTORE_FILE") ?: keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it).path }
+        if (storePath != null) create("release") {
+            storeFile = file(storePath)
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
         }
     }
 
