@@ -5,10 +5,10 @@ import { apiVersion, type ServerInfo } from '@ottlib/shared';
 const packageVersion = (JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version;
 
 export class ServerInfoService {
-  public constructor(private readonly port: number) {}
+  public constructor(private readonly port: number, private readonly authRequired: () => boolean = () => false) {}
   public get(): ServerInfo {
     const addresses = Object.values(networkInterfaces()).flat().filter((network): network is NetworkInterfaceInfo => Boolean(network && network.family === 'IPv4' && !network.internal && !network.address.startsWith('169.254.'))).map((network) => network.address);
-    return { name: this.name(), version: packageVersion, apiVersion, port: this.port, addresses };
+    return { name: this.name(), version: packageVersion, apiVersion, port: this.port, addresses, authRequired: this.authRequired() };
   }
   public name(): string { return `Ottlib on ${hostname()}`; }
 }

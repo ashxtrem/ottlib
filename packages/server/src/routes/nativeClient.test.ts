@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { authStatusSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import { buildApp } from '../app.js';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
@@ -42,6 +42,7 @@ function fixture() {
 function stable(value: unknown, media: string): unknown {
   return JSON.parse(JSON.stringify(value, (key, field) => {
     if (['addedAt', 'createdAt', 'updatedAt'].includes(key)) return '2026-01-01T00:00:00.000Z';
+    if (key === 'token' && typeof field === 'string') return 'session-token';
     if (['startedAt', 'finishedAt'].includes(key) && typeof field === 'string') return '2026-01-01 00:00:00';
     if (key === 'filePath' && typeof field === 'string') return field.replace(media, 'D:\\Movies').replaceAll('/', '\\');
     return field;
@@ -139,6 +140,31 @@ describe('native client endpoints', () => {
       const completed = scanRunSchema.parse((await app.inject({ method: 'GET', url: '/api/scan/status' })).json());
       expect(completed).toMatchObject({ status: 'completed', titlesAdded: 3, errorSummary: null });
       await snapshot('scan-status-completed', completed, media);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('sign in with the access PIN and hand keyed stream links to players', async () => {
+    const { app, db, media } = fixture();
+    try {
+      await app.inject({ method: 'PUT', url: '/api/auth/pin', payload: { newPin: '2468' } });
+      expect(serverInfoSchema.parse((await app.inject({ method: 'GET', url: '/api/server-info' })).json()).authRequired).toBe(true);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/1', headers })).statusCode).toBe(401);
+      const status = authStatusSchema.parse((await app.inject({ method: 'GET', url: '/api/auth/status' })).json());
+      expect(status).toEqual({ pinEnabled: true, authenticated: false });
+      await snapshot('auth-status', status, media);
+
+      expect((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { pin: '1111' } })).statusCode).toBe(401);
+      const login = pinLoginResultSchema.parse((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { pin: '2468' } })).json());
+      await snapshot('pin-login-result', login, media);
+      const authorized = { ...headers, authorization: `Bearer ${login.token}` };
+      expect((await app.inject({ method: 'GET', url: '/api/movies/1', headers: authorized })).statusCode).toBe(200);
+
+      const source = playbackSourceSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/1/playback', headers: authorized })).json());
+      expect(source.streamUrl).toMatch(/^\/api\/stream\/1\?key=[\w-]+$/);
+      expect((await app.inject({ method: 'HEAD', url: source.streamUrl })).statusCode).toBe(200);
+      expect((await app.inject({ method: 'GET', url: source.subtitles[0].url })).statusCode).toBe(200);
+      expect((await app.inject({ method: 'HEAD', url: '/api/stream/1' })).statusCode).toBe(401);
+      expect((await app.inject({ method: 'HEAD', url: source.streamUrl.replace('/stream/1', '/stream/2') })).statusCode).toBe(401);
     } finally { await app.close(); db.close(); }
   });
 });

@@ -62,6 +62,17 @@ fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
             LoadingMessage(Modifier.padding(padding), "Connecting to your Ottlib server…")
             return@Scaffold
         }
+        state.pinFor?.let { server ->
+            PinEntry(
+                server,
+                checking = state.connecting != null,
+                error = state.error,
+                onSubmit = viewModel::submitPin,
+                onCancel = viewModel::cancelPin,
+                modifier = Modifier.padding(padding).padding(24.dp),
+            )
+            return@Scaffold
+        }
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),

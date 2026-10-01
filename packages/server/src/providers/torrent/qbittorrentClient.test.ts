@@ -4,7 +4,7 @@ import { QbittorrentClient } from './qbittorrentClient.js';
 import * as searchModule from './qbittorrentSearch.js';
 
 function configuredSettings(): Settings {
-  return { tmdbApiKey: '', omdbApiKey: '', qbittorrentUrl: 'http://qb.local:8080', qbittorrentUsername: 'alice', qbittorrentPassword: 'secret', qbittorrentCategory: 'ottlib', qbittorrentSavePath: '', extensions: [], ignoredPatterns: [], excludedFolders: [], scheduleEnabled: false, scheduleCron: '0 3 * * *' };
+  return { tmdbApiKey: '', omdbApiKey: '', torrentSearchEnabled: true, qbittorrentUrl: 'http://qb.local:8080', qbittorrentUsername: 'alice', qbittorrentPassword: 'secret', qbittorrentCategory: 'ottlib', qbittorrentSavePath: '', extensions: [], ignoredPatterns: [], excludedFolders: [], scheduleEnabled: false, scheduleCron: '0 3 * * *' };
 }
 
 describe('QbittorrentClient', () => {

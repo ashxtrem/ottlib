@@ -55,12 +55,13 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 - [x] Server info panel — shows LAN IP:port to type into your phone
 - [x] Port/app-data path config (bootstrap-level, restart required)
 
-## Torrent Search
+## Torrent Search (optional, off by default)
+- [x] Settings toggle — hidden everywhere and torrent routes answer 404 until switched on
 - [x] qBittorrent WebUI connection settings — masked password, connection test, and Python/search-plugin health guidance
 - [x] Search enabled qBittorrent movie plugins — release quality tags, engine-aware deduplication, library ownership/missing-file badges, and result sorting
 - [x] One-click qBittorrent handoff — supports magnet and HTTP(S) torrent URLs with configurable category and save path
 
 ## Out of scope for v1
-- No user accounts/auth (single trusted LAN)
+- No user accounts (single home LAN); an optional access PIN gates every browser and app
 - No transcoding (direct file streaming only — planned as Phase 2 of the TV work, see `plans/ANDROID_TV_PLAN.md`)
 - No phone/iOS app yet — phones use the browser (the Android TV app is the first native client)

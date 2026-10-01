@@ -1,9 +1,12 @@
 package dev.ottlib.core.network
 
+import dev.ottlib.core.model.AuthStatus
 import dev.ottlib.core.model.Movie
 import dev.ottlib.core.model.MovieFilterOptions
 import dev.ottlib.core.model.MovieListItem
 import dev.ottlib.core.model.MovieListPage
+import dev.ottlib.core.model.PinLoginRequest
+import dev.ottlib.core.model.PinLoginResult
 import dev.ottlib.core.model.PlaybackProgressResult
 import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.model.PlaybackSource
@@ -28,6 +31,13 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
 
     /** Probes an arbitrary server (used before a server is saved as active). */
     suspend fun serverInfo(server: HttpUrl): ServerInfo = get(server.resolve("/api/server-info")!!)
+
+    /** Whether this device's saved session (if any) is still accepted by [server]. */
+    suspend fun authStatus(server: HttpUrl): AuthStatus = get(server.resolve("/api/auth/status")!!)
+
+    /** Signs in to [server] with its access PIN and returns the session token. Wrong PINs throw [ApiException] (401, or 429 when locked out). */
+    suspend fun login(server: HttpUrl, pin: String): String =
+        send<PinLoginResult>("POST", server.resolve("/api/auth/login")!!, OttlibJson.encodeToString(PinLoginRequest.serializer(), PinLoginRequest(pin))).token
 
     suspend fun movies(query: MovieQuery): MovieListPage = get(query.applyTo(url("/api/movies").newBuilder()).build())
     suspend fun continueWatching(limit: Int = 20): List<MovieListItem> =

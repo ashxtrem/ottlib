@@ -23,12 +23,15 @@ data class ConnectUiState(
     val connected: Boolean = false,
     /** True while trying the saved server on launch; the picker is hidden until that fails. */
     val restoring: Boolean = false,
+    /** `host:port` of a server waiting for its access PIN; the screen shows PIN entry instead of the picker. */
+    val pinFor: String? = null,
 )
 
 class ConnectViewModel(private val connection: ConnectionManager, discovery: ServerDiscovery, autoConnect: Boolean) : ViewModel() {
     private val state = MutableStateFlow(ConnectUiState(restoring = autoConnect))
     val uiState: StateFlow<ConnectUiState> = state.asStateFlow()
     private var attempt: Job? = null
+    private var pinServer: HttpUrl? = null
 
     val servers: StateFlow<List<DiscoveredServer>> = discovery.servers()
         .catch { emit(emptyList()) }
@@ -51,12 +54,30 @@ class ConnectViewModel(private val connection: ConnectionManager, discovery: Ser
         else connect(url, silent = false)
     }
 
-    private fun connect(url: HttpUrl, silent: Boolean) {
+    fun submitPin(pin: String) {
+        val url = pinServer ?: return
+        if (pin.isNotBlank()) run(url, silent = false) { connection.signIn(url, pin.trim()) }
+    }
+
+    /** Back to the server picker. */
+    fun cancelPin() {
+        attempt?.cancel()
+        pinServer = null
+        state.update { it.copy(pinFor = null, connecting = null, error = null) }
+    }
+
+    private fun connect(url: HttpUrl, silent: Boolean) = run(url, silent) { connection.connect(url) }
+
+    private fun run(url: HttpUrl, silent: Boolean, action: suspend () -> ConnectResult) {
         attempt?.cancel()
         attempt = viewModelScope.launch {
             state.update { it.copy(connecting = "${url.host}:${url.port}", error = null) }
-            when (val result = connection.connect(url)) {
-                is ConnectResult.Connected -> state.update { it.copy(connecting = null, connected = true) }
+            when (val result = action()) {
+                is ConnectResult.Connected -> state.update { it.copy(connecting = null, connected = true, pinFor = null) }
+                is ConnectResult.PinRequired -> {
+                    pinServer = result.url
+                    state.update { it.copy(connecting = null, restoring = false, pinFor = "${url.host}:${url.port}", error = result.message) }
+                }
                 is ConnectResult.Incompatible -> state.update { it.copy(connecting = null, restoring = false, error = result.message) }
                 is ConnectResult.Unreachable -> state.update {
                     it.copy(

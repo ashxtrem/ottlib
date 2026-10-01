@@ -15,7 +15,8 @@ function subtitleMimeType(path: string): string | undefined { return subtitleMim
 export class PlaybackService {
   private readonly local = new LocalLaunch();
   private readonly playlist = new LanPlaylist();
-  public constructor(private readonly movies: MovieRepository) {}
+  /** [streamQuery] adds the per-movie key external players need when an access PIN is set ('' otherwise). */
+  public constructor(private readonly movies: MovieRepository, private readonly streamQuery: (id: number) => string = () => '') {}
 
   public async movieFile(id: number): Promise<PlaybackMovie> {
     const movie = this.movies.playbackMovie(id);
@@ -24,16 +25,16 @@ export class PlaybackService {
   }
   public async playLocal(id: number): Promise<void> { this.local.open(await this.movieFile(id)); }
   public async reveal(id: number): Promise<void> { this.local.reveal(await this.movieFile(id)); }
-  public async playlistFor(id: number, origin: string): Promise<string> { return this.playlist.playlist(origin, await this.movieFile(id)); }
+  public async playlistFor(id: number, origin: string): Promise<string> { return this.playlist.playlist(origin, await this.movieFile(id), this.streamQuery(id)); }
 
   /** What an embedded player should load. URLs are server-relative; the client resolves them against its server origin. */
   public async source(id: number, deviceId: string | undefined): Promise<PlaybackSource> {
-    const file = await this.movieFile(id); const movie = this.movies.get(id, deviceId);
+    const file = await this.movieFile(id); const movie = this.movies.get(id, deviceId); const query = this.streamQuery(id);
     const subtitles = (await this.sideloadableSubtitles(file)).map(({ track }) => ({
-      url: `/api/movies/${id}/subtitles/${track.order}`, language: track.language, codec: track.codec, title: track.title, isForced: track.isForced, isHearingImpaired: track.isHearingImpaired
+      url: `/api/movies/${id}/subtitles/${track.order}${query}`, language: track.language, codec: track.codec, title: track.title, isForced: track.isForced, isHearingImpaired: track.isHearingImpaired
     }));
     return {
-      kind: 'direct', streamUrl: `/api/stream/${id}`, mimeType: mimeTypes[extname(file.filename).slice(1).toLowerCase()] ?? 'application/octet-stream',
+      kind: 'direct', streamUrl: `/api/stream/${id}${query}`, mimeType: mimeTypes[extname(file.filename).slice(1).toLowerCase()] ?? 'application/octet-stream',
       durationMs: movie?.mediaInfo?.durationMs ?? null, resumePositionMs: movie?.resumePositionMs ?? null, subtitles
     };
   }

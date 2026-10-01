@@ -83,5 +83,5 @@ Android checks this key on updates: an APK signed with a different key can't upd
 
 ## Notes
 
-- OttLib is meant for a trusted home network. Don't expose it to the internet: it has no login.
+- OttLib is meant for a home network. Set an access PIN (Settings → Access PIN) if others share your network, and don't expose it to the internet: it serves plain HTTP.
 - The bundled `ffprobe` is an unmodified build of FFmpeg, licensed GPL-3.0 (see `runtime/NOTICE.txt` in the full bundles).

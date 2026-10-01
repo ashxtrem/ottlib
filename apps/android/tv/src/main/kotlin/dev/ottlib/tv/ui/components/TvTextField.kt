@@ -26,7 +26,9 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -42,6 +44,8 @@ fun TvTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Done,
     onSubmit: () -> Unit = {},
+    /** Masks the text (PIN entry). */
+    secret: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
@@ -58,6 +62,7 @@ fun TvTextField(
         singleLine = true,
         textStyle = MaterialTheme.typography.titleMedium.copy(color = OttlibColors.Foreground),
         cursorBrush = SolidColor(OttlibColors.Accent),
+        visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction, autoCorrectEnabled = false),
         keyboardActions = KeyboardActions(onAny = { onSubmit() }),
         modifier = modifier

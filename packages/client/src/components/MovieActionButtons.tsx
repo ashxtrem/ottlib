@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PlayButton } from './PlayButton';
 import { RevealInFolderButton } from './RevealInFolderButton';
 import { focusRing, pressable } from './interactionStyles';
+import { useTorrentSearchEnabled } from '../hooks/useTorrentSearchEnabled';
 
 const secondaryButtonClassName = `inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground transition-[background-color,transform] duration-fast ease-emphasis hover:bg-surface-raised ${focusRing} ${pressable} disabled:cursor-not-allowed disabled:opacity-60`;
 
@@ -16,10 +17,11 @@ type MovieActionButtonsProps = {
 
 export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onToggleWatched, watchPending }: MovieActionButtonsProps) {
   const watchLabel = movie.watched ? 'Mark as unwatched' : 'Mark as watched';
+  const torrentSearchEnabled = useTorrentSearchEnabled();
 
   return <div className="space-y-2">
     <PlayButton movie={movie} />
-    <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>
+    {torrentSearchEnabled && <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>}
     <div className="flex flex-wrap items-center gap-2">
       <RevealInFolderButton movieId={movie.id} />
       <a href={imdbUrl} target="_blank" rel="noopener noreferrer" title="View on IMDb" aria-label="View on IMDb" className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border border-imdb-hover/70 text-imdb-hover transition-[background-color,transform] duration-fast ease-emphasis hover:bg-imdb-hover/10 ${pressable} ${focusRing} focus-visible:outline-imdb-hover`}>

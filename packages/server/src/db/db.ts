@@ -14,6 +14,8 @@ import { ensureCandidateEpisode } from './migrations/010_candidate_episode.js';
 import { ensureMetadataMediaType } from './migrations/011_metadata_media_type.js';
 import { ensureEpisodeColumns } from './migrations/012_episode_columns.js';
 import { playbackProgressMigration } from './migrations/013_playback_progress.js';
+import { ensureTorrentSearchToggle } from './migrations/014_torrent_search_toggle.js';
+import { accessPinMigration } from './migrations/015_access_pin.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -34,5 +36,7 @@ export function createDatabase(appDataPath: string): Database.Database {
   ensureMetadataMediaType(db);
   ensureEpisodeColumns(db);
   db.exec(playbackProgressMigration);
+  ensureTorrentSearchToggle(db);
+  db.exec(accessPinMigration);
   return db;
 }

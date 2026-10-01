@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export * from './torrent.js';
 export * from './playback.js';
+export * from './auth.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -144,6 +145,8 @@ export const scanRunSchema = z.object({
 export const settingsSchema = z.object({
   tmdbApiKey: z.string(),
   omdbApiKey: z.string(),
+  /** Off by default: torrent search and qBittorrent handoff are an opt-in integration. */
+  torrentSearchEnabled: z.boolean(),
   qbittorrentUrl: z.string(),
   qbittorrentUsername: z.string(),
   qbittorrentPassword: z.string(),

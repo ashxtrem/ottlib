@@ -36,7 +36,9 @@ export const serverInfoSchema = z.object({
   version: z.string(),
   apiVersion: z.number().int().positive(),
   port: z.number().int(),
-  addresses: z.array(z.string())
+  addresses: z.array(z.string()),
+  /** True when an access PIN is set: clients must sign in before anything but this endpoint answers. */
+  authRequired: z.boolean()
 });
 
 export type PlaybackProgressUpdate = z.infer<typeof playbackProgressUpdateSchema>;

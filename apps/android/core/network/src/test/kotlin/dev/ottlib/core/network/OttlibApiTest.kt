@@ -79,6 +79,23 @@ class OttlibApiTest {
     }
 
     @Test
+    fun signsInWithThePinAndSendsTheTokenAfterwards() = runTest {
+        var token: String? = null
+        val signedIn = OttlibApi(OkHttpClient.Builder().addInterceptor(AuthTokenInterceptor { token }).build()) { server.url("/") }
+        server.enqueue(MockResponse().setBody("""{"token":"abc123"}"""))
+        server.enqueue(MockResponse().setBody("""{"pinEnabled":true,"authenticated":true}"""))
+
+        token = signedIn.login(server.url("/"), "2468")
+        val login = server.takeRequest()
+        assertEquals("/api/auth/login", login.path)
+        assertEquals("""{"pin":"2468"}""", login.body.readUtf8())
+        assertNull(login.getHeader("Authorization"))
+
+        assertTrue(signedIn.authStatus(server.url("/")).authenticated)
+        assertEquals("Bearer abc123", server.takeRequest().getHeader("Authorization"))
+    }
+
+    @Test
     fun resolvesServerRelativeUrls() {
         assertEquals(server.url("/media/posters/a.jpg").toString(), api.resolve("/media/posters/a.jpg"))
         assertNull(api.resolve(null))

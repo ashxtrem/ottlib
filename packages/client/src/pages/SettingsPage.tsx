@@ -16,6 +16,8 @@ import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
 import { QbittorrentSettingsSection } from '../components/QbittorrentSettingsSection';
 import { SkeletonSettings } from '../components/Skeleton';
 import { useSuccessPulse } from '../hooks/useSuccessPulse';
+import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection';
+import { useAuthStatus } from '../hooks/useAccessPin';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -28,6 +30,7 @@ export function SettingsPage() {
   const metadataRefresh = useMetadataRefresh();
   const { preference, setPreference } = useTheme();
   const { show } = useToast();
+  const authStatus = useAuthStatus();
   const serverInfo = useQuery({ queryKey: ['server-info'], queryFn: () => api<ServerInfo>('/api/server-info') });
   const movieCount = useQuery({ queryKey: ['available-movie-count'], queryFn: () => api<{ total: number }>('/api/movies?availability=available&limit=1') });
   const scanFolderInput = useRef<HTMLInputElement>(null);
@@ -35,6 +38,7 @@ export function SettingsPage() {
   const scheduleInitialized = useRef(false);
   const isLocal = useIsLocalClient();
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [torrentSearchEnabled, setTorrentSearchEnabled] = useState(false);
   const [schedulePreset, setSchedulePreset] = useState<SchedulePresetId>('nightly');
   const [customScheduleCron, setCustomScheduleCron] = useState('0 3 * * *');
   const [refreshDialogOpen, setRefreshDialogOpen] = useState(false);
@@ -45,6 +49,7 @@ export function SettingsPage() {
     if (!settings.data || scheduleInitialized.current) return;
     scheduleInitialized.current = true;
     setScheduleEnabled(settings.data.scheduleEnabled);
+    setTorrentSearchEnabled(settings.data.torrentSearchEnabled);
     setSchedulePreset(schedulePresetFor(settings.data.scheduleCron));
     setCustomScheduleCron(settings.data.scheduleCron);
   }, [settings.data]);
@@ -74,7 +79,7 @@ export function SettingsPage() {
   return <section className="max-w-3xl space-y-8">
     <div>
       <h1 className="text-2xl font-bold">Settings</h1>
-      <p className="mt-1 text-sm text-warning">Trusted-LAN mode: anyone on your private network can browse and stream this library.</p>
+      {authStatus.data?.pinEnabled ? <p className="mt-1 text-sm text-muted">Protected by an access PIN.</p> : <p className="mt-1 text-sm text-warning">Trusted-LAN mode: anyone on your private network can browse and stream this library. Set an access PIN below to require sign-in.</p>}
     </div>
 
     <section aria-labelledby="appearance-heading" className="rounded-xl border border-border bg-surface p-5">
@@ -90,6 +95,8 @@ export function SettingsPage() {
       <p className="mt-2 text-xs text-muted">This preference is saved on this device and applies immediately.</p>
     </section>
 
+    <AccessPinSettingsSection />
+
     <form
       onSubmit={(event) => {
         event.preventDefault();
@@ -101,11 +108,15 @@ export function SettingsPage() {
           excludedFolders: String(values.get('excludedFolders')).split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
           scheduleEnabled,
           scheduleCron,
+          torrentSearchEnabled,
+        };
+        // The qBittorrent fields are only on the page while torrent search is on; leave saved values alone otherwise.
+        if (torrentSearchEnabled) Object.assign(update, {
           qbittorrentUrl: String(values.get('qbittorrentUrl') ?? '').trim(),
           qbittorrentUsername: String(values.get('qbittorrentUsername') ?? '').trim(),
           qbittorrentCategory: String(values.get('qbittorrentCategory') ?? '').trim(),
           qbittorrentSavePath: String(values.get('qbittorrentSavePath') ?? '').trim(),
-        };
+        });
         const tmdbApiKey = values.get('tmdbApiKey'); if (typeof tmdbApiKey === 'string') Object.assign(update, { tmdbApiKey });
         const omdbApiKey = values.get('omdbApiKey'); if (typeof omdbApiKey === 'string') Object.assign(update, { omdbApiKey });
         const qbittorrentPassword = values.get('qbittorrentPassword'); if (typeof qbittorrentPassword === 'string') Object.assign(update, { qbittorrentPassword });
@@ -125,7 +136,7 @@ export function SettingsPage() {
       </label>
       {isLocal ? <button type="button" onClick={browseForExcludedFolder} disabled={actions.pickFolder.isPending} className="rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60">{actions.pickFolder.isPending ? 'Opening…' : 'Browse excluded folder…'}</button> : <p className="text-xs text-muted">Type a path on the server, e.g. E:\\Movies.</p>}
       <ScheduleSettings enabled={scheduleEnabled} onEnabledChange={setScheduleEnabled} preset={schedulePreset} onPresetChange={setSchedulePreset} customCron={customScheduleCron} onCustomCronChange={setCustomScheduleCron} validation={scheduleValidation} />
-      <QbittorrentSettingsSection settings={current} testing={actions.testQbittorrent.isPending} testSuccess={actions.testQbittorrent.isSuccess && actions.testQbittorrent.data?.status === 'connected'} onTest={() => actions.testQbittorrent.mutate()} testError={actions.testQbittorrent.error?.message} testMessage={actions.testQbittorrent.data?.message} testConnected={actions.testQbittorrent.data?.status === 'connected'} />
+      <QbittorrentSettingsSection settings={current} enabled={torrentSearchEnabled} onEnabledChange={setTorrentSearchEnabled} testing={actions.testQbittorrent.isPending} testSuccess={actions.testQbittorrent.isSuccess && actions.testQbittorrent.data?.status === 'connected'} onTest={() => actions.testQbittorrent.mutate()} testError={actions.testQbittorrent.error?.message} testMessage={actions.testQbittorrent.data?.message} testConnected={actions.testQbittorrent.data?.status === 'connected'} />
       <button disabled={actions.update.isPending || customScheduleInvalid} className={`rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground transition-[background-color,transform] duration-fast ease-emphasis hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60 ${saved ? 'bg-success text-success-foreground hover:bg-success' : ''}`}>{actions.update.isPending ? 'Saving…' : saved ? 'Saved' : 'Save settings'}</button>
       {actions.update.error && <p className="text-sm text-error">{actions.update.error.message}</p>}
     </form>

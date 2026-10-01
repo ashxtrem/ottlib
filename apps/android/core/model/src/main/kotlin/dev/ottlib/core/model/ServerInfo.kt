@@ -13,4 +13,6 @@ data class ServerInfo(
     val apiVersion: Int,
     val port: Int,
     val addresses: List<String>,
+    /** True when the server has an access PIN: sign in (`POST /api/auth/login`) before calling anything else. */
+    val authRequired: Boolean = false,
 )

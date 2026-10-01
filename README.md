@@ -12,7 +12,8 @@ OttLib is a self-hosted movie-library app for a trusted home network. Point it a
 - Watch on Android TV / Google TV with a native app: remote-friendly browsing, a built-in player with resume, and automatic server discovery.
 - Watch on Android phones and foldables with a touch app: layouts that follow the window (Galaxy Z Fold cover and inner screens), swipe gestures, picture-in-picture, and Flex mode.
 - Schedule rescans and review scan progress/history.
-- Search enabled qBittorrent search plugins and hand selected releases back to qBittorrent.
+- Optionally require an access PIN on every browser and app.
+- Optional, off by default: search your own qBittorrent's installed search plugins and hand releases back to it.
 
 ## Screenshots
 
@@ -35,7 +36,7 @@ Optional integrations:
 
 - A [TMDb API key](https://www.themoviedb.org/settings/api) for automatic metadata and artwork
 - An OMDb API key as an additional metadata fallback
-- qBittorrent with its Web UI and search plugins enabled for torrent search and handoff
+- qBittorrent with its Web UI and search plugins enabled, if you turn on the optional torrent search
 
 ## Installing
 
@@ -56,7 +57,7 @@ In the app, open **Settings** to:
 
 1. Add one or more video-library folders.
 2. Enter and test a TMDb API key.
-3. Optionally configure OMDb and qBittorrent.
+3. Optionally configure OMDb, set an access PIN, or turn on torrent search.
 4. Start a scan.
 
 ## Configuration
@@ -73,7 +74,7 @@ Edit `config/config.json` before starting the server when you need a different p
 
 Metadata keys, library folders, schedules, and qBittorrent credentials are managed in the Settings page rather than committed to the repository.
 
-For qBittorrent, enable **Tools → Options → Web UI**, create Web UI credentials, and then add its URL and credentials in OttLib's Settings page. Anyone on the trusted network who can access OttLib can use this integration.
+Torrent search is off by default. To use it, tick **Torrent search** in Settings, enable **Tools → Options → Web UI** in qBittorrent, create Web UI credentials, and add its URL and credentials in OttLib's Settings page. OttLib ships no search plugins; it uses whatever you have installed in qBittorrent. Anyone who can reach OttLib can use this integration, so set an access PIN if your network isn't private.
 
 ## Android TV app
 
@@ -147,4 +148,8 @@ config/     Bootstrap configuration example
 
 ## Notes
 
-OttLib is designed for a single, trusted LAN and does not include user accounts or authentication. Keep it behind your local network and avoid exposing it directly to the public internet.
+OttLib is designed for a single home LAN. There are no user accounts; instead you can set an optional **access PIN** (Settings → Access PIN, 4–8 digits). With a PIN set, every browser and the TV and phone apps must enter it once; repeated wrong PINs lock the client out for increasing periods. Without a PIN, anyone on your network can browse and stream. Either way, keep OttLib behind your local network: it serves plain HTTP and is not hardened for the public internet.
+
+## License
+
+[MIT](LICENSE)

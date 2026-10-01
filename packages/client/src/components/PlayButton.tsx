@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Movie } from '@ottlib/shared';
+import type { Movie, PlaybackSource } from '@ottlib/shared';
 import { api } from '../hooks/apiClient';
 import { useIsLocalClient } from '../hooks/useIsLocalClient';
 import { useToast } from '../hooks/useToast';
@@ -12,7 +12,7 @@ const primaryButtonClassName = `inline-flex min-h-11 w-full items-center justify
 
 function androidIntent(streamUrl: string, title: string): string {
   const url = new URL(streamUrl);
-  return `intent://${url.host}${url.pathname}#Intent;scheme=${url.protocol.slice(0, -1)};type=video/*;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(streamUrl)};S.title=${encodeURIComponent(title)};end`;
+  return `intent://${url.host}${url.pathname}${url.search}#Intent;scheme=${url.protocol.slice(0, -1)};type=video/*;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(streamUrl)};S.title=${encodeURIComponent(title)};end`;
 }
 
 export function supportsExternalPlaybackHandoff(userAgent: string): boolean {
@@ -25,7 +25,6 @@ export function PlayButton({ movie, variant = 'primary' }: { movie: Movie; varia
   const { show } = useToast();
   const isLocal = useIsLocalClient();
   const label = isLocal ? 'Play' : 'Play on this device';
-  const streamUrl = `${location.origin}/api/stream/${movie.id}`;
 
   const play = async () => {
     setError(undefined);
@@ -50,7 +49,14 @@ export function PlayButton({ movie, variant = 'primary' }: { movie: Movie; varia
 
     show('Opening playback handoff…');
     if (supportsExternalPlaybackHandoff(navigator.userAgent)) {
-      location.href = androidIntent(streamUrl, movie.title);
+      // The playback source's stream URL carries the per-movie key an external player needs when a PIN is set.
+      try {
+        const source = await api<PlaybackSource>(`/api/movies/${movie.id}/playback`);
+        location.href = androidIntent(new URL(source.streamUrl, location.origin).href, movie.title);
+      } catch (reason) {
+        const message = reason instanceof Error ? reason.message : 'Playback failed';
+        setError(message); show(message, 'error'); setStatus('idle');
+      }
       return;
     }
     location.href = `/api/stream/${movie.id}/playlist.m3u`;

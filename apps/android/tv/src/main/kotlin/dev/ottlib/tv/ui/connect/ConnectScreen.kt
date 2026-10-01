@@ -53,6 +53,10 @@ fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
         LoadingMessage("Connecting to your Ottlib server…")
         return
     }
+    state.pinFor?.let { server ->
+        PinEntry(server, checking = state.connecting != null, error = state.error, onSubmit = viewModel::submitPin, onCancel = viewModel::cancelPin)
+        return
+    }
 
     val context = LocalContext.current
     var address by rememberSaveable { mutableStateOf(localSubnetPrefix(context)) }
