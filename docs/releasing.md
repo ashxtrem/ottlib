@@ -1,8 +1,6 @@
 # Releasing OttLib
 
-This source repository is private; downloads are published in the public repository [`ashxtrem/ottlib-releases`](https://github.com/ashxtrem/ottlib-releases), whose README is the install and deployment guide (its source is `docs/releases-repo/README.md` here; copy changes across by hand).
-
-Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed. It builds the Android APKs and the server bundles for every platform, then creates a **draft** release in the public repo, with notes from the commit subjects since the previous tag and a `SHA256SUMS` file. Review the draft there (the notes are public) and click **Publish**.
+Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed. It builds the Android APKs and the server bundles for every platform, then creates a **draft** GitHub release with generated notes and a `SHA256SUMS` file. Review it and click **Publish**. The user-facing install guide is [install.md](install.md).
 
 ```bash
 git tag v0.2.0
@@ -30,18 +28,6 @@ Extract it anywhere and run `start.bat` (Windows), `start.command` (double-click
 To upgrade, extract the new version and copy `config/` and `data/` from the old folder into it.
 
 The bundles are not code-signed. Windows SmartScreen may ask you to confirm ("More info" → "Run anyway"). On macOS the launcher clears the download quarantine flag; if Gatekeeper still blocks `start.command`, run `xattr -dr com.apple.quarantine <folder>` once.
-
-## One-time setup: publishing to the public repo
-
-The workflow's own token can't write to another repository, so it uses a fine-grained personal access token stored as the `RELEASES_TOKEN` secret:
-
-1. GitHub → Settings → Developer settings → Fine-grained tokens → **Generate new token**.
-2. Resource owner `ashxtrem`; repository access **Only select repositories** → `ottlib-releases`; permission **Contents: Read and write**; pick an expiry (and diarise renewing it).
-3. `gh secret set RELEASES_TOKEN --repo ashxtrem/ottlib` and paste the token.
-
-The publish job fails early with a clear message if the secret is missing. If the token expires, releases stop at that step and can be re-run after replacing it.
-
-Private repositories use metered Actions minutes, and macOS minutes count ten times. A release run costs roughly 50 minutes of the free allowance.
 
 ## One-time setup: Android signing
 

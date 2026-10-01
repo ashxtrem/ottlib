@@ -2,7 +2,7 @@
 
 OttLib is a self-hosted movie library for a trusted home network. Point it at your video folders, let it match titles and artwork, then browse and play your collection from a browser, an Android phone or foldable, or an Android TV / Google TV.
 
-This repository hosts the downloads. Get them from the [latest release](https://github.com/ashxtrem/ottlib-releases/releases/latest).
+Get the downloads from the [latest release](https://github.com/ashxtrem/ottlib/releases/latest).
 
 ## What to download
 

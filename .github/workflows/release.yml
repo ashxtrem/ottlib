@@ -1,13 +1,13 @@
 name: Release
 
-# Push a tag like v0.2.0 to build the Android APKs and the server bundles, then draft a release in the
-# public ashxtrem/ottlib-releases repo (this source repo is private). Review the draft there, then publish it.
+# Push a tag like v0.2.0 to build the Android APKs and the server bundles, then draft a
+# GitHub release. It is left as a draft: review the notes and assets, then publish it from the GitHub UI.
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   version:
@@ -122,21 +122,10 @@ jobs:
             release/*.tar.gz
 
   publish:
-    name: Draft the public release
-    needs: [version, android, server]
+    name: Draft the release
+    needs: [android, server]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: The public releases token must exist
-        shell: bash
-        env:
-          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        run: |
-          if [[ -z "${RELEASES_TOKEN}" ]]; then
-            echo "The RELEASES_TOKEN secret is not set (see docs/releasing.md)." >&2; exit 1
-          fi
       - uses: actions/download-artifact@v4
         with:
           path: assets
@@ -144,26 +133,9 @@ jobs:
       - name: Checksums
         working-directory: assets
         run: sha256sum -- * | tee SHA256SUMS
-      - name: Release notes from commit subjects since the previous tag
-        shell: bash
-        run: |
-          previous=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-          {
-            echo "## What's changed"
-            echo
-            git log --no-merges --pretty='- %s' ${previous:+"${previous}..${GITHUB_REF_NAME}"} | grep -v '^- Merge' || true
-            echo
-            echo "See the [README](https://github.com/ashxtrem/ottlib-releases#readme) for install instructions and how to verify the downloads."
-          } > notes.md
-          cat notes.md
-      # The source repo is private; releases live in a separate public repo. Left as a draft for review.
       - uses: softprops/action-gh-release@v2
         with:
-          repository: ashxtrem/ottlib-releases
-          token: ${{ secrets.RELEASES_TOKEN }}
-          tag_name: ${{ github.ref_name }}
-          name: OttLib ${{ needs.version.outputs.name }}
-          body_path: notes.md
           draft: true
+          generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: assets/*
