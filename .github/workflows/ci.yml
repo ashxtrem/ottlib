@@ -1,0 +1,48 @@
+name: CI
+
+# Runs on every pull request into master (and on master after a merge). Both jobs are required
+# status checks in master's branch protection, so a PR can only merge once they pass.
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Server and web tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Contract fixtures are file snapshots: in CI a response shape that differs from contract/fixtures fails here.
+      - run: npm test
+
+  android:
+    name: Android tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests and debug builds
+        working-directory: apps/android
+        run: ./gradlew test :tv:assembleDebug :mobile:assembleDebug --stacktrace
