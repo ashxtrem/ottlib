@@ -1,4 +1,4 @@
-$projectRoot = Split-Path -Parent $PSCommandPath
+$projectRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $port = 8081
 $configPath = Join-Path $projectRoot 'config\config.json'
 

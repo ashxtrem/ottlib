@@ -1,6 +1,7 @@
 {
   "name": "ottlib",
   "private": true,
+  "license": "MIT",
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build --workspace @ottlib/shared && npm run build --workspace @ottlib/server && npm run build --workspace @ottlib/client",

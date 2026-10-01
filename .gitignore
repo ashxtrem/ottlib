@@ -31,3 +31,6 @@ Thumbs.db
 
 # Release bundles
 /release/
+
+# Third-party qBittorrent search plugins (kept locally for development, never redistributed)
+/plugins/
