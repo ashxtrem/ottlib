@@ -9,12 +9,15 @@ import dev.ottlib.core.data.PlaybackPreferences
 import dev.ottlib.core.data.ServerAccess
 import dev.ottlib.core.data.ServerStore
 import dev.ottlib.core.data.TrackChoiceStore
+import dev.ottlib.core.data.UpdatePreferences
 import dev.ottlib.core.discovery.ServerDiscovery
 import dev.ottlib.core.network.AuthTokenInterceptor
 import dev.ottlib.core.network.DeviceIdInterceptor
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
 import dev.ottlib.core.presentation.sync.LibrarySync
+import dev.ottlib.core.presentation.update.AppUpdates
+import dev.ottlib.core.presentation.update.InstalledApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,9 +26,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Manual dependency wiring shared by the TV and phone apps. Each app supplies what differs between form factors
- * (today only [continueWatching]).
+ * ([continueWatching], and [InstalledApp] for self-updates).
  */
-class AppContainer(context: Context, val continueWatching: ContinueWatchingPublisher) {
+class AppContainer(context: Context, val continueWatching: ContinueWatchingPublisher, installedApp: InstalledApp) {
     /** Outlives screens: used for work that must finish after a screen closes (final progress save). */
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -47,4 +50,8 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
     val discovery = ServerDiscovery(context)
     val playerFactory = OttlibPlayerFactory(context, httpClient)
     val librarySync = LibrarySync(appScope, api::startScan, api::scanStatus)
+
+    /** Talks to GitHub, not the Ottlib server, so it shares the connection pool but not the device-id or auth headers. */
+    private val githubClient: OkHttpClient = httpClient.newBuilder().apply { interceptors().clear() }.readTimeout(60, TimeUnit.SECONDS).build()
+    val updates = AppUpdates(context, appScope, githubClient, installedApp, UpdatePreferences(context))
 }

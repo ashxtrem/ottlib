@@ -46,6 +46,7 @@ import dev.ottlib.tv.ui.components.PosterRow
 import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.components.TopNavigation
+import dev.ottlib.tv.ui.components.UpdateBanner
 import dev.ottlib.tv.ui.components.tryRequestFocus
 
 /** Distance from the top of the rows list to the focused poster: room for the row title above it. */
@@ -74,6 +75,7 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Unit
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             TopNavigation(TopDestination.Home, onNavigate)
+            UpdateBanner(Modifier.padding(horizontal = ScreenPadding, vertical = 4.dp))
             when (val current = state) {
                 LoadState.Loading -> LoadingMessage()
                 is LoadState.Failed -> ErrorMessage(current.message) { viewModel.load() }

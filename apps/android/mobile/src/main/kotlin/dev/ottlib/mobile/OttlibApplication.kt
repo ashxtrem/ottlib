@@ -9,6 +9,7 @@ import coil3.request.crossfade
 import dev.ottlib.core.presentation.AppContainer
 import dev.ottlib.core.presentation.AppContainerOwner
 import dev.ottlib.core.presentation.ContinueWatchingPublisher
+import dev.ottlib.core.presentation.update.InstalledApp
 
 class OttlibApplication : Application(), AppContainerOwner, SingletonImageLoader.Factory {
     override lateinit var container: AppContainer
@@ -17,7 +18,7 @@ class OttlibApplication : Application(), AppContainerOwner, SingletonImageLoader
     override fun onCreate() {
         super.onCreate()
         // Phones have no launcher row for in-progress titles; Continue watching lives on the Home screen.
-        container = AppContainer(this, continueWatching = ContinueWatchingPublisher.None)
+        container = AppContainer(this, continueWatching = ContinueWatchingPublisher.None, installedApp = InstalledApp(BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME, apkPrefix = "ottlib-mobile-"))
     }
 
     /** Posters and backdrops are served by the Ottlib server over the same client (and device header). */

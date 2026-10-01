@@ -124,6 +124,8 @@ The sync button (top bar of Home and Library) rescans the server's library folde
 
 Resume positions and watched state are per device, as on the TV. The phone must be on the same network as the server.
 
+Both apps update themselves from GitHub releases: a banner offers each new release, and **Settings → App updates** has a manual check and an off switch. Builds signed with the debug key can't install releases; see [docs/install.md](docs/install.md#updating-the-apps).
+
 ## Scripts
 
 | Command | Description |

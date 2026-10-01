@@ -38,6 +38,7 @@ import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.LoadingMessage
 import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TvTextField
+import dev.ottlib.tv.ui.components.UpdateBanner
 import dev.ottlib.tv.ui.components.tryRequestFocus
 
 @Composable
@@ -64,6 +65,7 @@ fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
 
     Column(Modifier.fillMaxSize().padding(ScreenPadding), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Text("Connect to Ottlib", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = OttlibColors.Foreground)
+        UpdateBanner()
         Text(
             "Pick the PC running the Ottlib server, or enter the address shown in the web app under Settings → Server info.",
             style = MaterialTheme.typography.bodyLarge,

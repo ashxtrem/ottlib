@@ -32,6 +32,7 @@ import dev.ottlib.mobile.ui.components.ErrorMessage
 import dev.ottlib.mobile.ui.components.LibrarySyncAction
 import dev.ottlib.mobile.ui.components.LoadingMessage
 import dev.ottlib.mobile.ui.components.PosterCard
+import dev.ottlib.mobile.ui.components.UpdateBanner
 import dev.ottlib.mobile.ui.components.WindowWidth
 import dev.ottlib.mobile.ui.components.gutter
 import dev.ottlib.mobile.ui.components.posterWidth
@@ -50,15 +51,17 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit) {
     val width = windowWidth()
 
     Scaffold(topBar = { TopAppBar(title = { Text("Ottlib", fontWeight = FontWeight.Bold, color = OttlibColors.Accent) }, actions = { LibrarySyncAction() }) }) { padding ->
-        val content = Modifier.padding(padding)
-        when (val current = state) {
-            LoadState.Loading -> LoadingMessage(modifier = content)
-            is LoadState.Failed -> ErrorMessage(current.message, content) { viewModel.load() }
-            is LoadState.Loaded -> if (current.value.isEmpty()) {
-                EmptyMessage("Your library is empty.\nAdd folders and run a scan from the Ottlib web app.", content)
-            } else {
-                LazyColumn(content.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    items(current.value, key = { it.key }) { row -> PosterRow(row, width, onOpenMovie) }
+        Column(Modifier.padding(padding)) {
+            UpdateBanner(Modifier.padding(horizontal = width.gutter, vertical = 8.dp))
+            when (val current = state) {
+                LoadState.Loading -> LoadingMessage()
+                is LoadState.Failed -> ErrorMessage(current.message) { viewModel.load() }
+                is LoadState.Loaded -> if (current.value.isEmpty()) {
+                    EmptyMessage("Your library is empty.\nAdd folders and run a scan from the Ottlib web app.")
+                } else {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        items(current.value, key = { it.key }) { row -> PosterRow(row, width, onOpenMovie) }
+                    }
                 }
             }
         }
