@@ -14,6 +14,12 @@ OttLib is a self-hosted movie-library app for a trusted home network. Point it a
 - Schedule rescans and review scan progress/history.
 - Search enabled qBittorrent search plugins and hand selected releases back to qBittorrent.
 
+## Screenshots
+
+![Library grid with filters, poster artwork and shelf/quality badges](docs/screenshots/library.png)
+
+![Movie details with backdrop, media info, and play and find-this actions](docs/screenshots/detail.png)
+
 ## Stack
 
 - React, Vite, Tailwind CSS, and TanStack Query
