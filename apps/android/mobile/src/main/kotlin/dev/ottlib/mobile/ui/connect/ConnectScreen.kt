@@ -45,6 +45,7 @@ import dev.ottlib.core.presentation.connect.ConnectViewModel
 import dev.ottlib.core.presentation.connect.localSubnetPrefix
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.mobile.ui.components.LoadingMessage
+import dev.ottlib.mobile.ui.components.UpdateBanner
 import dev.ottlib.mobile.ui.components.WindowWidth
 import dev.ottlib.mobile.ui.components.windowWidth
 
@@ -78,6 +79,7 @@ fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Text("Connect to Ottlib", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            UpdateBanner()
             Text(
                 "Pick the PC running the Ottlib server, or enter the address shown in the web app under Settings → Server info. Your phone must be on the same Wi-Fi.",
                 style = MaterialTheme.typography.bodyLarge,

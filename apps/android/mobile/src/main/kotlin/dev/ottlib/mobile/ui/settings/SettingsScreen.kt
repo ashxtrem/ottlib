@@ -83,6 +83,9 @@ fun SettingsScreen(onChangeServer: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
 
+                SectionTitle("App updates")
+                UpdateSettingsSection(container.updates)
+
                 SectionTitle("About")
                 Text("Ottlib ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted, modifier = Modifier.padding(horizontal = 16.dp))
                 deviceId?.let { Text("Device ID $it", style = MaterialTheme.typography.bodySmall, color = OttlibColors.Muted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }

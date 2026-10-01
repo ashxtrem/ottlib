@@ -25,6 +25,7 @@ dependencies {
     api(project(":core:data"))
     api(project(":core:discovery"))
     api(project(":core:player"))
+    api(project(":core:update"))
 
     api(platform(libs.compose.bom))
     api(libs.compose.ui)

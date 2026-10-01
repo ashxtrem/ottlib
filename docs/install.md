@@ -63,6 +63,14 @@ adb shell cmd package compile -m speed-profile -f dev.ottlib.tv
 
 On first launch both apps list OttLib servers found on your network. If the list stays empty, type the address shown under **Settings → Server info** in the web app. The device must be on the same network as the server.
 
+### Updating the apps
+
+The apps check this repository's latest GitHub release when they start. When a newer one is out, a banner appears on Home (and on the Connect screen). Choose **Update** and the app downloads its APK, checks it against the release's `SHA256SUMS`, and hands it to Android's installer; confirm when Android asks. **Later** hides the banner until the next release. You can also check by hand, or turn the automatic check off, under **Settings → App updates**. The check sends a request to GitHub, so GitHub sees your IP address.
+
+The first time, Android asks you to let OttLib install apps. On a phone, the app takes you to the right page. On Google TV it's usually **Settings → Apps → Security & restrictions → Unknown sources → OttLib**.
+
+Updating only works between APKs signed with the same key. If you built and installed the app yourself (signed with a debug key), Settings says updates are unavailable for that build: uninstall it once and install the APK from a release. After an in-app update on a TV, the app may feel slower until Android optimises it overnight; run the `compile` command above to do that right away.
+
 ## Verifying a download
 
 Compare a file against `SHA256SUMS`:

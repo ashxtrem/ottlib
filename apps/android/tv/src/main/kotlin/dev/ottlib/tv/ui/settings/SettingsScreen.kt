@@ -109,6 +109,9 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onChangeServer: () -> U
                 modifier = Modifier.padding(start = 16.dp),
             )
 
+            SectionTitle("App updates")
+            UpdateSettingsSection(container.updates)
+
             SectionTitle("About")
             Text("Ottlib TV ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted, modifier = Modifier.padding(start = 16.dp))
             deviceId?.let { Text("Device ID $it", style = MaterialTheme.typography.bodySmall, color = OttlibColors.Muted, modifier = Modifier.padding(start = 16.dp)) }

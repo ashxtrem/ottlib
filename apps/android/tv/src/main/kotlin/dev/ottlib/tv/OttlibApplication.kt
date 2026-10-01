@@ -9,6 +9,7 @@ import coil3.request.allowRgb565
 import coil3.request.crossfade
 import dev.ottlib.core.presentation.AppContainer
 import dev.ottlib.core.presentation.AppContainerOwner
+import dev.ottlib.core.presentation.update.InstalledApp
 import dev.ottlib.tv.watchnext.WatchNextPublisher
 
 class OttlibApplication : Application(), AppContainerOwner, SingletonImageLoader.Factory {
@@ -17,7 +18,7 @@ class OttlibApplication : Application(), AppContainerOwner, SingletonImageLoader
 
     override fun onCreate() {
         super.onCreate()
-        container = AppContainer(this, continueWatching = WatchNextPublisher(this))
+        container = AppContainer(this, continueWatching = WatchNextPublisher(this), installedApp = InstalledApp(BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME, apkPrefix = "ottlib-tv-"))
     }
 
     /** Posters and backdrops are served by the Ottlib server over the same client (and device header). */

@@ -64,6 +64,7 @@ core/data       DataStore-backed stores + ConnectionManager (Android library)
 core/discovery  mDNS server discovery via NsdManager (Android library)
 core/player     Media3 player factory, MediaItem mapping, progress reporting, picture modes (Android library)
 core/presentation  ViewModels (one per screen), LoadState/PosterItem/formatters, palette, AppContainer (manual DI)
+core/update     Self-update from GitHub releases: release lookup, verified APK download, system installer (Android library)
 tv              TV app: Compose for TV screens, D-pad focus, Watch Next
 mobile          Phone/foldable app: Material 3 screens, touch player (gestures, PiP, Flex mode)
 ```
