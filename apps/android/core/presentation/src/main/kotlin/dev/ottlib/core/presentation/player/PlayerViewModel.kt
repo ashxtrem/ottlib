@@ -17,6 +17,7 @@ import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
 import dev.ottlib.core.player.PlayerSettings
 import dev.ottlib.core.player.ProgressReporter
+import dev.ottlib.core.player.PlaybackSession
 import dev.ottlib.core.player.TrackMemory
 import dev.ottlib.core.player.hasOnlyUnsupportedAudio
 import dev.ottlib.core.player.hasOnlyUnsupportedVideo
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -82,9 +84,9 @@ class PlayerViewModel(
     private val collectionId = sequence.collectionFor(movieId)
     @Volatile private var ended = false
     private var completionSaved = false
-    private var player: ExoPlayer? = null
-    private var reporter: ProgressReporter? = null
-    private var trackMemory: TrackMemory? = null
+    private var session: PlaybackSession? = null
+    private val player: ExoPlayer? get() = session?.player
+    private var startup: Job? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
 
@@ -120,7 +122,7 @@ class PlayerViewModel(
     init { start() }
 
     private fun start() {
-        viewModelScope.launch {
+        startup = viewModelScope.launch {
             try {
                 val details = async { api.movie(movieId) }
                 val source = api.playbackSource(movieId)
@@ -135,20 +137,23 @@ class PlayerViewModel(
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
                 val skipBackMs = settings.skipBackSeconds * 1_000L
                 val skipForwardMs = settings.skipForwardSeconds * 1_000L
+                // Read preferences before creating a decoder: cancellation during a suspended read must not leak a player.
+                val savedTracks = trackChoices.get(movieId)
                 val exo = playerFactory.create(PlayerSettings(settings.audioLanguage, settings.subtitleLanguage, skipBackMs, skipForwardMs))
-                exo.addListener(listener)
                 // Before prepare(), so the first track list is seen and the title's remembered tracks are restored.
-                trackMemory = TrackMemory(exo, trackChoices.get(movieId), ::rememberTracks).also { it.start() }
+                session = PlaybackSession(
+                    exo, listener,
+                    ProgressReporter(exo, viewModelScope, backgroundScope, source.durationMs ?: loaded.mediaInfo?.durationMs) { position, duration -> save(position, duration) },
+                    TrackMemory(exo, savedTracks, ::rememberTracks),
+                )
                 exo.setMediaItem(source.toMediaItem(movieId, loaded.title) { api.resolve(it)!! }, if (fromStart) 0 else source.resumePositionMs ?: 0)
                 exo.prepare()
                 exo.playWhenReady = true
-                reporter = ProgressReporter(exo, viewModelScope, backgroundScope, source.durationMs ?: loaded.mediaInfo?.durationMs) { position, duration -> save(position, duration) }
-                    .also { it.start() }
-                player = exo
                 state.value = PlayerUiState.Ready(exo, loaded.title, PlayerControls(skipBackMs, skipForwardMs, showPictureHint = !settings.pictureHintShown))
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
+                releasePlayback()
                 state.value = PlayerUiState.Failed(error.userMessage())
             }
         }
@@ -226,15 +231,14 @@ class PlayerViewModel(
 
     private fun audioCodecs(): String = movie?.mediaInfo?.tracks?.filter { it.isAudio }?.mapNotNull { it.codec }?.distinct()?.joinToString(", ")?.ifEmpty { null } ?: "unknown codec"
 
-    override fun onCleared() {
-        reporter?.stop()
-        trackMemory?.stop()
-        player?.run {
-            removeListener(listener)
-            release()
-        }
-        player = null
+    /** Call before navigating away; Navigation may retain the old ViewModel through its exit animation. */
+    fun releasePlayback() {
+        startup?.cancel()
+        session?.release()
+        session = null
     }
+
+    override fun onCleared() = releasePlayback()
 }
 
 private fun playbackErrorMessage(error: PlaybackException): String = when (error.errorCode) {
