@@ -24,7 +24,7 @@ data class SubtitleSource(
 )
 
 @Serializable
-data class PlaybackProgressUpdate(val positionMs: Long, val durationMs: Long)
+data class PlaybackProgressUpdate(val positionMs: Long, val durationMs: Long, val shelfId: Long? = null)
 
 @Serializable
 data class PlaybackProgressResult(val resumePositionMs: Long?, val watched: Boolean)

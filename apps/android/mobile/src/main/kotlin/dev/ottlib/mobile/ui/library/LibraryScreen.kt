@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.ottlib.core.network.MovieSort
+import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.presentation.Choice
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.library.LibraryChoices
@@ -76,7 +77,10 @@ fun LibraryScreen(onOpenMovie: (Long) -> Unit) {
                 state.items.isEmpty() && state.error != null -> ErrorMessage(state.error!!) { viewModel.reload() }
                 state.items.isEmpty() && state.loading -> LoadingMessage()
                 state.items.isEmpty() -> EmptyMessage("Nothing matches these filters.")
-                else -> PosterGrid(state.items, onOpen = { onOpenMovie(it.id) }, onNearEnd = viewModel::loadMore)
+                else -> PosterGrid(state.items, onOpen = {
+                    container.playbackSequence.select(state.items.map { item -> item.id }, source = MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort), nextCursor = state.nextCursor)
+                    onOpenMovie(it.id)
+                }, onNearEnd = viewModel::loadMore)
             }
         }
     }

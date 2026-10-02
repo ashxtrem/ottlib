@@ -60,7 +60,7 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit) {
                     EmptyMessage("Your library is empty.\nAdd folders and run a scan from the Ottlib web app.")
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        items(current.value, key = { it.key }) { row -> PosterRow(row, width, onOpenMovie) }
+                        items(current.value, key = { it.key }) { row -> PosterRow(row, width) { id -> container.playbackSequence.select(if (row.key == "continue") emptyList() else row.items.map { it.id }, shelf = row.key.removePrefix("shelf-").toLongOrNull()); onOpenMovie(id) } }
                     }
                 }
             }

@@ -1,0 +1,30 @@
+{
+  "id": 3,
+  "title": "Dragon Ball Z · S1E1",
+  "year": 1989,
+  "rawFilename": "3.mkv",
+  "filePath": "D:\\Movies\\3.mkv",
+  "titleOverride": null,
+  "overview": null,
+  "posterUrl": null,
+  "backdropUrl": null,
+  "genres": [
+    "Animation"
+  ],
+  "cast": [],
+  "rating": null,
+  "runtime": 24,
+  "imdbId": null,
+  "metadataStatus": "matched",
+  "metadataSource": "tmdb",
+  "mediaType": "tv",
+  "season": 1,
+  "episode": 1,
+  "fileSizeBytes": 1,
+  "mediaInfo": null,
+  "watched": true,
+  "resumePositionMs": null,
+  "missing": false,
+  "addedAt": "2026-01-01T00:00:00.000Z",
+  "shelves": []
+}

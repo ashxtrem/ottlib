@@ -34,6 +34,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.presentation.player.nextLabel
+import dev.ottlib.core.presentation.player.episodeGapAfter
 import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.describe
@@ -51,9 +53,10 @@ import dev.ottlib.tv.ui.components.tryRequestFocus
 @Composable
 fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onBack: () -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId) }
+    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId, container.playbackSequence) }
     val state by viewModel.movie.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
         onPauseOrDispose { }
@@ -64,6 +67,8 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
         is LoadState.Failed -> ErrorMessage(current.message, actionLabel = "Back", onAction = onBack)
         is LoadState.Loaded -> MovieDetails(
             movie = current.value,
+            nextMovie = nextMovie,
+            onPlayNext = { nextMovie?.let { onPlay(it.id, false) } },
             busy = busy,
             onPlay = { fromStart -> onPlay(movieId, fromStart) },
             onToggleWatched = viewModel::toggleWatched,
@@ -74,7 +79,7 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
 }
 
 @Composable
-private fun MovieDetails(movie: Movie, busy: Boolean, onPlay: (fromStart: Boolean) -> Unit, onToggleWatched: () -> Unit, onClearProgress: () -> Unit, streamUrl: () -> String?) {
+private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit, busy: Boolean, onPlay: (fromStart: Boolean) -> Unit, onToggleWatched: () -> Unit, onClearProgress: () -> Unit, streamUrl: () -> String?) {
     val container = appContainer()
     val context = LocalContext.current
     val primary = remember { FocusRequester() }
@@ -102,13 +107,19 @@ private fun MovieDetails(movie: Movie, busy: Boolean, onPlay: (fromStart: Boolea
                 OutlinedButton(onClick = onToggleWatched, enabled = !busy) { Text(if (movie.watched) "Mark unwatched" else "Mark watched") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (resume != null) OutlinedButton(onClick = onClearProgress, enabled = !busy) { Text("Remove from Continue watching") }
+                if (movie.resumePositionMs != null) OutlinedButton(onClick = onClearProgress, enabled = !busy) { Text("Remove from Continue watching") }
                 OutlinedButton(onClick = {
                     val url = streamUrl()
                     if (url == null || !openInExternalPlayer(context, url, movie.title)) Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
                 }, enabled = !movie.missing) { Text("Play in another app") }
             }
 
+            nextMovie?.let { next ->
+                Text("${next.nextLabel()}: ${next.title}", color = OttlibColors.Foreground)
+                next.episodeGapAfter(movie)?.let { Text(it, color = OttlibColors.Muted) }
+                OutlinedButton(onClick = onPlayNext) { Text("Play next") }
+            }
+            if (movie.watched) Text("âœ“ Watched", color = OttlibColors.Success)
             if (movie.cast.isNotEmpty()) Text("Starring ${movie.cast.take(5).joinToString(", ")}", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             TechnicalDetails(movie)
         }

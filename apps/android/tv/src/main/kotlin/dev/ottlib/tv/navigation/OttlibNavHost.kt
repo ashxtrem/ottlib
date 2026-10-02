@@ -66,7 +66,12 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
         composable(Routes.DETAILS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
             DetailsScreen(
                 movieId = entry.arguments!!.getLong("id"),
-                onPlay = { id, fromStart -> nav.navigate(Routes.player(id, fromStart)) },
+                onPlay = { id, fromStart ->
+                        if (id != entry.arguments!!.getLong("id")) {
+                            nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }
+                        }
+                        nav.navigate(Routes.player(id, fromStart))
+                    },
                 onBack = { if (!nav.popBackStack()) nav.navigate(Routes.HOME) },
             )
         }
@@ -78,6 +83,11 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
                 movieId = entry.arguments!!.getLong("id"),
                 fromStart = entry.arguments!!.getBoolean("fromStart"),
                 onExit = { nav.popBackStack() },
+                    onNext = { id ->
+                        nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }
+                        nav.navigate(Routes.player(id, false))
+                    },
+                    onDetails = { id -> nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } } },
             )
         }
     }

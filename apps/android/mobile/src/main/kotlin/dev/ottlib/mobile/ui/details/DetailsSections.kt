@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.presentation.player.nextLabel
+import dev.ottlib.core.presentation.player.episodeGapAfter
 import dev.ottlib.core.presentation.describe
 import dev.ottlib.core.presentation.formatPosition
 import dev.ottlib.core.presentation.formatRemaining
@@ -54,7 +56,12 @@ fun ActionButtons(movie: Movie, busy: Boolean, actions: DetailsActions, fillWidt
             )
             SecondaryButton("Other app", Icons.AutoMirrored.Filled.OpenInNew, enabled = !movie.missing, onClick = actions.onPlayElsewhere)
         }
-        if (resume != null) TextButton(onClick = actions.onClearProgress, enabled = !busy) { Text("Remove from Continue watching") }
+        if (movie.resumePositionMs != null) TextButton(onClick = actions.onClearProgress, enabled = !busy) { Text("Remove from Continue watching") }
+        actions.nextMovie?.let { next ->
+            Text("${next.nextLabel()}: ${next.title}", style = MaterialTheme.typography.titleMedium)
+            next.episodeGapAfter(movie)?.let { Text(it, color = OttlibColors.Muted) }
+            OutlinedButton(onClick = actions.onPlayNext) { Text("Play next") }
+        }
         if (movie.missing) Text("This file is unavailable on the server (it may be on a disconnected drive).", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Error)
     }
 }

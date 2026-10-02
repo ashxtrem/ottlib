@@ -64,7 +64,7 @@ fun SearchScreen(onOpenMovie: (Long) -> Unit) {
                 LoadState.Loading -> LoadingMessage(text = "Searching…")
                 is LoadState.Failed -> EmptyMessage(current.message)
                 is LoadState.Loaded -> if (current.value.isEmpty()) EmptyMessage("No titles match “${text.trim()}”.")
-                else PosterGrid(current.value, onOpen = { onOpenMovie(it.id) })
+                else PosterGrid(current.value, onOpen = { container.playbackSequence.select(current.value.map { item -> item.id }); onOpenMovie(it.id) })
             }
         }
     }

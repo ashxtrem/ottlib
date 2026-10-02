@@ -18,7 +18,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 data class HomeRow(val key: String, val title: String, val items: List<PosterItem>)
 
@@ -30,32 +32,42 @@ class HomeViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewModel()
     val rows: StateFlow<LoadState<List<HomeRow>>> = state.asStateFlow()
     var lastFocus: FocusTarget? = null
     private var resumedOnce = false
+    private var loading: Job? = null
 
     init {
         load()
+        viewModelScope.launch { api.libraryRevision.collect { if (it > 0) load() } }
+        viewModelScope.launch {
+            api.watchChange.collect { change ->
+                if (change == null) return@collect
+                state.update { current ->
+                    if (current !is LoadState.Loaded) current else LoadState.Loaded(current.value.map { row ->
+                        row.copy(items = row.items.map { item ->
+                            if (item.id == change.movieId) item.copy(watched = change.watched, resumePositionMs = if (change.watched) null else item.resumePositionMs) else item
+                        }.filterNot { it.id == change.movieId && change.watched && row.key in listOf(CONTINUE_KEY, "unwatched") })
+                    }.filter { it.items.isNotEmpty() })
+                }
+            }
+        }
         // A finished sync may have added titles: show them without the viewer having to leave and come back.
         viewModelScope.launch { sync.outcomes.collect { if (it is SyncOutcome.Done) load() } }
     }
 
     fun load() {
-        viewModelScope.launch {
+        loading?.cancel()
+        loading = viewModelScope.launch {
             if (state.value !is LoadState.Loaded) state.value = LoadState.Loading
             state.value = try { LoadState.Loaded(buildRows()) } catch (error: CancellationException) { throw error } catch (error: Exception) { LoadState.Failed(error.userMessage()) }
         }
     }
 
-    /** Coming back from the player changes progress; refresh just the Continue watching row to keep focus stable. */
+    /** Refresh all rows so watched ticks and the Unwatched row agree with playback. */
     fun onResume() {
         if (!resumedOnce) { resumedOnce = true; return }
-        val current = (state.value as? LoadState.Loaded)?.value ?: return load()
-        viewModelScope.launch {
-            val row = runCatching { continueWatchingRow() }.getOrNull() ?: return@launch
-            val others = current.filterNot { it.key == CONTINUE_KEY }
-            state.value = LoadState.Loaded(if (row.items.isEmpty()) others else listOf(row) + others)
-        }
+        load()
     }
 
-    private suspend fun continueWatchingRow() = HomeRow(CONTINUE_KEY, "Continue watching", api.continueWatching(20).map { it.toPosterItem(api::resolve) })
+    private suspend fun continueWatchingRow() = HomeRow(CONTINUE_KEY, "Continue watching", api.continueWatching(20).map { it.toPosterItem(api::resolve).let { poster -> if (it.resumePositionMs == 0L) poster.copy(badge = if (it.nextUp == "episode") "Next episode" else "Up next", resumePositionMs = null) else poster } })
 
     private suspend fun buildRows(): List<HomeRow> = coroutineScope {
         val resolve: (String?) -> String? = api::resolve

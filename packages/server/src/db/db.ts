@@ -16,6 +16,7 @@ import { ensureEpisodeColumns } from './migrations/012_episode_columns.js';
 import { playbackProgressMigration } from './migrations/013_playback_progress.js';
 import { ensureTorrentSearchToggle } from './migrations/014_torrent_search_toggle.js';
 import { accessPinMigration } from './migrations/015_access_pin.js';
+import { ensurePlaybackCollection } from './migrations/016_playback_collection.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -38,5 +39,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   db.exec(playbackProgressMigration);
   ensureTorrentSearchToggle(db);
   db.exec(accessPinMigration);
+  ensurePlaybackCollection(db);
   return db;
 }

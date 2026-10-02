@@ -103,6 +103,7 @@ export const movieSchema = z.object({
 });
 
 export const movieListItemSchema = z.object({
+  nextUp: z.enum(['episode', 'collection']).nullable().optional(),
   id: z.number().int(),
   title: z.string(),
   year: z.number().int().nullable(),

@@ -166,7 +166,7 @@ describe('MovieRepository filters', () => {
       expect(first.nextCursor).toEqual(expect.any(String));
       expect(second).toMatchObject({ total: 3, nextCursor: null, items: [{ title: 'Example' }] });
       expect([...first.items, ...second.items].map((movie) => movie.title)).toEqual(['Bravo', 'Charlie', 'Example']);
-      expect(Object.keys(first.items[0]).sort()).toEqual(['durationMs', 'hdrFormat', 'id', 'metadataStatus', 'missing', 'posterUrl', 'resolution', 'resumePositionMs', 'shelves', 'title', 'watched', 'year']);
+      expect(Object.keys(first.items[0]).sort()).toEqual(['durationMs', 'hdrFormat', 'id', 'metadataStatus', 'missing', 'nextUp', 'posterUrl', 'resolution', 'resumePositionMs', 'shelves', 'title', 'watched', 'year']);
     } finally {
       close();
     }
