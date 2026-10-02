@@ -46,7 +46,16 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
         when (val current = state) {
             PlayerUiState.Loading -> LoadingMessage(text = "Starting playback…")
             is PlayerUiState.Failed -> ErrorMessage(current.message, actionLabel = "Back", onAction = onExit)
-            PlayerUiState.Ended -> PlaybackEnded(nextMovie, container.api.resolve(nextMovie?.posterUrl), nextWarning, completionError, viewModel::saveCompletion, onNext, onDetails, onExit)
+            PlayerUiState.Ended -> PlaybackEnded(
+                next = nextMovie,
+                posterUrl = container.api.resolve(nextMovie?.posterUrl),
+                warning = nextWarning,
+                error = completionError,
+                onRetry = viewModel::saveCompletion,
+                onPlay = { id -> viewModel.releasePlayback(); onNext(id) },
+                onDetails = { id -> viewModel.releasePlayback(); onDetails(id) },
+                onClose = { viewModel.releasePlayback(); onExit() },
+            )
             is PlayerUiState.Ready -> {
                 MediaSessionEffect(current.player)
                 // Stopped means no longer visible at all (screen off, app switched without picture-in-picture, or the
