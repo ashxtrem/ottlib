@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -31,9 +32,10 @@ class SearchViewModel(private val api: OttlibApi) : ViewModel() {
 
     val results: StateFlow<LoadState<List<PosterItem>>?> = query
         .map { it.trim() }
+        .combine(api.libraryRevision) { term, revision -> term to revision }
         .debounce(350)
         .distinctUntilChanged()
-        .flatMapLatest { search(it) }
+        .flatMapLatest { search(it.first) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun onTextChange(value: String) {

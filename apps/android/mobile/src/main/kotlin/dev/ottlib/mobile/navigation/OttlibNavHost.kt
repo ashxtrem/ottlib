@@ -63,7 +63,12 @@ fun OttlibNavHost() {
             composable(Routes.DETAILS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { backStackEntry ->
                 DetailsScreen(
                     movieId = backStackEntry.arguments!!.getLong("id"),
-                    onPlay = { id, fromStart -> nav.navigate(Routes.player(id, fromStart)) },
+                    onPlay = { id, fromStart ->
+                        if (id != backStackEntry.arguments!!.getLong("id")) {
+                            nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }
+                        }
+                        nav.navigate(Routes.player(id, fromStart))
+                    },
                     onBack = { if (!nav.popBackStack()) nav.navigate(Routes.HOME) },
                 )
             }
@@ -75,6 +80,11 @@ fun OttlibNavHost() {
                     movieId = backStackEntry.arguments!!.getLong("id"),
                     fromStart = backStackEntry.arguments!!.getBoolean("fromStart"),
                     onExit = { nav.popBackStack() },
+                    onNext = { id ->
+                        nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }
+                        nav.navigate(Routes.player(id, false))
+                    },
+                    onDetails = { id -> nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } } },
                 )
             }
         }

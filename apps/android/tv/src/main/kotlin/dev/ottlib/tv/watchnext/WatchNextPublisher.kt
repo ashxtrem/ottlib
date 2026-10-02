@@ -18,7 +18,7 @@ class WatchNextPublisher(context: Context) : ContinueWatchingPublisher {
     override fun upsert(entry: ContinueWatchingEntry) = safely {
         val program = WatchNextProgram.Builder()
             .setType(TvContractCompat.WatchNextPrograms.TYPE_MOVIE)
-            .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+            .setWatchNextType(if (entry.nextUp) TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT else TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
             .setLastEngagementTimeUtcMillis(System.currentTimeMillis())
             .setLastPlaybackPositionMillis(entry.positionMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
             .setDurationMillis(entry.durationMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())

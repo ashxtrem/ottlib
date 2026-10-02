@@ -16,6 +16,9 @@ import dev.ottlib.core.model.ShelfDetail
 import dev.ottlib.core.model.ShelfSummary
 import dev.ottlib.core.model.WatchStateUpdate
 import okhttp3.HttpUrl
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -27,6 +30,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
  * active server can change (Settings → Change server) without rebuilding the client.
  */
 class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> HttpUrl?) {
+    private val changes = MutableStateFlow(0L)
+    val libraryRevision = changes.asStateFlow()
+    private val watchChanges = MutableStateFlow<WatchChange?>(null)
+    val watchChange = watchChanges.asStateFlow()
+    private fun watched(id: Long, watched: Boolean) { watchChanges.value = WatchChange(id, watched); changed() }
+    private fun changed() { changes.update { it + 1 } }
     private val jsonType = "application/json".toMediaType()
 
     /** Probes an arbitrary server (used before a server is saved as active). */
@@ -47,13 +56,18 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     suspend fun shelves(): List<ShelfSummary> = get(url("/api/shelves"))
     suspend fun shelf(id: Long): ShelfDetail = get(url("/api/shelves/$id"))
     suspend fun playbackSource(id: Long): PlaybackSource = get(url("/api/movies/$id/playback"))
+    suspend fun nextMovie(id: Long, shelfId: Long? = null): Movie? = get(sequenceUrl(id, "next", shelfId))
+    suspend fun complete(id: Long, shelfId: Long? = null): Movie = post<Movie>(sequenceUrl(id, "complete", shelfId)).also { watched(id, true) }
+    private fun sequenceUrl(id: Long, action: String, shelfId: Long?): HttpUrl =
+        url("/api/movies/$id/$action").newBuilder().apply { shelfId?.let { addQueryParameter("shelfId", it.toString()) } }.build()
 
     suspend fun setWatched(id: Long, watched: Boolean): Movie =
-        send("PUT", url("/api/movies/$id/watch-state"), OttlibJson.encodeToString(WatchStateUpdate.serializer(), WatchStateUpdate(watched)))
+        send<Movie>("PUT", url("/api/movies/$id/watch-state"), OttlibJson.encodeToString(WatchStateUpdate.serializer(), WatchStateUpdate(watched))).also { watched(id, it.watched) }
     suspend fun saveProgress(id: Long, update: PlaybackProgressUpdate): PlaybackProgressResult =
-        send("PUT", url("/api/movies/$id/progress"), OttlibJson.encodeToString(PlaybackProgressUpdate.serializer(), update))
+        send<PlaybackProgressResult>("PUT", url("/api/movies/$id/progress"), OttlibJson.encodeToString(PlaybackProgressUpdate.serializer(), update)).also { if (it.watched) watched(id, true) }
     suspend fun clearProgress(id: Long) {
         client.newCall(Request.Builder().url(url("/api/movies/$id/progress")).delete().build()).awaitBody()
+        changed()
     }
 
     /**

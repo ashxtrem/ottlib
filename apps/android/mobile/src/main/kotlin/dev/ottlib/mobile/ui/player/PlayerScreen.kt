@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,13 +21,16 @@ import dev.ottlib.mobile.ui.components.ErrorMessage
 import dev.ottlib.mobile.ui.components.LoadingMessage
 
 @Composable
-fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit) {
+fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: (Long) -> Unit, onDetails: (Long) -> Unit) {
     val container = appContainer()
     val viewModel = viewModel(key = "player-$movieId-$fromStart") {
-        PlayerViewModel(container.api, container.playerFactory, container.playbackPreferences, container.pictureModes, container.trackChoices, container.continueWatching, container.appScope, movieId, fromStart)
+        PlayerViewModel(container.api, container.playerFactory, container.playbackPreferences, container.pictureModes, container.trackChoices, container.continueWatching, container.appScope, movieId, fromStart, container.playbackSequence)
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val problem by viewModel.problem.collectAsStateWithLifecycle()
+    val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
+    val completionError by viewModel.completionError.collectAsStateWithLifecycle()
+    val nextWarning by viewModel.nextWarning.collectAsStateWithLifecycle()
     val pictureMode by viewModel.pictureMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val inPictureInPicture = rememberInPictureInPicture()
@@ -44,7 +46,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit) {
         when (val current = state) {
             PlayerUiState.Loading -> LoadingMessage(text = "Starting playback…")
             is PlayerUiState.Failed -> ErrorMessage(current.message, actionLabel = "Back", onAction = onExit)
-            PlayerUiState.Ended -> LaunchedEffect(Unit) { onExit() }
+            PlayerUiState.Ended -> PlaybackEnded(nextMovie, container.api.resolve(nextMovie?.posterUrl), nextWarning, completionError, viewModel::saveCompletion, onNext, onDetails, onExit)
             is PlayerUiState.Ready -> {
                 MediaSessionEffect(current.player)
                 // Stopped means no longer visible at all (screen off, app switched without picture-in-picture, or the

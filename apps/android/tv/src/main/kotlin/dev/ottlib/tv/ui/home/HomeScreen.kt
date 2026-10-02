@@ -93,6 +93,7 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Unit
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HomeRows(rows: List<HomeRow>, viewModel: HomeViewModel, onOpenMovie: (Long) -> Unit, onFocused: (PosterItem) -> Unit) {
+    val appSequence = appContainer().playbackSequence
     val restore = remember { FocusRequester() }
     val target = viewModel.lastFocus?.takeIf { focus -> rows.any { row -> row.key == focus.rowKey && row.items.any { it.id == focus.itemId } } }
         ?: FocusTarget(rows.first().key, rows.first().items.first().id)
@@ -105,7 +106,7 @@ private fun HomeRows(rows: List<HomeRow>, viewModel: HomeViewModel, onOpenMovie:
                     PosterRow(
                         title = row.title,
                         items = row.items,
-                        onOpen = { onOpenMovie(it.id) },
+                        onOpen = { appSequence.select(if (row.key == "continue") emptyList() else row.items.map { item -> item.id }, shelf = row.key.removePrefix("shelf-").toLongOrNull()); onOpenMovie(it.id) },
                         onFocused = { item ->
                             viewModel.lastFocus = FocusTarget(row.key, item.id)
                             onFocused(item)

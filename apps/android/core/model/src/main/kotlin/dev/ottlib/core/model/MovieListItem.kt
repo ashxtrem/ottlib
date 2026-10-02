@@ -17,6 +17,7 @@ data class MovieListItem(
     val missing: Boolean,
     val metadataStatus: String,
     val shelves: List<ShelfMembership>,
+    val nextUp: String? = null,
 )
 
 @Serializable

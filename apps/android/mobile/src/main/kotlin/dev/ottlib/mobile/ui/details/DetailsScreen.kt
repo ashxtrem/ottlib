@@ -33,9 +33,10 @@ import dev.ottlib.mobile.ui.components.windowWidth
 @Composable
 fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onBack: () -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId) }
+    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId, container.playbackSequence) }
     val state by viewModel.movie.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
@@ -49,6 +50,8 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
             is LoadState.Loaded -> {
                 val actions = DetailsActions(
                     onPlay = { fromStart -> onPlay(movieId, fromStart) },
+                    nextMovie = nextMovie,
+                    onPlayNext = { nextMovie?.let { onPlay(it.id, false) } },
                     onToggleWatched = viewModel::toggleWatched,
                     onClearProgress = viewModel::clearProgress,
                     onPlayElsewhere = {
@@ -75,6 +78,8 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
 /** What the details buttons do; the screen wires these to the ViewModel. */
 class DetailsActions(
     val onPlay: (fromStart: Boolean) -> Unit,
+    val nextMovie: dev.ottlib.core.model.Movie?,
+    val onPlayNext: () -> Unit,
     val onToggleWatched: () -> Unit,
     val onClearProgress: () -> Unit,
     val onPlayElsewhere: () -> Unit,

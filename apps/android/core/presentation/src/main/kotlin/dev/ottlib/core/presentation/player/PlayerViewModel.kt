@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 sealed interface PlayerUiState {
     data object Loading : PlayerUiState
@@ -60,6 +62,7 @@ class PlayerViewModel(
     private val backgroundScope: CoroutineScope,
     private val movieId: Long,
     private val fromStart: Boolean,
+    private val sequence: PlaybackSequence,
 ) : ViewModel() {
     private val state = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading)
     val uiState: StateFlow<PlayerUiState> = state.asStateFlow()
@@ -69,6 +72,16 @@ class PlayerViewModel(
     /** The confirmed picture mode (panel previews are applied to the view without changing this). */
     val pictureMode: StateFlow<PictureMode> = picture.asStateFlow()
 
+    private val next = MutableStateFlow<Movie?>(null)
+    val nextMovie = next.asStateFlow()
+    private val warning = MutableStateFlow<String?>(null)
+    val nextWarning = warning.asStateFlow()
+    private val completion = MutableStateFlow<String?>(null)
+    val completionError = completion.asStateFlow()
+    private val saving = Mutex()
+    private val collectionId = sequence.collectionFor(movieId)
+    @Volatile private var ended = false
+    private var completionSaved = false
     private var player: ExoPlayer? = null
     private var reporter: ProgressReporter? = null
     private var trackMemory: TrackMemory? = null
@@ -96,7 +109,11 @@ class PlayerViewModel(
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) state.value = PlayerUiState.Ended
+            if (playbackState == Player.STATE_ENDED) {
+                ended = true
+                state.value = PlayerUiState.Ended
+                saveCompletion()
+            }
         }
     }
 
@@ -108,6 +125,12 @@ class PlayerViewModel(
                 val details = async { api.movie(movieId) }
                 val source = api.playbackSource(movieId)
                 val loaded = details.await().also { movie = it }
+                viewModelScope.launch {
+                    next.value = try { sequence.next(loaded) }
+                    catch (error: CancellationException) { throw error }
+                    catch (_: Exception) { null }
+                    warning.value = next.value?.episodeGapAfter(loaded)
+                }
                 val settings = preferences.current()
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
                 val skipBackMs = settings.skipBackSeconds * 1_000L
@@ -171,9 +194,31 @@ class PlayerViewModel(
         player?.run { prepare(); play() }
     }
 
-    private suspend fun save(positionMs: Long, durationMs: Long) {
-        val result = api.saveProgress(movieId, PlaybackProgressUpdate(positionMs, durationMs))
-        val current = movie ?: return
+    fun saveCompletion() {
+        backgroundScope.launch {
+            saving.withLock {
+                if (completionSaved) return@withLock
+                try {
+                    api.complete(movieId, collectionId)
+                    completionSaved = true
+                    completion.value = null
+                    runCatching {
+                        continueWatching.remove(movieId)
+                        next.value?.let { upcoming ->
+                            val queued = api.continueWatching().find { it.id == upcoming.id }
+                            if (queued != null) continueWatching.upsert(ContinueWatchingEntry(queued.id, queued.title, api.resolve(queued.posterUrl), queued.resumePositionMs ?: 0, queued.durationMs ?: 0, nextUp = queued.nextUp != null))
+                        }
+                    }
+                } catch (error: CancellationException) { throw error }
+                catch (_: Exception) { completion.value = "Couldn't save watched status. Check your connection and retry." }
+            }
+        }
+    }
+
+    private suspend fun save(positionMs: Long, durationMs: Long) = saving.withLock {
+        if (ended) return@withLock
+        val result = api.saveProgress(movieId, PlaybackProgressUpdate(positionMs, durationMs, collectionId))
+        val current = movie ?: return@withLock
         val resume = result.resumePositionMs
         if (resume != null) continueWatching.upsert(ContinueWatchingEntry(movieId, current.title, api.resolve(current.posterUrl), resume, durationMs))
         else continueWatching.remove(movieId)

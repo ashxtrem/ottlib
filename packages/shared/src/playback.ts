@@ -5,6 +5,7 @@ export const apiVersion = 1;
 
 export const playbackProgressUpdateSchema = z.object({
   positionMs: z.number().int().nonnegative(),
+  shelfId: z.number().int().positive().optional(),
   durationMs: z.number().int().positive()
 });
 

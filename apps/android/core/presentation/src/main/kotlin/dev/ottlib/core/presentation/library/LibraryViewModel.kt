@@ -46,6 +46,15 @@ class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewMode
     init {
         loadGenres()
         reload()
+        viewModelScope.launch {
+            api.watchChange.collect { change ->
+                if (change == null) return@collect
+                state.update { current -> current.copy(items = current.items.map {
+                    if (it.id == change.movieId) it.copy(watched = change.watched, resumePositionMs = if (change.watched) null else it.resumePositionMs) else it
+                }) }
+                if (state.value.filters.watched != null) reload()
+            }
+        }
         // A finished sync may have added titles (and genres): refresh the grid and the genre choices.
         viewModelScope.launch {
             sync.outcomes.collect {
@@ -87,7 +96,13 @@ class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewMode
         page = viewModelScope.launch {
             try {
                 val result = api.movies(MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort, limit = PAGE_SIZE, cursor = cursor))
-                state.update { it.copy(items = it.items + result.items.map { item -> item.toPosterItem(api::resolve) }, total = result.total, nextCursor = result.nextCursor, loading = false) }
+                val change = api.watchChange.value
+                val posters = result.items.map { item ->
+                    item.toPosterItem(api::resolve).let { poster ->
+                        if (change?.movieId == poster.id) poster.copy(watched = change.watched, resumePositionMs = if (change.watched) null else poster.resumePositionMs) else poster
+                    }
+                }
+                state.update { it.copy(items = it.items + posters, total = result.total, nextCursor = result.nextCursor, loading = false) }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

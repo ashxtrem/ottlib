@@ -13,4 +13,13 @@ export class WatchStateRepository {
     const row = this.db.prepare('SELECT watched FROM movie_watch_state WHERE movie_id = ? AND device_id = ?').get(movieId, deviceId) as { watched: number } | undefined;
     return Boolean(row?.watched);
   }
+
+  public collectionId(movieId: number, deviceId: string): number | undefined {
+    const row = this.db.prepare('SELECT shelf_id FROM movie_watch_state WHERE movie_id = ? AND device_id = ?').get(movieId, deviceId) as { shelf_id: number | null } | undefined;
+    return row?.shelf_id ?? undefined;
+  }
+
+  public setCollection(movieId: number, deviceId: string, shelfId: number): void {
+    this.db.prepare('UPDATE movie_watch_state SET shelf_id = ? WHERE movie_id = ? AND device_id = ?').run(shelfId, movieId, deviceId);
+  }
 }

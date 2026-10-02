@@ -1,7 +1,7 @@
 package dev.ottlib.core.presentation
 
 /** What the system shows for an in-progress title. [posterUrl] must be absolute. */
-data class ContinueWatchingEntry(val movieId: Long, val title: String, val posterUrl: String?, val positionMs: Long, val durationMs: Long)
+data class ContinueWatchingEntry(val movieId: Long, val title: String, val posterUrl: String?, val positionMs: Long, val durationMs: Long, val nextUp: Boolean = false)
 
 /**
  * Mirrors in-progress titles into a system surface outside the app (the Android TV "Watch Next" row). Each app

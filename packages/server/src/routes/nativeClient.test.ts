@@ -56,6 +56,30 @@ async function snapshot(name: string, value: unknown, media: string): Promise<vo
 afterEach(() => directories.splice(0).forEach((directory) => rmSync(directory, { force: true, recursive: true })));
 
 describe('native client endpoints', () => {
+  it('offers a next episode and queues it when playback completes', async () => {
+    const { app, db, media } = fixture();
+    try {
+      const movies = new MovieRepository(db);
+      for (const id of [3, 4]) {
+        movies.upsertScanned({ folderId: 1, path: join(media, `${id}.mkv`), filename: `${id}.mkv`, title: 'Dragon Ball Z', year: 1989, size: 1, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
+        movies.applyMetadata(id, { source: 'tmdb', providerId: '12971', mediaType: 'tv', season: 1, episode: id - 2, title: `Dragon Ball Z · S1E${id - 2}`, year: 1989, overview: null, posterFile: null, backdropFile: null, genres: ['Animation'], cast: [], rating: null, runtime: 24, imdbId: null });
+      }
+      expect((await app.inject({ method: 'GET', url: '/api/movies/3/next' })).statusCode).toBe(400);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/999/next', headers })).statusCode).toBe(404);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/3/next?shelfId=bad', headers })).statusCode).toBe(400);
+      const next = await app.inject({ method: 'GET', url: '/api/movies/3/next', headers });
+      expect(next.statusCode).toBe(200);
+      await snapshot('next-episode', movieSchema.parse(next.json()), media);
+      const complete = await app.inject({ method: 'POST', url: '/api/movies/3/complete', headers });
+      expect(complete.statusCode).toBe(200);
+      expect(complete.json().watched).toBe(true);
+      await snapshot('completed-episode', movieSchema.parse(complete.json()), media);
+      const queued = (await app.inject({ method: 'GET', url: '/api/movies/continue-watching', headers })).json();
+      expect(queued).toMatchObject([{ id: 4, nextUp: 'episode', resumePositionMs: 0 }]);
+      await snapshot('queued-next', movieListItemSchema.array().parse(queued), media);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/4/next', headers })).json()).toBeNull();
+    } finally { await app.close(); db.close(); }
+  });
   it('describe the playback source, including side-loadable subtitles', async () => {
     const { app, db, media } = fixture();
     try {

@@ -14,7 +14,7 @@ interface MovieRow {
 interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
-  resume_position_ms: number | null; duration_ms: number | null;
+  resume_position_ms: number | null; duration_ms: number | null; metadata_media_type: string | null;
 }
 
 export interface ScannedMovie { folderId: number; path: string; filename: string; title: string; year: number | null; size: number; mtimeMs: number; seenAt: string }
@@ -85,6 +85,17 @@ export class MovieRepository {
   public listContinueWatching(deviceId: string, limit: number): MovieListItem[] {
     const rows = this.db.prepare(`${this.summarySelectSql()} WHERE pp.movie_id IS NOT NULL AND m.missing = 0 ORDER BY pp.updated_at DESC, m.id DESC LIMIT ?`).all(deviceId, limit) as MovieListItemRow[];
     return rows.map(this.mapListItem);
+  }
+
+  public nextEpisodeId(id: number): number | undefined {
+    const row = this.db.prepare(`SELECT n.id FROM movies c JOIN movies n ON
+      n.metadata_media_type = 'tv' AND n.missing = 0 AND n.season > 0 AND n.episode > 0
+      AND ((c.metadata_source IS NOT NULL AND c.provider_id IS NOT NULL AND n.metadata_source = c.metadata_source AND n.provider_id = c.provider_id)
+        OR (c.imdb_id IS NOT NULL AND n.imdb_id = c.imdb_id))
+      WHERE c.id = ? AND c.metadata_media_type = 'tv' AND c.season > 0 AND c.episode > 0
+      AND (n.season > c.season OR (n.season = c.season AND n.episode > c.episode))
+      ORDER BY n.season, n.episode, n.id LIMIT 1`).get(id) as { id: number } | undefined;
+    return row?.id;
   }
 
   public hasAll(ids: number[]): boolean {
@@ -258,7 +269,7 @@ export class MovieRepository {
 
   private summarySelectSql(): string {
     return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
+      m.missing, m.metadata_media_type, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
   }
 
   /** Binds the device id once (first `?`) and exposes it to both per-device joins. */
@@ -369,6 +380,7 @@ export class MovieRepository {
   });
 
   private mapListItem = (row: MovieListItemRow): MovieListItem => ({
+    nextUp: row.resume_position_ms === 0 ? (row.metadata_media_type === 'tv' ? 'episode' : 'collection') : null,
     id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format,

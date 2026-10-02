@@ -41,6 +41,23 @@ class OttlibApiTest {
     }
 
     @Test
+    fun successfulCompletionProgressNotifiesCachedScreensAndSendsCollectionContext() = runTest {
+        server.enqueue(MockResponse().setBody("""{"resumePositionMs":null,"watched":true}"""))
+        api.saveProgress(7, PlaybackProgressUpdate(6_960_000, 6_960_000, shelfId = 3))
+        assertEquals(WatchChange(7, true), api.watchChange.value)
+        assertEquals(1L, api.libraryRevision.value)
+        assertEquals("""{"positionMs":6960000,"durationMs":6960000,"shelfId":3}""", server.takeRequest().body.readUtf8())
+    }
+
+    @Test
+    fun failedProgressDoesNotPublishWatchedChanges() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500).setBody("""{"error":"Unavailable"}"""))
+        runCatching { api.saveProgress(7, PlaybackProgressUpdate(1_000_000, 1_000_000)) }
+        assertNull(api.watchChange.value)
+        assertEquals(0L, api.libraryRevision.value)
+    }
+
+    @Test
     fun startsAScanWithAnEmptyPostAndFollowsItsStatus() = runTest {
         server.enqueue(MockResponse().setBody("""{"id":7,"kind":"scan","status":"running","startedAt":"a","finishedAt":null,"filesFound":10,"filesProcessed":2,"titlesAdded":0,"errorSummary":null}"""))
         server.enqueue(MockResponse().setBody("""{"id":7,"kind":"scan","status":"completed","startedAt":"a","finishedAt":"b","filesFound":10,"filesProcessed":10,"titlesAdded":2,"errorSummary":null}"""))

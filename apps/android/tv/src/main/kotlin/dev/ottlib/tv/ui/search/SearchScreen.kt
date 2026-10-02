@@ -50,7 +50,7 @@ fun SearchScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Un
             LoadState.Loading -> LoadingMessage("Searching…")
             is LoadState.Failed -> EmptyMessage(current.message)
             is LoadState.Loaded -> if (current.value.isEmpty()) EmptyMessage("No titles match “${text.trim()}”.")
-            else PosterGrid(current.value, onOpen = { onOpenMovie(it.id) }, onFocused = { viewModel.lastFocusedId = it.id }, focusItemId = viewModel.lastFocusedId, focusRequester = resultFocus)
+            else PosterGrid(current.value, onOpen = { container.playbackSequence.select(current.value.map { item -> item.id }); onOpenMovie(it.id) }, onFocused = { viewModel.lastFocusedId = it.id }, focusItemId = viewModel.lastFocusedId, focusRequester = resultFocus)
         }
     }
     // Fresh screen: focus the search box. Returning from a movie: focus the poster the user opened.
