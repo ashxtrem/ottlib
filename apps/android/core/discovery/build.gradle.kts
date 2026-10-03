@@ -19,4 +19,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.annotation)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }
