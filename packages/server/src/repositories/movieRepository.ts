@@ -172,20 +172,20 @@ export class MovieRepository {
   }
 
   public upsertScanned(movie: ScannedMovie): { id: number; inserted: boolean; needsMatch: boolean; needsProbe: boolean } {
-    const existing = this.db.prepare('SELECT id, size, mtime_ms, metadata_status, media_probe_status FROM movies WHERE canonical_path = ?').get(movie.path) as any;
-    const changed = !existing || existing.size !== movie.size || existing.mtime_ms !== movie.mtimeMs;
-    this.db.prepare(`INSERT INTO movies (folder_id, canonical_path, raw_filename, parsed_title, parsed_year, size, mtime_ms, last_seen_at, metadata_status, missing)
-      VALUES (@folderId, @path, @filename, @title, @year, @size, @mtimeMs, @seenAt, 'pending', 0)
-      ON CONFLICT(canonical_path) DO UPDATE SET folder_id = excluded.folder_id, raw_filename = excluded.raw_filename,
-      parsed_title = excluded.parsed_title, parsed_year = excluded.parsed_year,
-      metadata_title = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.metadata_title END,
-      metadata_year = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.metadata_year END,
-      size = excluded.size, mtime_ms = excluded.mtime_ms,
-      last_seen_at = excluded.last_seen_at, missing = 0,
-      metadata_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.metadata_status END,
-      media_probe_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.media_probe_status END`).run(movie);
-    const row = this.db.prepare('SELECT id FROM movies WHERE canonical_path = ?').get(movie.path) as { id: number };
-    return { id: row.id, inserted: !existing, needsMatch: changed || existing?.metadata_status === 'error', needsProbe: changed || existing?.media_probe_status === 'pending' };
+    return this.db.transaction(() => {
+      const existing = this.db.prepare('SELECT id, size, mtime_ms, metadata_status, media_probe_status FROM movies WHERE canonical_path = ?').get(movie.path) as any;
+      const changed = !existing || existing.size !== movie.size || existing.mtime_ms !== movie.mtimeMs;
+      this.db.prepare(`INSERT INTO movies (folder_id, canonical_path, raw_filename, parsed_title, parsed_year, size, mtime_ms, last_seen_at, metadata_status, missing)
+        VALUES (@folderId, @path, @filename, @title, @year, @size, @mtimeMs, @seenAt, 'pending', 0)
+        ON CONFLICT(canonical_path) DO UPDATE SET folder_id = excluded.folder_id, raw_filename = excluded.raw_filename,
+        parsed_title = excluded.parsed_title, parsed_year = excluded.parsed_year,
+        size = excluded.size, mtime_ms = excluded.mtime_ms,
+        last_seen_at = excluded.last_seen_at, missing = 0,
+        media_probe_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.media_probe_status END`).run(movie);
+      const row = this.db.prepare('SELECT id FROM movies WHERE canonical_path = ?').get(movie.path) as { id: number };
+      if (existing && changed) this.resetForRematch(row.id);
+      return { id: row.id, inserted: !existing, needsMatch: changed || existing?.metadata_status === 'error', needsProbe: changed || existing?.media_probe_status === 'pending' };
+    })();
   }
 
   public clearMediaInfo(id: number): void {
@@ -215,8 +215,10 @@ export class MovieRepository {
   }
 
   public resetForRematch(id: number): void {
-    this.db.prepare("UPDATE movies SET metadata_status = 'pending', metadata_error = NULL WHERE id = ?").run(id);
-    this.clearCandidates(id);
+    this.db.transaction(() => {
+      this.clearAutomaticMetadata(id, 'pending');
+      this.clearCandidates(id);
+    })();
   }
 
   public saveCandidates(movieId: number, candidates: Array<{ provider: string; providerId: string; title: string; year: number | null; score: number; mediaType: 'movie' | 'tv'; season?: number; episode?: number }>): void {
@@ -225,7 +227,10 @@ export class MovieRepository {
       const stmt = this.db.prepare('INSERT INTO movie_match_candidates (movie_id, provider, provider_id, title, year, score, media_type, season, episode, rank) VALUES (@movieId, @provider, @providerId, @title, @year, @score, @mediaType, @season, @episode, @rank)');
       rows.forEach((row, index) => stmt.run({ ...row, season: row.season ?? null, episode: row.episode ?? null, movieId, rank: index }));
       const topMatch = rows[0];
-      this.db.prepare("UPDATE movies SET metadata_title = ?, metadata_year = ?, metadata_status = 'suggested', metadata_error = NULL WHERE id = ?").run(topMatch.title, topMatch.year, movieId);
+      this.db.prepare(`UPDATE movies SET
+        metadata_title = CASE WHEN provider_id IS NOT NULL THEN metadata_title ELSE ? END,
+        metadata_year = CASE WHEN provider_id IS NOT NULL THEN metadata_year ELSE ? END,
+        metadata_status = 'suggested', metadata_error = NULL WHERE id = ?`).run(topMatch.title, topMatch.year, movieId);
     });
     insert(candidates);
   }
@@ -244,6 +249,18 @@ export class MovieRepository {
     this.db.prepare('DELETE FROM movie_match_candidates WHERE movie_id = ?').run(movieId);
   }
 
+  public dismissCandidates(movieId: number): void {
+    const dismiss = this.db.transaction(() => {
+      this.db.prepare(`UPDATE movies SET
+        metadata_status = CASE WHEN provider_id IS NOT NULL THEN 'matched' ELSE 'unmatched' END,
+        metadata_title = CASE WHEN provider_id IS NOT NULL THEN metadata_title ELSE NULL END,
+        metadata_year = CASE WHEN provider_id IS NOT NULL THEN metadata_year ELSE NULL END,
+        metadata_error = NULL WHERE id = ?`).run(movieId);
+      this.clearCandidates(movieId);
+    });
+    dismiss();
+  }
+
   public applyMetadata(id: number, metadata: { source: string; providerId: string; mediaType?: 'movie' | 'tv'; season?: number | null; episode?: number | null; title: string; year: number | null; overview: string | null; posterFile: string | null; backdropFile: string | null; genres: string[]; cast: string[]; rating: number | null; runtime: number | null; imdbId: string | null }): void {
     const apply = this.db.transaction((values: Omit<typeof metadata, 'mediaType'> & { mediaType: 'movie' | 'tv' | null; id: number }) => {
       this.db.prepare(`UPDATE movies SET metadata_status = 'matched', metadata_source = @source, provider_id = @providerId,
@@ -255,11 +272,19 @@ export class MovieRepository {
   }
 
   public markUnmatched(id: number, error: string | null = null): void {
-    this.db.prepare(error
-      ? "UPDATE movies SET metadata_status = 'error', metadata_error = ? WHERE id = ?"
-      : "UPDATE movies SET metadata_status = 'unmatched', metadata_title = NULL, metadata_year = NULL, metadata_error = NULL WHERE id = ?"
-    ).run(...(error ? [error, id] : [id]));
-    this.clearCandidates(id);
+    this.db.transaction(() => {
+      if (error) this.db.prepare("UPDATE movies SET metadata_status = 'error', metadata_error = ? WHERE id = ?").run(error, id);
+      else this.clearAutomaticMetadata(id, 'unmatched');
+      this.clearCandidates(id);
+    })();
+  }
+
+  private clearAutomaticMetadata(id: number, status: 'pending' | 'unmatched'): void {
+    this.db.prepare(`UPDATE movies SET metadata_status = ?, metadata_error = NULL,
+      metadata_title = NULL, metadata_year = NULL, metadata_source = NULL, provider_id = NULL,
+      imdb_id = NULL, metadata_media_type = NULL, season = NULL, episode = NULL, matched_at = NULL,
+      overview = NULL, poster_file = NULL, backdrop_file = NULL, genres_json = '[]', cast_json = '[]',
+      rating = NULL, runtime = NULL WHERE id = ?`).run(status, id);
   }
 
   private selectSql(): string {

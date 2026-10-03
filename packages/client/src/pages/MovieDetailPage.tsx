@@ -92,13 +92,13 @@ export function MovieDetailPage() {
       </div>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row">
         <input value={imdbInput} onChange={(event) => setImdbInput(event.target.value)} placeholder="Paste an IMDb URL or ID (e.g. tt1375666)" className="flex-1 rounded-lg border border-border bg-field px-3 py-2 placeholder:text-subtle" />
-        <button type="button" onClick={() => actions.lookupImdb.mutate({ id: item.id, imdbId: imdbInput })} disabled={actions.lookupImdb.isPending || !imdbInput.trim()} className="rounded-lg border border-border-strong px-4 py-2 hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60">{actions.lookupImdb.isPending ? 'Looking up…' : 'Fetch from IMDb'}</button>
+        <button type="button" onClick={() => actions.lookupImdb.mutate({ id: item.id, imdbId: imdbInput }, { onSuccess: () => setManualCandidates(null) })} disabled={actions.lookupImdb.isPending || !imdbInput.trim()} className="rounded-lg border border-border-strong px-4 py-2 hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60">{actions.lookupImdb.isPending ? 'Looking up…' : 'Fetch from IMDb'}</button>
       </div>
       <div className="mt-4 border-t border-border pt-4"><p className="text-sm text-muted">Refreshes this title's automatic metadata and artwork. Your saved title override is kept.</p><button type="button" onClick={() => setRefreshDialogOpen(true)} disabled={metadataRefresh.status.data?.status === 'running'} className="mt-3 rounded-lg border border-warning-border px-4 py-2 text-sm font-medium text-warning hover:bg-warning-border/15 disabled:cursor-not-allowed disabled:opacity-60">Refresh metadata</button></div>
     </form>
     {(needsReview || manualCandidates !== null) && <div className="rounded-xl border border-warning-border/50 bg-surface p-5">
       <h2 className="font-semibold text-warning">{manualCandidates !== null ? 'Match results — pick one' : 'Suggested matches — pick one'}</h2>
-      <p className="mt-1 text-sm text-muted">Nothing is saved until you accept a suggestion. Fields the provider doesn't have will stay blank.</p>
+      <p className="mt-1 text-sm text-muted">Accept a suggestion to replace this title's metadata and artwork. Fields the provider doesn't have will stay blank.</p>
       {manualCandidates === null && candidates.isLoading && <p className="mt-3 text-sm text-muted">Loading suggestions…</p>}
       {manualCandidates !== null && manualCandidates.length === 0 && <p className="mt-3 text-sm text-muted">No candidates found. Try adjusting the title above and searching again.</p>}
       {manualCandidates === null && candidates.data && candidates.data.length === 0 && <p className="mt-3 text-sm text-muted">No candidates found. Try adjusting the title above and searching again.</p>}
