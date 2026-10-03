@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SettingRepository } from '../repositories/settingRepository.js';
 import type { SchedulerService } from './schedulerService.js';
 import { SettingsService } from './settingsService.js';
+import { defaultSettings } from '../config/defaults.js';
 
 const mocks = vi.hoisted(() => ({ searchCandidates: vi.fn(), TmdbProvider: vi.fn() }));
 vi.mock('../providers/metadata/tmdbProvider.js', () => ({ TmdbProvider: mocks.TmdbProvider }));
@@ -43,4 +44,17 @@ describe('SettingsService schedule validation', () => {
   it('rejects an invalid cron expression without saving settings', () => {
     expect(createService().validateSchedule('not a schedule')).toEqual({ valid: false, error: 'Enter a valid cron expression.' });
   });
+});
+
+it('masks subtitle credentials and keeps existing credentials when masks are submitted', () => {
+  const saved = { ...defaultSettings, opensubtitlesApiKey: 'opensubtitles-secret-key', subdlApiKey: 'subdl-secret-key', opensubtitlesPassword: 'password' };
+  const repository = { get: vi.fn(() => saved), update: vi.fn(update => ({ ...saved, ...update })) };
+  const service = new SettingsService(repository as unknown as SettingRepository, { refresh: vi.fn() } as unknown as SchedulerService);
+  const masked = service.get();
+  expect(masked.opensubtitlesPassword).toBe('••••');
+  expect(JSON.stringify(masked)).not.toContain('secret-key');
+  service.update({ opensubtitlesApiKey: masked.opensubtitlesApiKey, subdlApiKey: masked.subdlApiKey, opensubtitlesPassword: masked.opensubtitlesPassword });
+  expect(repository.update).toHaveBeenCalledWith({});
+  service.update({ subdlApiKey: '' });
+  expect(repository.update).toHaveBeenLastCalledWith({ subdlApiKey: '' });
 });

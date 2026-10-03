@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./subtitles": {
+      "types": "./dist/subtitles.d.ts",
+      "default": "./dist/subtitles.js"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"

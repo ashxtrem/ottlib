@@ -18,6 +18,7 @@ coreKtx = "1.17.0"
 tvprovider = "1.1.0"
 annotation = "1.9.1"
 junit = "4.13.2"
+robolectric = "4.16.1"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -53,6 +54,7 @@ nextlib-media3ext = { module = "io.github.anilbeesetti:nextlib-media3ext", versi
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 junit = { module = "junit:junit", version.ref = "junit" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

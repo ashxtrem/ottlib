@@ -30,6 +30,13 @@ import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import androidx.tv.material3.Button
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.ottlib.core.presentation.player.SubtitleSearchController
+import dev.ottlib.tv.ui.components.tryRequestFocus
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.PictureModeController
 import dev.ottlib.core.player.SeekAccumulator
@@ -48,11 +55,16 @@ fun PlayerSurface(
     keysEnabled: Boolean,
     onPictureModeChosen: (PictureMode, Boolean) -> Unit,
     onPictureHintSeen: () -> Unit,
+    subtitles: SubtitleSearchController,
+    onFindSubtitles: () -> Unit,
 ) {
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var picture by remember { mutableStateOf<PictureModeController?>(null) }
     var controlsVisible by remember { mutableStateOf(false) }
     var panelOpen by remember { mutableStateOf(false) }
+    var subtitlesOpen by remember { mutableStateOf(false) }
+    val subtitleFocus = remember { FocusRequester() }
+    val subtitleState by subtitles.uiState.collectAsStateWithLifecycle()
     var hint by remember { mutableStateOf<SeekHint?>(null) }
     var showPictureHint by remember { mutableStateOf(controls.showPictureHint) }
 
@@ -68,8 +80,8 @@ fun PlayerSurface(
     }
     DisposableEffect(seeker) { onDispose { seeker.release() } }
 
-    InterceptKeys { event -> playerView?.let { remoteKeys.handle(event, it, enabled = keysEnabled && !panelOpen) } ?: false }
-    BackHandler(enabled = controlsVisible && !panelOpen) { playerView?.hideController() }
+    InterceptKeys { event -> playerView?.let { remoteKeys.handle(event, it, enabled = keysEnabled && !panelOpen && !subtitlesOpen) } ?: false }
+    BackHandler(enabled = controlsVisible && !panelOpen && !subtitlesOpen) { playerView?.hideController() }
     LaunchedEffect(picture, pictureMode) { picture?.apply(pictureMode) }
 
     Box(Modifier.fillMaxSize()) {
@@ -104,6 +116,19 @@ fun PlayerSurface(
         AnimatedVisibility(visible = controlsVisible, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopStart)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = Color.White, modifier = Modifier.padding(40.dp))
         }
+        if (controlsVisible && !panelOpen && !subtitlesOpen) {
+            Button(onClick = { playerView?.clearFocus(); onFindSubtitles(); subtitlesOpen = true },
+                modifier = Modifier.align(Alignment.TopEnd).padding(40.dp).focusRequester(subtitleFocus).onFocusChanged {
+                    playerView?.controllerShowTimeoutMs = if (it.isFocused) 0 else 4_000
+                }) { Text("Find subtitles") }
+        }
+        if (subtitlesOpen) {
+            SubtitlePanel(subtitleState, subtitles, onRetry = onFindSubtitles, onDismiss = {
+                subtitlesOpen = false
+                playerView?.showController()
+                playerView?.post { subtitleFocus.tryRequestFocus() }
+            }, modifier = Modifier.align(Alignment.CenterEnd))
+        }
         hint?.let { current ->
             OverlayText(current.text, Modifier.align(Alignment.Center))
             LaunchedEffect(current.id) {
@@ -111,7 +136,7 @@ fun PlayerSurface(
                 hint = null
             }
         }
-        if (showPictureHint && !panelOpen) {
+        if (showPictureHint && !panelOpen && !subtitlesOpen) {
             OverlayText("Hold OK for picture options", Modifier.align(Alignment.BottomStart).padding(40.dp), small = true)
             LaunchedEffect(Unit) {
                 delay(PICTURE_HINT_VISIBLE_MS)

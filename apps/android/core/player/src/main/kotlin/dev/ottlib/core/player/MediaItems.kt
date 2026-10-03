@@ -21,9 +21,10 @@ fun PlaybackSource.toMediaItem(movieId: Long, title: String, resolve: (String) -
         .setSubtitleConfigurations(subtitles.mapNotNull { it.toConfiguration(resolve) })
         .build()
 
-private fun SubtitleSource.toConfiguration(resolve: (String) -> String): MediaItem.SubtitleConfiguration? {
+internal fun SubtitleSource.toConfiguration(resolve: (String) -> String): MediaItem.SubtitleConfiguration? {
     val mimeType = subtitleMimeType(codec) ?: return null
     return MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(url)))
+        .setId(url.substringBefore('?'))
         .setMimeType(mimeType)
         .setLanguage(language)
         .setLabel("${title ?: language?.let(::languageName) ?: "Subtitles"} $EXTERNAL_SUBTITLE_SUFFIX")

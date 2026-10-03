@@ -12,6 +12,11 @@ export const releaseYearUpperBoundOffset = 1;
 export const defaultSettings = {
   tmdbApiKey: '',
   omdbApiKey: '',
+  opensubtitlesApiKey: '',
+  opensubtitlesUsername: '',
+  opensubtitlesPassword: '',
+  subdlApiKey: '',
+  subtitleSearchLanguages: ['en'],
   torrentSearchEnabled: false,
   qbittorrentUrl: '',
   qbittorrentUsername: '',

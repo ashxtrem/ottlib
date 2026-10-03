@@ -27,7 +27,7 @@ private class TrackOption(val group: Tracks.Group, val index: Int, val label: St
  * title exactly as it does for the TV player's menus.
  */
 @Composable
-fun BoxScope.TrackPanel(player: Player, onDismiss: () -> Unit) {
+fun BoxScope.TrackPanel(player: Player, onFindSubtitles: () -> Unit, onDismiss: () -> Unit) {
     val resources = LocalResources.current
     val names = remember(resources) { DefaultTrackNameProvider(resources) }
     val tracks by produceState(player.currentTracks, player) {
@@ -47,6 +47,7 @@ fun BoxScope.TrackPanel(player: Player, onDismiss: () -> Unit) {
         if (audio.isEmpty()) item { ListItem(headlineContent = { Text("No playable audio track") }, colors = PanelRowColors) }
         items(audio) { option -> PanelOption(option.label, option.selected) { player.select(option) } }
         item { PanelHeading("Subtitles") }
+        item { PanelOption("Find subtitles online", false, supporting = "Search, download, and use without leaving playback", onClick = onFindSubtitles) }
         item { PanelOption("Off", subtitles.none { it.selected }) { player.turnSubtitlesOff() } }
         items(subtitles) { option -> PanelOption(option.label, option.selected) { player.select(option) } }
     }

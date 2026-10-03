@@ -89,6 +89,15 @@ class PlayerViewModel(
     private var startup: Job? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
+    val subtitles = SubtitleSearchController(api, movieId, viewModelScope,
+        preferredLanguages = { preferences.current().subtitleSearchLanguages },
+        saveLanguages = preferences::setSubtitleSearchLanguages,
+        applySubtitle = { source ->
+            val active = session ?: error("Playback is no longer active")
+            rememberTracks(active.useSubtitle(source) { api.resolve(it) ?: error("No server selected") })
+        })
+
+    fun findSubtitles() = subtitles.open(movie)
 
     val streamUrl: String? get() = api.resolve("/api/stream/$movieId")
     val title: String get() = movie?.title ?: ""
@@ -233,6 +242,7 @@ class PlayerViewModel(
 
     /** Call before navigating away; Navigation may retain the old ViewModel through its exit animation. */
     fun releasePlayback() {
+        subtitles.cancel()
         startup?.cancel()
         session?.release()
         session = null

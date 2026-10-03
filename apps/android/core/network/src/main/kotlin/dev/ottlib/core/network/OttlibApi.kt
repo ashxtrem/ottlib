@@ -22,6 +22,11 @@ import dev.ottlib.core.model.ServerInfo
 import dev.ottlib.core.model.ShelfDetail
 import dev.ottlib.core.model.ShelfSummary
 import dev.ottlib.core.model.WatchStateUpdate
+import dev.ottlib.core.model.SubtitleOptions
+import dev.ottlib.core.model.SubtitleSearch
+import dev.ottlib.core.model.SubtitleSearchResponse
+import dev.ottlib.core.model.SubtitleDownloadRequest
+import dev.ottlib.core.model.SubtitleDownloadResponse
 import okhttp3.HttpUrl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +36,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.serialization.json.Json
+
+private val subtitleRequestJson = Json(OttlibJson) { encodeDefaults = true }
 
 /**
  * Typed client for the Ottlib server endpoints the TV app uses. [baseUrl] is read per call so the
@@ -66,6 +74,11 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     suspend fun shelves(): List<ShelfSummary> = get(url("/api/shelves"))
     suspend fun shelf(id: Long): ShelfDetail = get(url("/api/shelves/$id"))
     suspend fun playbackSource(id: Long): PlaybackSource = get(url("/api/movies/$id/playback"))
+    suspend fun subtitleOptions(): SubtitleOptions = get(url("/api/subtitles/options"))
+    suspend fun searchSubtitles(id: Long, search: SubtitleSearch): SubtitleSearchResponse =
+        send("POST", url("/api/movies/$id/subtitles/search"), subtitleRequestJson.encodeToString(SubtitleSearch.serializer(), search))
+    suspend fun downloadSubtitle(id: Long, resultId: String): SubtitleDownloadResponse =
+        send("POST", url("/api/movies/$id/subtitles/download"), OttlibJson.encodeToString(SubtitleDownloadRequest.serializer(), SubtitleDownloadRequest(resultId)))
     suspend fun nextMovie(id: Long, shelfId: Long? = null): Movie? = get(sequenceUrl(id, "next", shelfId))
     suspend fun complete(id: Long, shelfId: Long? = null): Movie = post<Movie>(sequenceUrl(id, "complete", shelfId)).also { watched(id, true) }
     private fun sequenceUrl(id: Long, action: String, shelfId: Long?): HttpUrl =

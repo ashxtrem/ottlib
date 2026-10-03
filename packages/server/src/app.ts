@@ -49,6 +49,11 @@ import { TorrentSearchService } from './services/torrentSearchService.js';
 import { TorrentHandoffService } from './services/torrentHandoffService.js';
 import { TorrentConnectionService } from './services/torrentConnectionService.js';
 import { TorrentDownloadService } from './services/torrentDownloadService.js';
+import { DownloadedSubtitleRepository } from './repositories/downloadedSubtitleRepository.js';
+import { SubtitleLibraryService } from './services/subtitles/subtitleLibraryService.js';
+import { SubtitleService } from './services/subtitles/subtitleService.js';
+import { subtitleProviders } from './providers/subtitles/subtitleProviders.js';
+import { registerSubtitleRoutes } from './routes/subtitles.js';
 
 export function buildApp(db: Database.Database, appDataPath: string, port: number) {
   const app = Fastify({ logger: true, trustProxy: false });
@@ -59,13 +64,16 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   });
   const movies = new MovieRepository(db); const folders = new FolderRepository(db); const settings = new SettingRepository(db); const watches = new WatchStateRepository(db); const runs = new ScanRunRepository(db); const shelfRecords = new ShelfRepository(db); const shelfMovies = new ShelfMovieRepository(db); const mediaTracks = new MediaTrackRepository(db); runs.failAbandonedRuns();
   const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
-  const scanner = new ScanService(folders, movies, runs, settings, metadata, new MediaInfoService(movies, mediaTracks, new MediaProbeService())); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db)); const playback = new PlaybackService(movies, (id) => pins.streamQuery(id));
+  const scanner = new ScanService(folders, movies, runs, settings, metadata, new MediaInfoService(movies, mediaTracks, new MediaProbeService())); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
+  const subtitleLibrary = new SubtitleLibraryService(new DownloadedSubtitleRepository(db), appDataPath, id => pins.streamQuery(id));
+  const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins);
   registerLibraryRoutes(app, movies, progress, metadata, library); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback);
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
+  registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
   app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
   app.register(fastifyStatic, { root: appDataPath, prefix: '/media/', decorateReply: false });
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');

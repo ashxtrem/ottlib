@@ -59,6 +59,8 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                 keysEnabled = problem == null,
                 onPictureModeChosen = viewModel::choosePictureMode,
                 onPictureHintSeen = viewModel::pictureHintSeen,
+                subtitles = viewModel.subtitles,
+                onFindSubtitles = viewModel::findSubtitles,
             )
         }
     }

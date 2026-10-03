@@ -146,6 +146,11 @@ export const scanRunSchema = z.object({
 export const settingsSchema = z.object({
   tmdbApiKey: z.string(),
   omdbApiKey: z.string(),
+  opensubtitlesApiKey: z.string(),
+  opensubtitlesUsername: z.string(),
+  opensubtitlesPassword: z.string(),
+  subdlApiKey: z.string(),
+  subtitleSearchLanguages: z.array(z.string().regex(/^[a-z]{2,3}(?:-[a-z]{2,3})?$/)).min(1).max(10),
   /** Off by default: torrent search and qBittorrent handoff are an opt-in integration. */
   torrentSearchEnabled: z.boolean(),
   qbittorrentUrl: z.string(),

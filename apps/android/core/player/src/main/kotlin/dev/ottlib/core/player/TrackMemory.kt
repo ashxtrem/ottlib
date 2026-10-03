@@ -23,12 +23,17 @@ class TrackMemory(
     private var ownParameters: TrackSelectionParameters? = null
     private var userChanged = false
     private var lastSubtitle: TrackIdentity? = null
+    private var reloading = false
+
+    fun beginReload() { reloading = true; userChanged = false }
+    fun finishReload() { reloading = false; userChanged = false; ownParameters = player.trackSelectionParameters }
 
     fun start() = player.addListener(this)
 
     fun stop() = player.removeListener(this)
 
     override fun onTracksChanged(tracks: Tracks) {
+        if (reloading) return
         if (tracks.groups.isEmpty()) return
         if (!restored) {
             restored = true
@@ -48,6 +53,7 @@ class TrackMemory(
     }
 
     override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
+        if (reloading) return
         if (parameters != ownParameters) userChanged = true
     }
 

@@ -1,0 +1,11 @@
+{
+  "subtitle": {
+    "url": "/api/movies/1/subtitles/1000001",
+    "language": "en",
+    "codec": "SRT",
+    "title": "EN · OpenSubtitles · Arrival.2016.WEB-DL",
+    "isForced": false,
+    "isHearingImpaired": true
+  },
+  "reused": false
+}
