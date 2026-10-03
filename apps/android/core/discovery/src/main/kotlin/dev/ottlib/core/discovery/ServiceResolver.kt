@@ -5,9 +5,7 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import androidx.annotation.RequiresApi
 import java.net.InetAddress
-import java.util.concurrent.Executors
 
 /** Resolves discovered services to addresses, hiding the Android 14 API change. */
 internal interface ServiceResolver {
@@ -17,31 +15,6 @@ internal interface ServiceResolver {
     companion object {
         fun create(nsd: NsdManager): ServiceResolver =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) CallbackResolver(nsd) else QueuedResolver(nsd)
-    }
-}
-
-/** Android 14+: `registerServiceInfoCallback` reports every address and can run concurrently. */
-@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-private class CallbackResolver(private val nsd: NsdManager) : ServiceResolver {
-    private val executor = Executors.newSingleThreadExecutor()
-    private val callbacks = mutableListOf<NsdManager.ServiceInfoCallback>()
-
-    override fun resolve(service: NsdServiceInfo, onResolved: (NsdServiceInfo, List<InetAddress>) -> Unit) {
-        val callback = object : NsdManager.ServiceInfoCallback {
-            override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) = Unit
-            override fun onServiceUpdated(serviceInfo: NsdServiceInfo) {
-                if (serviceInfo.hostAddresses.isNotEmpty()) onResolved(serviceInfo, serviceInfo.hostAddresses)
-            }
-            override fun onServiceLost() = Unit
-            override fun onServiceInfoCallbackUnregistered() = Unit
-        }
-        synchronized(callbacks) { callbacks += callback }
-        runCatching { nsd.registerServiceInfoCallback(service, executor, callback) }
-    }
-
-    override fun close() {
-        synchronized(callbacks) { callbacks.forEach { runCatching { nsd.unregisterServiceInfoCallback(it) } }; callbacks.clear() }
-        executor.shutdown()
     }
 }
 
