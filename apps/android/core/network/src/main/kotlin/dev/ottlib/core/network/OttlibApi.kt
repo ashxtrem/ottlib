@@ -1,6 +1,13 @@
 package dev.ottlib.core.network
 
 import dev.ottlib.core.model.AuthStatus
+import dev.ottlib.core.model.AcceptMetadataRequest
+import dev.ottlib.core.model.EpisodeSelection
+import dev.ottlib.core.model.ImdbLookupRequest
+import dev.ottlib.core.model.MetadataCandidate
+import dev.ottlib.core.model.MetadataRefreshRequest
+import dev.ottlib.core.model.MetadataSearchRequest
+import dev.ottlib.core.model.MetadataSelection
 import dev.ottlib.core.model.Movie
 import dev.ottlib.core.model.MovieFilterOptions
 import dev.ottlib.core.model.MovieListItem
@@ -32,6 +39,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> HttpUrl?) {
     private val changes = MutableStateFlow(0L)
     val libraryRevision = changes.asStateFlow()
+    private val metadataChanges = MutableStateFlow(0L)
+    val metadataRevision = metadataChanges.asStateFlow()
+    fun metadataUpdated() { metadataChanges.update { it + 1 }; changed() }
     private val watchChanges = MutableStateFlow<WatchChange?>(null)
     val watchChange = watchChanges.asStateFlow()
     private fun watched(id: Long, watched: Boolean) { watchChanges.value = WatchChange(id, watched); changed() }
@@ -77,6 +87,28 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
      */
     suspend fun startScan(): ScanStatus = post(url("/api/scan"))
     suspend fun scanStatus(): ScanStatus = get(url("/api/scan/status"))
+
+    /** Always sends exactly one title ID; this client exposes no bulk metadata operation. */
+    suspend fun refreshMetadata(id: Long): ScanStatus =
+        send("POST", url("/api/movies/metadata-refresh"), OttlibJson.encodeToString(MetadataRefreshRequest.serializer(), MetadataRefreshRequest(listOf(id))))
+    suspend fun metadataRefreshStatus(): ScanStatus = get(url("/api/movies/metadata-refresh/status"))
+    suspend fun metadataCandidates(id: Long): List<MetadataCandidate> = get(url("/api/movies/$id/candidates"))
+    suspend fun searchMetadata(id: Long, title: String): List<MetadataCandidate> =
+        send("POST", url("/api/movies/$id/rematch"), OttlibJson.encodeToString(MetadataSearchRequest.serializer(), MetadataSearchRequest(title.trim())))
+    suspend fun lookupMetadataImdb(id: Long, imdbId: String): Movie =
+        send<Movie>("POST", url("/api/movies/$id/candidates/from-imdb"), OttlibJson.encodeToString(ImdbLookupRequest.serializer(), ImdbLookupRequest(imdbId.trim()))).also { metadataUpdated() }
+
+    suspend fun acceptMetadata(id: Long, candidate: MetadataCandidate, season: Int? = null, episode: Int? = null): Movie {
+        val selection = if (candidate.mediaType == "tv") EpisodeSelection(season, episode) else EpisodeSelection()
+        return if (candidate.id != null) {
+            send<Movie>("POST", url("/api/movies/$id/candidates/${candidate.id}/accept"), OttlibJson.encodeToString(EpisodeSelection.serializer(), selection))
+        } else {
+            val identity = MetadataSelection(candidate.provider, candidate.providerId, candidate.mediaType, candidate.season, candidate.episode)
+            send<Movie>("POST", url("/api/movies/$id/manual-candidates/accept"), OttlibJson.encodeToString(AcceptMetadataRequest.serializer(), AcceptMetadataRequest(identity, selection.season, selection.episode)))
+        }.also { metadataUpdated() }
+    }
+    suspend fun rejectMetadata(id: Long): Movie =
+        post<Movie>(url("/api/movies/$id/candidates/reject")).also { metadataUpdated() }
 
     /** Turns a server-relative path (`/media/posters/x.jpg`, `/api/stream/1`) into an absolute URL on the active server. */
     fun resolve(path: String?): String? = path?.let { baseUrl()?.resolve(it)?.toString() }

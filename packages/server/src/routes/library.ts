@@ -29,7 +29,8 @@ export function registerLibraryRoutes(app: FastifyInstance, movies: MovieReposit
   app.post('/api/movies/metadata-refresh', async (request, reply) => {
     const { movieIds } = metadataRefreshSchema.parse(request.body ?? {});
     if (movieIds && !movies.hasAll(movieIds)) return reply.code(404).send({ error: 'One or more titles were not found' });
-    return matcher.startMetadataRefresh(movieIds);
+    const run = movieIds ? matcher.startSelectedMetadataRefresh(movieIds) : matcher.startMetadataRefresh();
+    return run ?? reply.code(409).send({ error: 'Another metadata refresh is running. Try again when it finishes.' });
   });
   app.get('/api/movies/:id', async (request, reply) => {
     const movie = library.get(Number((request.params as any).id), deviceId(request.headers)); if (!movie) return reply.code(404).send({ error: 'Movie not found' }); return movie;

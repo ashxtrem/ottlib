@@ -34,6 +34,10 @@ class ContractFixturesTest {
         "scan-status-idle" to ScanStatus.serializer(),
         "scan-status-running" to ScanStatus.serializer(),
         "scan-status-completed" to ScanStatus.serializer(),
+        "metadata-refresh-idle" to ScanStatus.serializer(),
+        "metadata-refresh-completed" to ScanStatus.serializer(),
+        "metadata-candidates" to ListSerializer(MetadataCandidate.serializer()),
+        "metadata-search-results" to ListSerializer(MetadataCandidate.serializer()),
         "auth-status" to AuthStatus.serializer(),
         "pin-login-result" to PinLoginResult.serializer(),
     )

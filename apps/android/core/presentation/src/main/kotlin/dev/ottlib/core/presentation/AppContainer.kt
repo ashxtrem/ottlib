@@ -16,6 +16,7 @@ import dev.ottlib.core.network.DeviceIdInterceptor
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
 import dev.ottlib.core.presentation.sync.LibrarySync
+import dev.ottlib.core.presentation.metadata.MetadataRefresh
 import dev.ottlib.core.presentation.player.PlaybackSequence
 import dev.ottlib.core.presentation.update.AppUpdates
 import dev.ottlib.core.presentation.update.InstalledApp
@@ -52,6 +53,7 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
     val discovery = ServerDiscovery(context)
     val playerFactory = OttlibPlayerFactory(context, httpClient)
     val librarySync = LibrarySync(appScope, api::startScan, api::scanStatus)
+    val metadataRefresh = MetadataRefresh(appScope, api::refreshMetadata, api::metadataRefreshStatus, api::metadataUpdated, { api.resolve("/") })
 
     /** Talks to GitHub, not the Ottlib server, so it shares the connection pool but not the device-id or auth headers. */
     private val githubClient: OkHttpClient = httpClient.newBuilder().apply { interceptors().clear() }.readTimeout(60, TimeUnit.SECONDS).build()

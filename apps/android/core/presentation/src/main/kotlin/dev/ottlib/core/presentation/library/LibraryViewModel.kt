@@ -47,6 +47,9 @@ class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewMode
         loadGenres()
         reload()
         viewModelScope.launch {
+            api.metadataRevision.collect { if (it > 0) { loadGenres(); reload() } }
+        }
+        viewModelScope.launch {
             api.watchChange.collect { change ->
                 if (change == null) return@collect
                 state.update { current -> current.copy(items = current.items.map {

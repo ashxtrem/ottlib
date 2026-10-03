@@ -91,6 +91,12 @@ export class MetadataMatchService {
     return this.runs.active('metadata-refresh') ?? this.runs.latest('metadata-refresh') ?? { status: 'idle' };
   }
 
+  /** A selected refresh must never silently join a run for other titles. */
+  public startSelectedMetadataRefresh(movieIds: number[]): ScanRun | null {
+    if (this.runs?.active('metadata-refresh')) return null;
+    return this.startMetadataRefresh(movieIds);
+  }
+
   public startMissingMediaTypeBackfill(): ScanRun | undefined {
     if (!this.runs) return undefined;
     const active = this.runs.active('metadata-type-backfill'); if (active) return active;
@@ -235,7 +241,8 @@ export class MetadataMatchService {
     const providers = createMetadataProviders(this.settings.get());
     const provider = providers.find((item) => item.name === target.metadataSource);
     const notices: string[] = [];
-    const detectedEpisode = detectSeasonEpisode(target.rawFilename);
+    const saved = this.movies.get(target.id);
+    const detectedEpisode = saved?.season && saved?.episode ? { season: saved.season, episode: saved.episode } : detectSeasonEpisode(target.rawFilename);
     const mediaTypes: Array<'movie' | 'tv'> = target.mediaType ? [target.mediaType] : detectedEpisode ? ['tv', 'movie'] : ['movie', 'tv'];
     if (provider && target.providerId) {
       try {
@@ -269,7 +276,7 @@ export class MetadataMatchService {
     for (const mediaType of mediaTypes) {
       const show = await provider.getDetails(providerId, mediaType);
       if (!show) continue;
-      await this.saveMetadata(target.id, provider, mediaType, show, mediaType === 'tv' ? episode : {});
+      await this.saveMetadata(target.id, provider, mediaType, show, mediaType === 'tv' ? episode : {}, true);
       return true;
     }
     return false;
@@ -298,7 +305,7 @@ export class MetadataMatchService {
     return undefined;
   }
 
-  private async saveMetadata(movieId: number, provider: MetadataProvider, mediaType: 'movie' | 'tv', show: MovieMetadata, options: AcceptOptions): Promise<void> {
+  private async saveMetadata(movieId: number, provider: MetadataProvider, mediaType: 'movie' | 'tv', show: MovieMetadata, options: AcceptOptions, refreshArtwork = false): Promise<void> {
     let title = show.title; let overview = show.overview; let posterUrl = show.posterUrl; let rating = show.rating;
     if (mediaType === 'tv' && options.season && options.episode) {
       const episode = provider.getEpisodeDetails ? await provider.getEpisodeDetails(show.providerId, options.season, options.episode) : null;
@@ -308,7 +315,7 @@ export class MetadataMatchService {
 
     const prefix = `${provider.name}-${show.providerId}${mediaType === 'tv' && options.season && options.episode ? `-s${options.season}e${options.episode}` : ''}`;
     const [posterFile, backdropFile] = await Promise.all([
-      this.cache.cache(posterUrl, 'posters', prefix), this.cache.cache(show.backdropUrl, 'backdrops', prefix)
+      this.cache.cache(posterUrl, 'posters', prefix, refreshArtwork), this.cache.cache(show.backdropUrl, 'backdrops', prefix, refreshArtwork)
     ]);
     this.movies.applyMetadata(movieId, { source: provider.name, providerId: show.providerId, mediaType, season: mediaType === 'tv' ? options.season ?? null : null, episode: mediaType === 'tv' ? options.episode ?? null : null, title, year: show.year, overview, posterFile, backdropFile, genres: show.genres, cast: show.cast, rating, runtime: show.runtime, imdbId: show.imdbId });
   }

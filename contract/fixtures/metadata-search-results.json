@@ -1,0 +1,12 @@
+[
+  {
+    "provider": "tmdb",
+    "providerId": "42",
+    "title": "Example Show",
+    "year": 2024,
+    "score": 0.9,
+    "mediaType": "tv",
+    "season": 3,
+    "episode": 7
+  }
+]

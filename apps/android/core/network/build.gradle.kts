@@ -13,3 +13,8 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+
+tasks.test {
+    systemProperty("contract.fixtures", rootProject.projectDir.resolve("../../contract/fixtures").canonicalPath)
+    inputs.dir(rootProject.projectDir.resolve("../../contract/fixtures"))
+}
