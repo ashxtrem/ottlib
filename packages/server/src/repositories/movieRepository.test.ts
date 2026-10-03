@@ -104,6 +104,57 @@ describe('MovieRepository filters', () => {
     }
   });
 
+  it('keeps accepted metadata together until a replacement suggestion is accepted', () => {
+    const { repository, close } = createRepository();
+    try {
+      repository.applyMetadata(1, { source: 'tmdb', providerId: '1368337', mediaType: 'movie', imdbId: 'tt33764258', title: 'The Odyssey', year: 2026, overview: 'Odysseus journeys home.', posterFile: 'odyssey.jpg', backdropFile: 'odyssey-backdrop.jpg', genres: ['Adventure'], cast: ['Matt Damon'], rating: 8, runtime: 173 });
+      const accepted = repository.get(1)!;
+
+      repository.saveCandidates(1, [{ provider: 'tmdb', providerId: '1325734', title: 'The Drama', year: 2025, score: 1, mediaType: 'movie' }]);
+
+      expect(repository.get(1)).toEqual({ ...accepted, metadataStatus: 'suggested' });
+      expect(repository.listSummaries(undefined).items[0]).toMatchObject({ title: 'The Odyssey', year: 2026, posterUrl: accepted.posterUrl });
+      expect(repository.getCandidates(1)).toMatchObject([{ title: 'The Drama', year: 2025, providerId: '1325734' }]);
+
+      repository.applyMetadata(1, { source: 'tmdb', providerId: '1325734', mediaType: 'movie', imdbId: 'tt33071426', title: 'The Drama', year: 2026, overview: 'A wedding week goes off the rails.', posterFile: 'drama.jpg', backdropFile: 'drama-backdrop.jpg', genres: ['Drama'], cast: ['Zendaya'], rating: 7, runtime: 105 });
+
+      expect(repository.get(1)).toMatchObject({ title: 'The Drama', year: 2026, imdbId: 'tt33071426', posterUrl: '/media/posters/drama.jpg', overview: 'A wedding week goes off the rails.', cast: ['Zendaya'], runtime: 105, metadataStatus: 'matched' });
+      expect(repository.getCandidates(1)).toEqual([]);
+    } finally {
+      close();
+    }
+  });
+
+  it('restores the accepted match when replacement suggestions are dismissed', () => {
+    const { repository, close } = createRepository();
+    try {
+      const accepted = repository.get(1);
+      repository.saveCandidates(1, [{ provider: 'omdb', providerId: 'tt7654321', title: 'Other movie', year: 2025, score: 1, mediaType: 'movie' }]);
+
+      repository.dismissCandidates(1);
+
+      expect(repository.get(1)).toEqual(accepted);
+      expect(repository.getCandidates(1)).toEqual([]);
+    } finally {
+      close();
+    }
+  });
+
+  it('returns an unaccepted suggestion to its filename title when dismissed', () => {
+    const { repository, close } = createRepository();
+    try {
+      repository.upsertScanned({ folderId: 1, path: 'E:/Movies/unmatched.mkv', filename: 'unmatched.mkv', title: 'Unmatched', year: null, size: 1, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
+      repository.saveCandidates(2, [{ provider: 'tmdb', providerId: '2', title: 'Suggested title', year: 2024, score: 0.6, mediaType: 'movie' }]);
+
+      repository.dismissCandidates(2);
+
+      expect(repository.get(2)).toMatchObject({ title: 'Unmatched', year: null, metadataStatus: 'unmatched' });
+      expect(repository.getCandidates(2)).toEqual([]);
+    } finally {
+      close();
+    }
+  });
+
   it('persists an episode number carried by a match candidate', () => {
     const { repository, close } = createRepository();
     try {

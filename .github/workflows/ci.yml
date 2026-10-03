@@ -35,6 +35,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for Android source changes
+        id: android_changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          git cat-file -e "${BASE_SHA}^{commit}"
+          if git diff --quiet "$BASE_SHA" HEAD -- apps/android; then
+            echo "build_apks=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_apks=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -43,6 +56,10 @@ jobs:
         with:
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests and debug builds
+      - name: Android unit tests
         working-directory: apps/android
-        run: ./gradlew test :tv:assembleDebug :mobile:assembleDebug --stacktrace
+        run: ./gradlew test --stacktrace
+      - name: Debug APK builds
+        if: steps.android_changes.outputs.build_apks == 'true'
+        working-directory: apps/android
+        run: ./gradlew :tv:assembleDebug :mobile:assembleDebug --stacktrace

@@ -328,6 +328,6 @@ export class MetadataMatchService {
   }
 
   public reject(movieId: number): void {
-    this.movies.markUnmatched(movieId);
+    this.movies.dismissCandidates(movieId);
   }
 }
