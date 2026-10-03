@@ -21,7 +21,7 @@ function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFi
     getCandidates: vi.fn().mockReturnValue([{ id: 7, provider: 'tmdb', providerId: '42', title: 'Example', year: 2024, score, mediaType }]),
     getCandidate: vi.fn().mockReturnValue({ provider: 'tmdb', providerId: '42', mediaType }),
     applyMetadata: vi.fn(),
-    get: vi.fn().mockReturnValue({ metadataStatus: 'matched' }),
+    get: vi.fn().mockReturnValue({ metadataStatus: 'matched', season: null as number | null, episode: null as number | null }),
     resetForRematch: vi.fn(),
     listMetadataRefreshTargets: vi.fn(),
     listMatchedWithoutMediaType: vi.fn(),
@@ -32,7 +32,7 @@ function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFi
   const cache = { cache: vi.fn().mockResolvedValue(null) };
   vi.mocked(createMetadataProviders).mockReturnValue([provider]);
   const service = new MetadataMatchService(movies as unknown as MovieRepository, { get: vi.fn() } as unknown as SettingRepository, cache as unknown as PosterCacheService, runs);
-  return { service, movies, provider };
+  return { service, movies, provider, cache };
 }
 
 afterEach(() => vi.clearAllMocks());
@@ -171,6 +171,32 @@ describe('MetadataMatchService automatic scan acceptance', () => {
     expect(provider.getDetails).toHaveBeenCalledWith('42', 'movie');
     expect(movies.applyMetadata).toHaveBeenCalledWith(1, expect.objectContaining({ mediaType: 'movie', title: 'Example' }));
     expect(runs.progress).toHaveBeenLastCalledWith(19, 1, 1, 1);
+  });
+
+  it('preserves a manually selected episode during refresh and forces artwork fetching', async () => {
+    const run = { id: 22, kind: 'metadata-refresh' as const, status: 'running' as const, startedAt: 'a', finishedAt: null, filesFound: 0, filesProcessed: 0, titlesAdded: 0, errorSummary: null };
+    const runs = { active: vi.fn(), create: vi.fn().mockReturnValue(run), progress: vi.fn(), finish: vi.fn() } as unknown as ScanRunRepository;
+    const { service, movies, provider, cache } = createSubject(0.9, 'tv', 'Wrong.S01E02.mkv', runs);
+    movies.listMetadataRefreshTargets.mockReturnValue([{ id: 1, title: 'Example Show', year: 2024, rawFilename: 'Wrong.S01E02.mkv', metadataSource: 'tmdb', providerId: '42', mediaType: 'tv' }]);
+    movies.get.mockReturnValue({ metadataStatus: 'matched', season: 3, episode: 7 });
+    provider.getEpisodeDetails = vi.fn().mockResolvedValue({ title: 'Correct', overview: null, stillUrl: 'https://example.com/still.jpg', rating: null });
+    service.startMetadataRefresh([1]);
+    await vi.waitFor(() => expect(runs.finish).toHaveBeenCalledWith(22, 'completed', null));
+    expect(provider.getEpisodeDetails).toHaveBeenCalledWith('42', 3, 7);
+    expect(cache.cache).toHaveBeenCalledWith('https://example.com/still.jpg', 'posters', 'tmdb-42-s3e7', true);
+    expect(movies.applyMetadata).toHaveBeenCalledWith(1, expect.objectContaining({ season: 3, episode: 7 }));
+  });
+
+  it('keeps saved metadata when refreshed artwork cannot be downloaded', async () => {
+    const run = { id: 23, kind: 'metadata-refresh' as const, status: 'running' as const, startedAt: 'a', finishedAt: null, filesFound: 0, filesProcessed: 0, titlesAdded: 0, errorSummary: null };
+    const runs = { active: vi.fn(), create: vi.fn().mockReturnValue(run), progress: vi.fn(), finish: vi.fn() } as unknown as ScanRunRepository;
+    const { service, movies, cache } = createSubject(0.9, 'movie', 'Example.mkv', runs);
+    movies.listMetadataRefreshTargets.mockReturnValue([{ id: 1, title: 'Example', year: 2024, rawFilename: 'Example.mkv', metadataSource: 'tmdb', providerId: '42', mediaType: 'movie' }]);
+    cache.cache.mockRejectedValue(new Error('Artwork download failed'));
+    service.startMetadataRefresh([1]);
+    await vi.waitFor(() => expect(runs.finish).toHaveBeenCalledWith(23, 'completed', expect.stringContaining('Artwork download failed')));
+    expect(movies.applyMetadata).not.toHaveBeenCalled();
+    expect(movies.resetForRematch).not.toHaveBeenCalled();
   });
 
   it('falls back to a different provider by IMDb ID and reports a rate limit', async () => {

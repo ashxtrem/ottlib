@@ -36,3 +36,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
 }
+
+tasks.withType<Test>().configureEach {
+    systemProperty("contract.fixtures", rootProject.projectDir.resolve("../../contract/fixtures").canonicalPath)
+    inputs.dir(rootProject.projectDir.resolve("../../contract/fixtures"))
+}

@@ -9,10 +9,17 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -23,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.details.DetailsViewModel
+import dev.ottlib.core.presentation.metadata.MetadataViewModel
 import dev.ottlib.core.presentation.openInExternalPlayer
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.mobile.ui.components.ErrorMessage
@@ -38,6 +46,8 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var menuOpen by rememberSaveable(movieId) { mutableStateOf(false) }
+    var metadataOpen by rememberSaveable(movieId) { mutableStateOf(false) }
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
         onPauseOrDispose { }
@@ -54,6 +64,7 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
                     onPlayNext = { nextMovie?.let { onPlay(it.id, false) } },
                     onToggleWatched = viewModel::toggleWatched,
                     onClearProgress = viewModel::clearProgress,
+                    onManageMetadata = { metadataOpen = true },
                     onPlayElsewhere = {
                         val url = viewModel.streamUrl()
                         if (url == null || !openInExternalPlayer(context, url, current.value.title)) Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
@@ -64,6 +75,16 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
                 // Two panes once the window is wide enough (unfolded, or phone landscape); one scrolling column otherwise.
                 if (windowWidth() == WindowWidth.Compact) CompactDetails(current.value, imageUrl, posterUrl, busy, actions)
                 else WideDetails(current.value, imageUrl, posterUrl, busy, actions)
+                Box(Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(8.dp)) {
+                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More options") }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("Metadata") }, onClick = { menuOpen = false; metadataOpen = true })
+                    }
+                }
+                if (metadataOpen) {
+                    val editor = viewModel(key = "metadata-$movieId") { MetadataViewModel(container.api, container.metadataRefresh, current.value) }
+                    MetadataSheet(current.value, editor, onDismiss = { metadataOpen = false })
+                }
             }
         }
         IconButton(
@@ -82,5 +103,6 @@ class DetailsActions(
     val onPlayNext: () -> Unit,
     val onToggleWatched: () -> Unit,
     val onClearProgress: () -> Unit,
+    val onManageMetadata: () -> Unit,
     val onPlayElsewhere: () -> Unit,
 )

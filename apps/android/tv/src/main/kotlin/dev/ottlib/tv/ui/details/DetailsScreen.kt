@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -40,6 +42,7 @@ import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.describe
 import dev.ottlib.core.presentation.details.DetailsViewModel
+import dev.ottlib.core.presentation.metadata.MetadataViewModel
 import dev.ottlib.core.presentation.formatPosition
 import dev.ottlib.core.presentation.metaLine
 import dev.ottlib.core.presentation.openInExternalPlayer
@@ -83,6 +86,9 @@ private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit
     val container = appContainer()
     val context = LocalContext.current
     val primary = remember { FocusRequester() }
+    val metadataFocus = remember { FocusRequester() }
+    var metadataOpen by remember(movie.id) { mutableStateOf(false) }
+    var restoreMetadataFocus by remember(movie.id) { mutableStateOf(false) }
     val resume = movie.resumePositionMs?.takeIf { it > 0 }
 
     Box(Modifier.fillMaxSize()) {
@@ -113,6 +119,9 @@ private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit
                     if (url == null || !openInExternalPlayer(context, url, movie.title)) Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
                 }, enabled = !movie.missing) { Text("Play in another app") }
             }
+            OutlinedButton(onClick = { metadataOpen = true }, modifier = Modifier.focusRequester(metadataFocus)) {
+                Text(if (movie.metadataStatus == "suggested") "Review suggested matches" else "Manage metadata")
+            }
 
             nextMovie?.let { next ->
                 Text("${next.nextLabel()}: ${next.title}", color = OttlibColors.Foreground)
@@ -125,6 +134,13 @@ private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit
         }
     }
     LaunchedEffect(movie.id) { primary.tryRequestFocus() }
+    if (metadataOpen) {
+        val editor = viewModel(key = "metadata-${movie.id}") { MetadataViewModel(container.api, container.metadataRefresh, movie) }
+        MetadataDialog(movie, editor, onDismiss = { metadataOpen = false; restoreMetadataFocus = true })
+    }
+    LaunchedEffect(metadataOpen) {
+        if (!metadataOpen && restoreMetadataFocus) { metadataFocus.tryRequestFocus(); restoreMetadataFocus = false }
+    }
 }
 
 @Composable

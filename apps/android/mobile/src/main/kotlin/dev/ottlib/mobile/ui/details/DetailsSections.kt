@@ -57,6 +57,7 @@ fun ActionButtons(movie: Movie, busy: Boolean, actions: DetailsActions, fillWidt
             SecondaryButton("Other app", Icons.AutoMirrored.Filled.OpenInNew, enabled = !movie.missing, onClick = actions.onPlayElsewhere)
         }
         if (movie.resumePositionMs != null) TextButton(onClick = actions.onClearProgress, enabled = !busy) { Text("Remove from Continue watching") }
+        if (movie.metadataStatus == "suggested") TextButton(onClick = actions.onManageMetadata) { Text("Review suggested matches") }
         actions.nextMovie?.let { next ->
             Text("${next.nextLabel()}: ${next.title}", style = MaterialTheme.typography.titleMedium)
             next.episodeGapAfter(movie)?.let { Text(it, color = OttlibColors.Muted) }

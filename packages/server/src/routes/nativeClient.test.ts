@@ -1,8 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { authStatusSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { authStatusSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import * as metadataProviders from '../providers/metadata/metadataProviders.js';
+import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { buildApp } from '../app.js';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
@@ -53,9 +55,73 @@ async function snapshot(name: string, value: unknown, media: string): Promise<vo
   await expect(`${JSON.stringify(stable(value, media), null, 2)}\n`).toMatchFileSnapshot(`${fixturesPath}/${name}.json`);
 }
 
-afterEach(() => directories.splice(0).forEach((directory) => rmSync(directory, { force: true, recursive: true })));
+afterEach(() => {
+  vi.restoreAllMocks();
+  directories.splice(0).forEach((directory) => rmSync(directory, { force: true, recursive: true }));
+});
 
 describe('native client endpoints', () => {
+  it('searches and applies a single episode match while preserving personal state', async () => {
+    const { app, db, media } = fixture();
+    const candidate = { id: '42', title: 'Example Show', year: 2024, score: 0.9, mediaType: 'tv' as const, season: 3, episode: 7 };
+    const provider: MetadataProvider = {
+      name: 'tmdb', searchCandidates: vi.fn().mockResolvedValue([candidate]), getByImdbId: vi.fn().mockResolvedValue(candidate),
+      getDetails: vi.fn().mockResolvedValue({ providerId: '42', title: 'Example Show', year: 2024, overview: 'Show overview', posterUrl: null, backdropUrl: null, genres: ['Drama'], cast: [], rating: 8, runtime: 45, imdbId: 'tt1234567' }),
+      getEpisodeDetails: vi.fn().mockResolvedValue({ title: 'The correct episode', overview: 'Episode overview', stillUrl: null, rating: 9 }),
+    };
+    vi.spyOn(metadataProviders, 'createMetadataProviders').mockReturnValue([provider]);
+    try {
+      const untouched = (await app.inject({ method: 'GET', url: '/api/movies/1', headers })).json();
+      await app.inject({ method: 'PATCH', url: '/api/movies/2', payload: { titleOverride: 'My episode' } });
+      await app.inject({ method: 'PUT', url: '/api/movies/2/progress', headers, payload: { positionMs: 120_000, durationMs: 2_700_000 } });
+      const searched = await app.inject({ method: 'POST', url: '/api/movies/2/rematch', payload: { title: 'Example Show' } });
+      expect(searched.statusCode).toBe(200);
+      const results = manualMatchCandidateSchema.array().parse(searched.json());
+      await snapshot('metadata-search-results', results, media);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/2/candidates' })).json()).toEqual([]);
+      const lookedUp = await app.inject({ method: 'POST', url: '/api/movies/2/candidates/from-imdb', payload: { imdbId: 'tt1234567' } });
+      expect(lookedUp.statusCode).toBe(200);
+      const suggestions = matchCandidateSchema.array().parse((await app.inject({ method: 'GET', url: '/api/movies/2/candidates' })).json());
+      await snapshot('metadata-candidates', suggestions, media);
+      const invalid = await app.inject({ method: 'POST', url: '/api/movies/2/manual-candidates/accept', payload: { candidate: { provider: 'tmdb', providerId: '42', mediaType: 'tv' } } });
+      expect(invalid.statusCode).toBe(400);
+      const accepted = await app.inject({ method: 'POST', url: '/api/movies/2/manual-candidates/accept', headers, payload: { candidate: { provider: 'tmdb', providerId: '42', mediaType: 'tv' }, season: 3, episode: 7 } });
+      expect(accepted.statusCode).toBe(200);
+      expect(movieSchema.parse(accepted.json())).toMatchObject({ id: 2, title: 'My episode', titleOverride: 'My episode', metadataStatus: 'matched', season: 3, episode: 7, resumePositionMs: 120_000, watched: false });
+      expect((await app.inject({ method: 'GET', url: '/api/movies/1', headers })).json()).toEqual(untouched);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('refreshes only the requested title and refuses to join another metadata run', async () => {
+    const { app, db, media } = fixture();
+    const provider: MetadataProvider = {
+      name: 'tmdb', searchCandidates: vi.fn(),
+      getDetails: vi.fn().mockResolvedValue({ providerId: '329865', title: 'Arrival', year: 2016, overview: 'Updated overview', posterUrl: null, backdropUrl: null, genres: ['Drama'], cast: ['Amy Adams'], rating: 8, runtime: 116, imdbId: 'tt2543164' }),
+    };
+    vi.spyOn(metadataProviders, 'createMetadataProviders').mockReturnValue([provider]);
+    try {
+      const untouched = (await app.inject({ method: 'GET', url: '/api/movies/2', headers })).json();
+      const idle = (await app.inject({ method: 'GET', url: '/api/movies/metadata-refresh/status' })).json();
+      await snapshot('metadata-refresh-idle', idle, media);
+      await app.inject({ method: 'PATCH', url: '/api/movies/1', payload: { titleOverride: 'My Arrival' } });
+      await app.inject({ method: 'PUT', url: '/api/movies/1/watch-state', headers, payload: { watched: true } });
+      const started = await app.inject({ method: 'POST', url: '/api/movies/metadata-refresh', payload: { movieIds: [1] } });
+      expect(started.statusCode).toBe(200);
+      await vi.waitFor(async () => {
+        const completed = scanRunSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/metadata-refresh/status' })).json());
+        expect(completed).toMatchObject({ status: 'completed', filesFound: 1, filesProcessed: 1, titlesAdded: 1 });
+      });
+      await snapshot('metadata-refresh-completed', scanRunSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/metadata-refresh/status' })).json()), media);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/1', headers })).json()).toMatchObject({ title: 'My Arrival', watched: true, overview: 'Updated overview' });
+      expect((await app.inject({ method: 'GET', url: '/api/movies/2', headers })).json()).toEqual(untouched);
+      const active = new ScanRunRepository(db).create('metadata-refresh');
+      const conflict = await app.inject({ method: 'POST', url: '/api/movies/metadata-refresh', payload: { movieIds: [2] } });
+      expect(conflict.statusCode).toBe(409);
+      expect(scanRunSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/metadata-refresh/status' })).json()).id).toBe(active.id);
+      expect(provider.getDetails).toHaveBeenCalledTimes(1);
+    } finally { await app.close(); db.close(); }
+  });
+
   it('offers a next episode and queues it when playback completes', async () => {
     const { app, db, media } = fixture();
     try {

@@ -1,0 +1,11 @@
+{
+  "id": 1,
+  "kind": "metadata-refresh",
+  "status": "completed",
+  "startedAt": "2026-01-01 00:00:00",
+  "finishedAt": "2026-01-01 00:00:00",
+  "filesFound": 1,
+  "filesProcessed": 1,
+  "titlesAdded": 1,
+  "errorSummary": null
+}
