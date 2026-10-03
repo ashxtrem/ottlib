@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { authStatusSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
+import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
+import { OpensubtitlesProvider } from '../providers/subtitles/opensubtitlesProvider.js';
 import { buildApp } from '../app.js';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
@@ -122,6 +124,44 @@ describe('native client endpoints', () => {
     } finally { await app.close(); db.close(); }
   });
 
+  it('searches, saves, and serves downloaded subtitles across clients', async () => {
+    const { app, db, media } = fixture();
+    const search = vi.spyOn(OpensubtitlesProvider.prototype, 'search').mockResolvedValue([{
+      provider: 'OpenSubtitles', remoteId: '12345', language: 'en', releaseName: 'Arrival.2016.WEB-DL',
+      format: 'srt', hearingImpaired: true, forced: false, hashMatch: false, downloads: 120, score: 0,
+    }]);
+    const download = vi.spyOn(OpensubtitlesProvider.prototype, 'download').mockResolvedValue({ bytes: Buffer.from('1\n00:00:01,000 --> 00:00:02,000\nDownloaded subtitle\n'), filename: 'Arrival.srt' });
+    try {
+      const options = subtitleOptionsSchema.parse((await app.inject({ method: 'GET', url: '/api/subtitles/options' })).json());
+      await snapshot('subtitle-options', options, media);
+      expect((await app.inject({ method: 'POST', url: '/api/movies/1/subtitles/search', payload: { mode: 'manual', languages: ['en'] } })).statusCode).toBe(400);
+      await app.inject({ method: 'PUT', url: '/api/settings', payload: { opensubtitlesApiKey: 'secret-api-key' } });
+      const response = await app.inject({ method: 'POST', url: '/api/movies/1/subtitles/search', payload: { languages: ['en'] } });
+      expect(response.statusCode).toBe(200);
+      const found = subtitleSearchResponseSchema.parse(response.json());
+      expect(search).toHaveBeenCalledWith(expect.objectContaining({ imdbId: 'tt2543164', filename: 'Arrival.2016.2160p.mkv', languages: ['en'] }));
+      await snapshot('subtitle-search', { ...found, results: found.results.map(result => ({ ...result, id: 'subtitle-result' })) }, media);
+      expect((await app.inject({ method: 'POST', url: '/api/movies/2/subtitles/download', payload: { resultId: found.results[0].id } })).statusCode).toBe(400);
+      const payload = { resultId: found.results[0].id };
+      const [first, second] = await Promise.all([app.inject({ method: 'POST', url: '/api/movies/1/subtitles/download', payload }), app.inject({ method: 'POST', url: '/api/movies/1/subtitles/download', payload })]);
+      expect(first.statusCode).toBe(200); expect(second.statusCode).toBe(200); expect(download).toHaveBeenCalledTimes(1);
+      const saved = subtitleDownloadResponseSchema.parse(first.json());
+      await snapshot('subtitle-download', saved, media);
+      const reused = subtitleDownloadResponseSchema.parse((await app.inject({ method: 'POST', url: '/api/movies/1/subtitles/download', payload })).json());
+      expect(reused.reused).toBe(true); expect(download).toHaveBeenCalledTimes(1);
+      const playback = playbackSourceSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/1/playback', headers })).json());
+      expect(playback.subtitles).toHaveLength(2); // The copied sidecar is deduplicated against managed storage.
+      expect(playback.subtitles).toContainEqual(saved.subtitle);
+      expect((await app.inject({ method: 'GET', url: saved.subtitle.url })).body).toContain('Downloaded subtitle');
+      expect((await app.inject({ method: 'GET', url: saved.subtitle.url.replace('/movies/1/', '/movies/2/') })).statusCode).toBe(404);
+      await app.inject({ method: 'PUT', url: '/api/auth/pin', payload: { newPin: '2468' } });
+      expect((await app.inject({ method: 'POST', url: '/api/movies/1/subtitles/search', payload: { languages: ['en'] } })).statusCode).toBe(401);
+      const login = (await app.inject({ method: 'POST', url: '/api/auth/login', payload: { pin: '2468' } })).json();
+      const keyed = playbackSourceSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/1/playback', headers: { ...headers, authorization: `Bearer ${login.token}` } })).json()).subtitles.find(subtitle => subtitle.url.includes('/1000001'))!;
+      expect((await app.inject({ method: 'GET', url: keyed.url })).statusCode).toBe(200);
+      expect((await app.inject({ method: 'GET', url: keyed.url.replace('/movies/1/', '/movies/2/') })).statusCode).toBe(401);
+    } finally { await app.close(); db.close(); }
+  });
   it('offers a next episode and queues it when playback completes', async () => {
     const { app, db, media } = fixture();
     try {

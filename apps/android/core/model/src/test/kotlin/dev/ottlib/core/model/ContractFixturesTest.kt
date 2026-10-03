@@ -40,6 +40,9 @@ class ContractFixturesTest {
         "metadata-search-results" to ListSerializer(MetadataCandidate.serializer()),
         "auth-status" to AuthStatus.serializer(),
         "pin-login-result" to PinLoginResult.serializer(),
+        "subtitle-options" to SubtitleOptions.serializer(),
+        "subtitle-search" to SubtitleSearchResponse.serializer(),
+        "subtitle-download" to SubtitleDownloadResponse.serializer(),
     )
 
     @Test

@@ -36,10 +36,12 @@ import androidx.media3.common.Player
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.SeekDirection
 import dev.ottlib.core.presentation.player.PlayerControls
+import dev.ottlib.core.presentation.player.SubtitleSearchController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ottlib.mobile.MainActivity
 import kotlinx.coroutines.delay
 
-private enum class Panel { Tracks, Picture }
+private enum class Panel { Tracks, Picture, Subtitles }
 
 /**
  * The video with touch controls. Flat, the controls float over the video and fade while it plays; half-folded
@@ -58,10 +60,13 @@ fun PlayerSurface(
     onSessionPictureMode: (PictureMode) -> Unit,
     onPictureHintSeen: () -> Unit,
     onPlayElsewhere: () -> Unit,
+    subtitles: SubtitleSearchController,
+    onFindSubtitles: () -> Unit,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current as? MainActivity
     val snapshot by rememberPlaybackSnapshot(player)
+    val subtitleState by subtitles.uiState.collectAsStateWithLifecycle()
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<Panel?>(null) }
     var scrubbing by remember { mutableStateOf(false) }
@@ -176,7 +181,8 @@ fun PlayerSurface(
             }
         }
         when (panel) {
-            Panel.Tracks -> TrackPanel(player, onDismiss = { panel = null })
+            Panel.Tracks -> TrackPanel(player, onFindSubtitles = { onFindSubtitles(); panel = Panel.Subtitles }, onDismiss = { panel = null })
+            Panel.Subtitles -> SubtitlePanel(subtitleState, subtitles, onRetry = onFindSubtitles, onDismiss = { panel = null })
             Panel.Picture -> PicturePanel(pictureMode, onChoose = onPictureModeChosen, onDismiss = { panel = null })
             null -> Unit
         }

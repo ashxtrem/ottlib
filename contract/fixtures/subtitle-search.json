@@ -1,0 +1,18 @@
+{
+  "results": [
+    {
+      "id": "subtitle-result",
+      "provider": "OpenSubtitles",
+      "language": "en",
+      "releaseName": "Arrival.2016.WEB-DL",
+      "format": "srt",
+      "hearingImpaired": true,
+      "forced": false,
+      "hashMatch": false,
+      "downloads": 120,
+      "score": 0,
+      "downloaded": false
+    }
+  ],
+  "warnings": []
+}

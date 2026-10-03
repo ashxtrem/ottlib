@@ -5,17 +5,22 @@ import { SchedulerService } from './schedulerService.js';
 import { TmdbProvider } from '../providers/metadata/tmdbProvider.js';
 
 const mask = (value: string) => value ? `••••${value.slice(-4)}` : '';
+const subtitleSecrets = ['opensubtitlesApiKey', 'opensubtitlesPassword', 'subdlApiKey'] as const;
+function maskSubtitleSecrets(value: Settings): Settings {
+  const masked = { ...value }; for (const key of subtitleSecrets) masked[key] = key === 'opensubtitlesPassword' && value[key] ? '••••' : mask(value[key]); return masked;
+}
 export class SettingsService {
   public constructor(private readonly settings: SettingRepository, private readonly scheduler: SchedulerService) {}
-  public get(): Settings { const value = this.settings.get(); return { ...value, tmdbApiKey: mask(value.tmdbApiKey), omdbApiKey: mask(value.omdbApiKey), qbittorrentPassword: mask(value.qbittorrentPassword) }; }
+  public get(): Settings { const value = this.settings.get(); return maskSubtitleSecrets({ ...value, tmdbApiKey: mask(value.tmdbApiKey), omdbApiKey: mask(value.omdbApiKey), qbittorrentPassword: mask(value.qbittorrentPassword) }); }
   public update(update: UpdateSettings): Settings {
     const safe = { ...update };
+    for (const key of subtitleSecrets) if (safe[key]?.startsWith('••••')) delete safe[key];
     if (safe.tmdbApiKey?.startsWith('••••')) delete safe.tmdbApiKey;
     if (safe.omdbApiKey?.startsWith('••••')) delete safe.omdbApiKey;
     if (safe.qbittorrentPassword?.startsWith('••••')) delete safe.qbittorrentPassword;
     if (safe.scheduleCron !== undefined && !this.validateSchedule(safe.scheduleCron).valid) throw new Error('Schedule must be a valid cron expression');
     const result = this.settings.update(safe); this.scheduler.refresh();
-    return { ...result, tmdbApiKey: mask(result.tmdbApiKey), omdbApiKey: mask(result.omdbApiKey), qbittorrentPassword: mask(result.qbittorrentPassword) };
+    return maskSubtitleSecrets({ ...result, tmdbApiKey: mask(result.tmdbApiKey), omdbApiKey: mask(result.omdbApiKey), qbittorrentPassword: mask(result.qbittorrentPassword) });
   }
 
   public validateSchedule(scheduleCron: string): ScheduleValidationResult {

@@ -11,16 +11,18 @@ type MovieActionButtonsProps = {
   imdbUrl: string;
   movie: Movie;
   onManageShelves: () => void;
+  onSubtitles: () => void;
   onToggleWatched: () => void;
   watchPending: boolean;
 };
 
-export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onToggleWatched, watchPending }: MovieActionButtonsProps) {
+export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitles, onToggleWatched, watchPending }: MovieActionButtonsProps) {
   const watchLabel = movie.watched ? 'Mark as unwatched' : 'Mark as watched';
   const torrentSearchEnabled = useTorrentSearchEnabled();
 
   return <div className="space-y-2">
     <PlayButton movie={movie} />
+    <button type="button" onClick={onSubtitles} disabled={movie.missing} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised disabled:opacity-50 ${focusRing}`}>Find subtitles</button>
     {torrentSearchEnabled && <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>}
     <div className="flex flex-wrap items-center gap-2">
       <RevealInFolderButton movieId={movie.id} />

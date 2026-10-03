@@ -18,6 +18,7 @@ import { SkeletonSettings } from '../components/Skeleton';
 import { useSuccessPulse } from '../hooks/useSuccessPulse';
 import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection';
 import { useAuthStatus } from '../hooks/useAccessPin';
+import { SubtitleSettingsSection } from '../components/SubtitleSettingsSection';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -96,6 +97,7 @@ export function SettingsPage() {
     </section>
 
     <AccessPinSettingsSection />
+    <SubtitleSettingsSection />
 
     <form
       onSubmit={(event) => {

@@ -72,6 +72,8 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                     onSessionPictureMode = viewModel::usePictureModeForSession,
                     onPictureHintSeen = viewModel::pictureHintSeen,
                     onPlayElsewhere = openExternally,
+                    subtitles = viewModel.subtitles,
+                    onFindSubtitles = viewModel::findSubtitles,
                 )
             }
         }

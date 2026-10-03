@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.map
 data class PlaybackSettings(
     val audioLanguage: String? = null,
     val subtitleLanguage: String? = null,
+    val subtitleSearchLanguages: List<String> = emptyList(),
     val skipBackSeconds: Int = DEFAULT_SKIP_SECONDS,
     val skipForwardSeconds: Int = DEFAULT_SKIP_SECONDS,
     val defaultPictureMode: PictureMode = PictureMode.Fit,
@@ -35,6 +36,7 @@ data class PlaybackSettings(
 class PlaybackPreferences(private val context: Context) {
     private val audioKey = stringPreferencesKey("audio_language")
     private val subtitleKey = stringPreferencesKey("subtitle_language")
+    private val subtitleSearchKey = stringPreferencesKey("subtitle_search_languages")
     private val skipBackKey = intPreferencesKey("skip_back_seconds")
     private val skipForwardKey = intPreferencesKey("skip_forward_seconds")
     private val pictureModeKey = stringPreferencesKey("default_picture_mode")
@@ -45,6 +47,7 @@ class PlaybackPreferences(private val context: Context) {
         PlaybackSettings(
             audioLanguage = it[audioKey],
             subtitleLanguage = it[subtitleKey],
+            subtitleSearchLanguages = it[subtitleSearchKey]?.split(',')?.filter(String::isNotBlank).orEmpty(),
             skipBackSeconds = it[skipBackKey] ?: PlaybackSettings.DEFAULT_SKIP_SECONDS,
             skipForwardSeconds = it[skipForwardKey] ?: PlaybackSettings.DEFAULT_SKIP_SECONDS,
             defaultPictureMode = PictureMode.fromName(it[pictureModeKey]) ?: PictureMode.Fit,
@@ -57,6 +60,7 @@ class PlaybackPreferences(private val context: Context) {
 
     suspend fun setAudioLanguage(language: String?) = set(audioKey, language)
     suspend fun setSubtitleLanguage(language: String?) = set(subtitleKey, language)
+    suspend fun setSubtitleSearchLanguages(languages: List<String>) = set(subtitleSearchKey, languages.joinToString(","))
     suspend fun setSkipBackSeconds(seconds: Int) = set(skipBackKey, seconds)
     suspend fun setSkipForwardSeconds(seconds: Int) = set(skipForwardKey, seconds)
     suspend fun setDefaultPictureMode(mode: PictureMode) = set(pictureModeKey, mode.name)

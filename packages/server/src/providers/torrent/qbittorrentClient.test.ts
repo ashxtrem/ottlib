@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Settings } from '@ottlib/shared';
 import { QbittorrentClient } from './qbittorrentClient.js';
 import * as searchModule from './qbittorrentSearch.js';
+import { defaultSettings } from '../../config/defaults.js';
 
 function configuredSettings(): Settings {
-  return { tmdbApiKey: '', omdbApiKey: '', torrentSearchEnabled: true, qbittorrentUrl: 'http://qb.local:8080', qbittorrentUsername: 'alice', qbittorrentPassword: 'secret', qbittorrentCategory: 'ottlib', qbittorrentSavePath: '', extensions: [], ignoredPatterns: [], excludedFolders: [], scheduleEnabled: false, scheduleCron: '0 3 * * *' };
+  return { ...defaultSettings, torrentSearchEnabled: true, qbittorrentUrl: 'http://qb.local:8080', qbittorrentUsername: 'alice', qbittorrentPassword: 'secret' };
 }
 
 describe('QbittorrentClient', () => {
