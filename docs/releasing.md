@@ -7,6 +7,12 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
+Or release without a local checkout: **Actions → Release → Run workflow**, then enter the tag (`v0.2.7`) and the branch to release (default `master`). The run builds the latest commit on that branch, and only once every build passes does it create the tag there and draft the release. If the tag already exists it must point at that same commit, or the run stops before building anything. From the command line:
+
+```bash
+gh workflow run release.yml -f tag=v0.2.7 -f branch=master
+```
+
 The tag is the only version number: `v0.2.0` becomes Android `versionName` 0.2.0 and `versionCode` 200 (`major*10000 + minor*100 + patch`), and the version in the bundle file names. Tags with a suffix (`v0.2.0-rc1`) are published as pre-releases.
 
 ## Release assets
