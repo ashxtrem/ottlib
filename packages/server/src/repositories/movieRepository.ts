@@ -140,6 +140,9 @@ export class MovieRepository {
     return row.count === uniqueIds.length;
   }
 
+  /** Removes the row; watch state, progress, tracks, candidates and shelf membership go with it (ON DELETE CASCADE). */
+  public deleteMovie(id: number): void { this.db.prepare('DELETE FROM movies WHERE id = ?').run(id); }
+
   public playbackMovie(id: number): PlaybackMovie | undefined {
     const row = this.db.prepare('SELECT m.id, m.canonical_path, f.path AS folder_path, m.raw_filename, m.missing FROM movies m JOIN folders f ON f.id = m.folder_id WHERE m.id = ?').get(id) as any;
     return row && { id: row.id, path: row.canonical_path, folderPath: row.folder_path, filename: row.raw_filename, missing: Boolean(row.missing) };

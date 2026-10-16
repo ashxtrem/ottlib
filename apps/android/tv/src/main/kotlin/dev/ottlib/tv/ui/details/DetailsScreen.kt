@@ -56,7 +56,7 @@ import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.tryRequestFocus
 
 @Composable
-fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onOpenMovie: (Long) -> Unit, onBack: () -> Unit) {
+fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onOpenMovie: (Long) -> Unit, onCompare: (Long) -> Unit, onBack: () -> Unit) {
     val container = appContainer()
     val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId, container.playbackSequence, container.hiddenTitles) }
     val state by viewModel.movie.collectAsStateWithLifecycle()
@@ -64,6 +64,7 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
     val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
     val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
+    val copies by viewModel.copies.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
         onPauseOrDispose { }
@@ -82,6 +83,8 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
             hidden = hidden,
             recommendations = recommendations,
             onOpenMovie = onOpenMovie,
+            copies = copies,
+            onCompare = { onCompare(movieId) },
             onToggleHidden = viewModel::toggleHidden,
             onClearProgress = viewModel::clearProgress,
             streamUrl = viewModel::streamUrl,
@@ -90,7 +93,7 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
 }
 
 @Composable
-private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit, busy: Boolean, onPlay: (fromStart: Boolean) -> Unit, onToggleWatched: () -> Unit, hidden: Boolean, recommendations: List<RecommendedPoster>, onOpenMovie: (Long) -> Unit, onToggleHidden: () -> Unit, onClearProgress: () -> Unit, streamUrl: () -> String?) {
+private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit, busy: Boolean, onPlay: (fromStart: Boolean) -> Unit, onToggleWatched: () -> Unit, hidden: Boolean, recommendations: List<RecommendedPoster>, onOpenMovie: (Long) -> Unit, copies: Int, onCompare: () -> Unit, onToggleHidden: () -> Unit, onClearProgress: () -> Unit, streamUrl: () -> String?) {
     val container = appContainer()
     val context = LocalContext.current
     val primary = remember { FocusRequester() }
@@ -132,6 +135,7 @@ private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit
                     Text(if (movie.metadataStatus == "suggested") "Review suggested matches" else "Manage metadata")
                 }
                 val isShow = movie.showKey != null
+                if (copies > 0) OutlinedButton(onClick = onCompare) { Text(if (copies == 1) "Compare with 1 other copy" else "Compare with $copies other copies") }
                 OutlinedButton(onClick = onToggleHidden) { Text(if (hidden) (if (isShow) "Unhide show" else "Unhide") else (if (isShow) "Hide show on this TV" else "Hide on this TV")) }
             }
 

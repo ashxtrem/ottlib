@@ -31,6 +31,16 @@ fun formatRemaining(positionMs: Long, durationMs: Long?): String? {
     return if (remaining > 60_000) "${formatRuntime(null, remaining)} left" else null
 }
 
+/** `1.4 GB`, `820 MB`. */
+fun formatBytes(bytes: Long): String {
+    if (bytes < 0) return "—"
+    val units = listOf("B", "KB", "MB", "GB", "TB")
+    var value = bytes.toDouble()
+    var unit = 0
+    while (value >= 1024 && unit < units.lastIndex) { value /= 1024; unit++ }
+    return if (unit > 1) "%.1f %s".format(java.util.Locale.US, value, units[unit]) else "%d %s".format(java.util.Locale.US, value.toLong(), units[unit])
+}
+
 fun resolutionLabel(height: Int?): String? = when {
     height == null || height <= 0 -> null
     height >= 2_000 -> "4K"
