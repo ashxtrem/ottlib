@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { initialLibraryViewState, libraryStateFromSearchParams, libraryStateToSearchParams } from './useLibraryViewState';
+import { initialLibraryViewState, libraryStateFromSearchParams, libraryStateToSearchParams, reconcileSearchDraft } from './useLibraryViewState';
+
+describe('search draft', () => {
+  it('keeps trailing and inner spaces while the URL holds the trimmed text', () => {
+    expect(libraryStateToSearchParams({ ...initialLibraryViewState, search: 'the ' }).get('search')).toBe('the');
+    expect(reconcileSearchDraft('the ', 'the')).toBe('the ');
+    expect(reconcileSearchDraft('the dark', 'the dark')).toBe('the dark');
+  });
+
+  it('follows the URL when it changes elsewhere', () => {
+    expect(reconcileSearchDraft('the ', '')).toBe('');
+    expect(reconcileSearchDraft('the ', 'alien')).toBe('alien');
+  });
+});
 
 describe('library URL state', () => {
   it('reads shareable filter parameters', () => {

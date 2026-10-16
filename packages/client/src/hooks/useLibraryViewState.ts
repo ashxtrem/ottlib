@@ -43,12 +43,19 @@ export function libraryStateToSearchParams(state: LibraryViewState): URLSearchPa
   return params;
 }
 
+/** The URL keeps the trimmed search; the input keeps what was typed so spaces between words survive. */
+export function reconcileSearchDraft(draft: string, urlSearch: string): string {
+  return draft.trim() === urlSearch ? draft : urlSearch;
+}
+
 export function useLibraryViewState() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [fallbackState, setFallbackState] = useState<LibraryViewState>(readState);
   const hasUrlState = searchParams.size > 0;
   const urlState = libraryStateFromSearchParams(searchParams);
   const state = hasUrlState ? urlState : fallbackState;
+  const [searchDraft, setSearchDraft] = useState(state.search);
+  const search = reconcileSearchDraft(searchDraft, state.search);
 
   useEffect(() => {
     if (!hasUrlState) return;
@@ -63,7 +70,8 @@ export function useLibraryViewState() {
 
   return {
     ...state,
-    setSearch: (search: string) => update({ search }),
+    search,
+    setSearch: (value: string) => { setSearchDraft(value); update({ search: value }); },
     setWatched: (watched: boolean | undefined) => update({ watched }),
     setAvailability: (availability: 'available' | 'unavailable' | undefined) => update({ availability }),
     setMediaType: (mediaType: 'movie' | 'tv' | undefined) => update({ mediaType }),
