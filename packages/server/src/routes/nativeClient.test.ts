@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authStatusSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { authStatusSchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
@@ -229,6 +229,21 @@ describe('native client endpoints', () => {
       await app.inject({ method: 'PUT', url: '/api/movies/1/progress', headers, payload: { positionMs: 1_830_000, durationMs: 6_960_000 } });
       expect((await app.inject({ method: 'DELETE', url: '/api/movies/1/progress', headers })).statusCode).toBe(204);
       expect((await app.inject({ method: 'GET', url: '/api/movies/continue-watching', headers })).json()).toEqual([]);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('serve recommendations in the shape the native client decodes', async () => {
+    const { app, db, media } = fixture();
+    try {
+      const movies = new MovieRepository(db);
+      movies.upsertScanned({ folderId: 1, path: join(media, 'Contact.1997.mkv'), filename: 'Contact.1997.mkv', title: 'Contact', year: 1997, size: 10, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
+      movies.applyMetadata(3, { source: 'tmdb', providerId: '686', mediaType: 'movie', title: 'Contact', year: 1997, overview: null, posterFile: null, backdropFile: null, genres: ['Drama', 'Science Fiction'], cast: [], rating: 7.4, runtime: 150, imdbId: 'tt0118884' });
+      const response = await app.inject({ method: 'GET', url: '/api/movies/1/recommendations', headers });
+      expect(response.statusCode).toBe(200);
+      const recommendations = recommendationSchema.array().parse(response.json());
+      expect(recommendations.map((item) => item.movie.title)).toEqual(['Contact']);
+      await snapshot('recommendations', recommendations, media);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/999/recommendations', headers })).statusCode).toBe(404);
     } finally { await app.close(); db.close(); }
   });
 

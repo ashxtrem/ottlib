@@ -17,6 +17,7 @@ import dev.ottlib.core.model.PinLoginResult
 import dev.ottlib.core.model.PlaybackProgressResult
 import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.model.PlaybackSource
+import dev.ottlib.core.model.Recommendation
 import dev.ottlib.core.model.ScanStatus
 import dev.ottlib.core.model.ServerInfo
 import dev.ottlib.core.model.ShelfDetail
@@ -70,6 +71,15 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     suspend fun continueWatching(limit: Int = 20): List<MovieListItem> =
         get(url("/api/movies/continue-watching").newBuilder().addQueryParameter("limit", limit.toString()).build())
     suspend fun movie(id: Long): Movie = get(url("/api/movies/$id"))
+    /** Other available copies of the same title (same IMDb id, or same title and year when unmatched). */
+    suspend fun duplicates(id: Long): List<Movie> = get(url("/api/movies/$id/duplicates"))
+    /** Permanently deletes this copy's video file from the server's disk and removes it from the library. The server refuses to delete the only copy. */
+    suspend fun deleteFile(id: Long) {
+        client.newCall(Request.Builder().url(url("/api/movies/$id/file")).delete().build()).awaitBody()
+        changed()
+    }
+    suspend fun recommendations(id: Long, limit: Int = 24): List<Recommendation> =
+        get(url("/api/movies/$id/recommendations").newBuilder().addQueryParameter("limit", limit.toString()).build())
     suspend fun filterOptions(): MovieFilterOptions = get(url("/api/movies/filter-options"))
     suspend fun shelves(): List<ShelfSummary> = get(url("/api/shelves"))
     suspend fun shelf(id: Long): ShelfDetail = get(url("/api/shelves/$id"))

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { formatRuntime, hiddenDisplayTitle, hideKeyOf, type ManualMatchCandidate } from '@ottlib/shared';
 import { MatchCandidateRow } from '../components/MatchCandidateRow';
 import { MovieActionButtons } from '../components/MovieActionButtons';
@@ -16,6 +16,7 @@ import { SkeletonDetail } from '../components/Skeleton';
 import { PosterImage } from '../components/PosterImage';
 import { DuplicateCompareDialog } from '../components/DuplicateCompareDialog';
 import { SubtitleDialog } from '../components/SubtitleDialog';
+import { RecommendationsRow } from '../components/RecommendationsRow';
 import { useHiddenTitles } from '../hooks/useHiddenTitles';
 import { useToast } from '../hooks/useToast';
 
@@ -26,6 +27,7 @@ function BrowseFilterChips({ label, values, parameter }: { label: string; values
 
 export function MovieDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const movie = useMovie(id);
   const duplicates = useMovieDuplicates(id);
   const actions = useMovieActions();
@@ -95,6 +97,7 @@ export function MovieDetailPage() {
         <MediaInfoPanel mediaInfo={item.mediaInfo} filePath={item.filePath} />
       </div>
     </div>
+    {id && <RecommendationsRow movieId={id} />}
     <form onSubmit={(event) => { event.preventDefault(); actions.titleOverride.mutate({ id: item.id, titleOverride: activeTitle.trim() || null }); }} className="rounded-xl border border-border bg-surface p-5">
       <h2 className="font-semibold">Fix this match</h2>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row">
@@ -124,7 +127,7 @@ export function MovieDetailPage() {
     </div>}
     <MovieShelfDialog open={shelfManagerOpen} movie={item} shelves={shelves.data ?? []} saving={shelfActions.updateMovieShelves.isPending} onClose={() => setShelfManagerOpen(false)} onSave={({ shelfIds, newShelfName }) => shelfActions.updateMovieShelves.mutate({ movieId: item.id, shelfIds, newShelfName }, { onSuccess: () => setShelfManagerOpen(false) })} />
     <MetadataRefreshDialog open={refreshDialogOpen} title="Refresh title metadata" count={1} running={metadataRefresh.start.isPending} onClose={() => setRefreshDialogOpen(false)} onConfirm={() => metadataRefresh.start.mutate([item.id], { onSuccess: () => setRefreshDialogOpen(false) })} />
-    <DuplicateCompareDialog open={compareOpen} onClose={() => setCompareOpen(false)} primary={item} duplicates={duplicates.data ?? []} />
+    <DuplicateCompareDialog open={compareOpen} onClose={() => setCompareOpen(false)} primary={item} duplicates={duplicates.data ?? []} onDeleted={(deletedId, remaining) => { if (remaining.length === 0) setCompareOpen(false); if (deletedId === item.id && remaining[0]) { setCompareOpen(false); navigate(`/movie/${remaining[0].id}`, { replace: true }); } }} />
     {subtitlesOpen && <SubtitleDialog key={item.id} movie={item} onClose={() => setSubtitlesOpen(false)} />}
   </section>;
 }

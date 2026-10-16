@@ -20,6 +20,7 @@ class ContractFixturesTest {
     private val serializers: Map<String, KSerializer<*>> = mapOf(
         "server-info" to ServerInfo.serializer(),
         "movie-list-page" to MovieListPage.serializer(),
+        "recommendations" to ListSerializer(Recommendation.serializer()),
         "movie" to Movie.serializer(),
         "movie-unmatched" to Movie.serializer(),
         "filter-options" to MovieFilterOptions.serializer(),

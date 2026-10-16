@@ -1,0 +1,21 @@
+[
+  {
+    "movie": {
+      "nextUp": null,
+      "id": 3,
+      "title": "Contact",
+      "year": 1997,
+      "posterUrl": null,
+      "resolution": null,
+      "hdrFormat": null,
+      "showKey": null,
+      "watched": false,
+      "resumePositionMs": null,
+      "durationMs": null,
+      "missing": false,
+      "metadataStatus": "matched",
+      "shelves": []
+    },
+    "reason": "Shares genres: Drama, Science Fiction"
+  }
+]

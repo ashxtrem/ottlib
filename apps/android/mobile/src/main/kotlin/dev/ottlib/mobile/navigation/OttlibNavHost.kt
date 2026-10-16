@@ -68,6 +68,7 @@ fun OttlibNavHost() {
             composable(Routes.DETAILS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { backStackEntry ->
                 DetailsScreen(
                     movieId = backStackEntry.arguments!!.getLong("id"),
+                    onOpenMovie = openMovie,
                     onPlay = { id, fromStart ->
                         if (id != backStackEntry.arguments!!.getLong("id")) {
                             nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }
