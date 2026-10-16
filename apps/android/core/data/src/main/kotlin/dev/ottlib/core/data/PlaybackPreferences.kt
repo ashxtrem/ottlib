@@ -25,11 +25,15 @@ data class PlaybackSettings(
     val pictureHintShown: Boolean = false,
     /** When on, changing audio/subtitles during playback also updates the language defaults for new titles. */
     val languagesFollowLastChoice: Boolean = false,
+    /** Seconds the ended screen counts down before playing the next title; 0 means wait for the viewer. */
+    val autoPlayNextSeconds: Int = DEFAULT_AUTO_PLAY_SECONDS,
 ) {
     companion object {
         const val DEFAULT_SKIP_SECONDS = 10
+        const val DEFAULT_AUTO_PLAY_SECONDS = 10
         val SKIP_BACK_CHOICES = listOf(5, 10, 15, 30)
         val SKIP_FORWARD_CHOICES = listOf(5, 10, 15, 30, 60)
+        val AUTO_PLAY_CHOICES = listOf(0, 5, 10, 15, 30)
     }
 }
 
@@ -42,6 +46,7 @@ class PlaybackPreferences(private val context: Context) {
     private val pictureModeKey = stringPreferencesKey("default_picture_mode")
     private val pictureHintKey = booleanPreferencesKey("picture_hint_shown")
     private val followChoiceKey = booleanPreferencesKey("languages_follow_last_choice")
+    private val autoPlayKey = intPreferencesKey("auto_play_next_seconds")
 
     val settings: Flow<PlaybackSettings> = context.ottlibPreferences.data.map {
         PlaybackSettings(
@@ -53,6 +58,7 @@ class PlaybackPreferences(private val context: Context) {
             defaultPictureMode = PictureMode.fromName(it[pictureModeKey]) ?: PictureMode.Fit,
             pictureHintShown = it[pictureHintKey] ?: false,
             languagesFollowLastChoice = it[followChoiceKey] ?: false,
+            autoPlayNextSeconds = it[autoPlayKey] ?: PlaybackSettings.DEFAULT_AUTO_PLAY_SECONDS,
         )
     }
 
@@ -66,6 +72,7 @@ class PlaybackPreferences(private val context: Context) {
     suspend fun setDefaultPictureMode(mode: PictureMode) = set(pictureModeKey, mode.name)
     suspend fun markPictureHintShown() = set(pictureHintKey, true)
     suspend fun setLanguagesFollowLastChoice(enabled: Boolean) = set(followChoiceKey, enabled)
+    suspend fun setAutoPlayNextSeconds(seconds: Int) = set(autoPlayKey, seconds)
 
     private suspend fun <T> set(key: Preferences.Key<T>, value: T?) {
         context.ottlibPreferences.edit { if (value == null) it.remove(key) else it[key] = value }

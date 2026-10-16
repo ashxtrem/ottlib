@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.openInExternalPlayer
+import dev.ottlib.core.presentation.player.AutoPlayState
 import dev.ottlib.core.presentation.player.PlayerUiState
 import dev.ottlib.core.presentation.player.PlayerViewModel
 import dev.ottlib.mobile.ui.components.ErrorMessage
@@ -24,7 +26,7 @@ import dev.ottlib.mobile.ui.components.LoadingMessage
 fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: (Long) -> Unit, onDetails: (Long) -> Unit) {
     val container = appContainer()
     val viewModel = viewModel(key = "player-$movieId-$fromStart") {
-        PlayerViewModel(container.api, container.playerFactory, container.playbackPreferences, container.pictureModes, container.trackChoices, container.continueWatching, container.appScope, movieId, fromStart, container.playbackSequence)
+        PlayerViewModel(container.api, container.playerFactory, container.playbackPreferences, container.pictureModes, container.trackChoices, container.continueWatching, container.appScope, movieId, fromStart, container.playbackSequence, container.autoPlayStreak)
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val problem by viewModel.problem.collectAsStateWithLifecycle()
@@ -32,6 +34,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
     val completionError by viewModel.completionError.collectAsStateWithLifecycle()
     val nextWarning by viewModel.nextWarning.collectAsStateWithLifecycle()
     val pictureMode by viewModel.pictureMode.collectAsStateWithLifecycle()
+    val autoPlay by viewModel.autoPlay.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val inPictureInPicture = rememberInPictureInPicture()
     val openExternally = {
@@ -46,16 +49,21 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
         when (val current = state) {
             PlayerUiState.Loading -> LoadingMessage(text = "Starting playback…")
             is PlayerUiState.Failed -> ErrorMessage(current.message, actionLabel = "Back", onAction = onExit)
-            PlayerUiState.Ended -> PlaybackEnded(
-                next = nextMovie,
-                posterUrl = container.api.resolve(nextMovie?.posterUrl),
-                warning = nextWarning,
-                error = completionError,
-                onRetry = viewModel::saveCompletion,
-                onPlay = { id -> viewModel.releasePlayback(); onNext(id) },
-                onDetails = { id -> viewModel.releasePlayback(); onDetails(id) },
-                onClose = { viewModel.releasePlayback(); onExit() },
-            )
+            PlayerUiState.Ended -> {
+                LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.cancelAutoPlay() }
+                PlaybackEnded(
+                    next = nextMovie,
+                    posterUrl = container.api.resolve(nextMovie?.posterUrl),
+                    warning = nextWarning,
+                    error = completionError,
+                    autoPlay = autoPlay,
+                    onRetry = viewModel::saveCompletion,
+                    onCancelAutoPlay = viewModel::cancelAutoPlay,
+                    onPlay = { id -> viewModel.releasePlayback(); onNext(id) },
+                    onDetails = { id -> viewModel.releasePlayback(); onDetails(id) },
+                    onClose = { viewModel.releasePlayback(); onExit() },
+                )
+            }
             is PlayerUiState.Ready -> {
                 MediaSessionEffect(current.player)
                 // Stopped means no longer visible at all (screen off, app switched without picture-in-picture, or the
@@ -77,6 +85,11 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                 )
             }
         }
+    }
+
+    // Collected only while the screen is started, so the next title never begins behind another app.
+    LaunchedEffect(autoPlay) {
+        (autoPlay as? AutoPlayState.Due)?.let { viewModel.releasePlayback(); onNext(it.movieId) }
     }
 
     problem?.let { shown ->

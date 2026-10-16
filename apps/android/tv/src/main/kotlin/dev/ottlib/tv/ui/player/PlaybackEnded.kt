@@ -20,12 +20,14 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.presentation.player.AutoPlayState
+import dev.ottlib.core.presentation.player.message
 import dev.ottlib.core.presentation.player.nextLabel
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.tryRequestFocus
 
 @Composable
-fun PlaybackEnded(next: Movie?, posterUrl: String?, warning: String?, error: String?, onRetry: () -> Unit, onPlay: (Long) -> Unit, onDetails: (Long) -> Unit, onClose: () -> Unit) {
+fun PlaybackEnded(next: Movie?, posterUrl: String?, warning: String?, error: String?, autoPlay: AutoPlayState, onRetry: () -> Unit, onCancelAutoPlay: () -> Unit, onPlay: (Long) -> Unit, onDetails: (Long) -> Unit, onClose: () -> Unit) {
     val primary = remember { FocusRequester() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
         Text("Playback finished", color = OttlibColors.Foreground)
@@ -34,7 +36,9 @@ fun PlaybackEnded(next: Movie?, posterUrl: String?, warning: String?, error: Str
             Text(next.nextLabel(), color = OttlibColors.Muted)
             Text(next.title, color = OttlibColors.Foreground)
             warning?.let { Text(it, color = OttlibColors.Muted) }
+            autoPlay.message(next)?.let { Text(it, color = OttlibColors.Accent) }
             Button(onClick = { onPlay(next.id) }, modifier = Modifier.focusRequester(primary)) { Text(if ((next.resumePositionMs ?: 0) > 0) "Resume next" else "Play next") }
+            if (autoPlay is AutoPlayState.Counting) OutlinedButton(onClick = onCancelAutoPlay) { Text("Cancel auto-play") }
             OutlinedButton(onClick = { onDetails(next.id) }) { Text("View details") }
         }
         if (error != null) {
@@ -43,5 +47,6 @@ fun PlaybackEnded(next: Movie?, posterUrl: String?, warning: String?, error: Str
         }
         OutlinedButton(onClick = onClose, modifier = if (next == null) Modifier.focusRequester(primary) else Modifier) { Text("Close") }
     }
-    LaunchedEffect(next?.id) { primary.tryRequestFocus() }
+    // Also when the countdown ends, so focus doesn't vanish with the Cancel button.
+    LaunchedEffect(next?.id, autoPlay is AutoPlayState.Counting) { primary.tryRequestFocus() }
 }

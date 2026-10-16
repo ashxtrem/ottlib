@@ -65,6 +65,7 @@ class PlayerViewModel(
     private val movieId: Long,
     private val fromStart: Boolean,
     private val sequence: PlaybackSequence,
+    private val autoPlayStreak: AutoPlayStreak,
 ) : ViewModel() {
     private val state = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading)
     val uiState: StateFlow<PlayerUiState> = state.asStateFlow()
@@ -80,6 +81,9 @@ class PlayerViewModel(
     val nextWarning = warning.asStateFlow()
     private val completion = MutableStateFlow<String?>(null)
     val completionError = completion.asStateFlow()
+    private val countdown = AutoPlayCountdown(viewModelScope, autoPlayStreak)
+    val autoPlay: StateFlow<AutoPlayState> = countdown.state
+    private var autoPlaySeconds = 0
     private val saving = Mutex()
     private val collectionId = sequence.collectionFor(movieId)
     @Volatile private var ended = false
@@ -124,11 +128,17 @@ class PlayerViewModel(
                 ended = true
                 state.value = PlayerUiState.Ended
                 saveCompletion()
+                startAutoPlay()
             }
         }
     }
 
-    init { start() }
+    init {
+        autoPlayStreak.playerOpened()
+        // Leaving the title unwatched because the save failed would be worse than waiting for the viewer.
+        viewModelScope.launch { completion.collect { if (it != null) countdown.cancel() } }
+        start()
+    }
 
     private fun start() {
         startup = viewModelScope.launch {
@@ -141,8 +151,10 @@ class PlayerViewModel(
                     catch (error: CancellationException) { throw error }
                     catch (_: Exception) { null }
                     warning.value = next.value?.episodeGapAfter(loaded)
+                    startAutoPlay()
                 }
                 val settings = preferences.current()
+                autoPlaySeconds = settings.autoPlayNextSeconds
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
                 val skipBackMs = settings.skipBackSeconds * 1_000L
                 val skipForwardMs = settings.skipForwardSeconds * 1_000L
@@ -194,6 +206,14 @@ class PlayerViewModel(
         }
     }
 
+    /** Once the title has ended and the next one is known, whichever comes last. */
+    private fun startAutoPlay() {
+        val upcoming = next.value ?: return
+        if (ended && completion.value == null) countdown.start(upcoming.id, autoPlaySeconds)
+    }
+
+    fun cancelAutoPlay() = countdown.cancel()
+
     fun pictureHintSeen() {
         backgroundScope.launch { preferences.markPictureHintShown() }
     }
@@ -242,6 +262,7 @@ class PlayerViewModel(
 
     /** Call before navigating away; Navigation may retain the old ViewModel through its exit animation. */
     fun releasePlayback() {
+        countdown.cancel()
         subtitles.cancel()
         startup?.cancel()
         session?.release()

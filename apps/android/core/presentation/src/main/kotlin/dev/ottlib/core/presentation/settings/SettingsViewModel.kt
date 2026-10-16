@@ -45,6 +45,7 @@ class SettingsViewModel(
     fun setSkipForwardSeconds(seconds: Int) { viewModelScope.launch { preferences.setSkipForwardSeconds(seconds) } }
     fun setDefaultPictureMode(mode: PictureMode) { viewModelScope.launch { preferences.setDefaultPictureMode(mode) } }
     fun setLanguagesFollowLastChoice(enabled: Boolean) { viewModelScope.launch { preferences.setLanguagesFollowLastChoice(enabled) } }
+    fun setAutoPlayNextSeconds(seconds: Int) { viewModelScope.launch { preferences.setAutoPlayNextSeconds(seconds) } }
 
     fun changeServer(onDone: () -> Unit) {
         viewModelScope.launch {
