@@ -1,10 +1,23 @@
 name: Release
 
 # Push a tag like v0.2.0 to build the Android APKs and the server bundles, then draft a
-# GitHub release. It is left as a draft: review the notes and assets, then publish it from the GitHub UI.
+# GitHub release. Or run it from the Actions tab with a tag and a branch: it builds the head of that
+# branch and creates the tag on it once every build has passed.
+# The release is left as a draft: review the notes and assets, then publish it from the GitHub UI.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, like v0.2.7 (created if it doesn't exist yet)
+        required: true
+        type: string
+      branch:
+        description: Branch whose latest commit is released
+        required: true
+        default: master
+        type: string
 
 permissions:
   contents: write
@@ -16,23 +29,46 @@ jobs:
     outputs:
       name: ${{ steps.v.outputs.name }}
       code: ${{ steps.v.outputs.code }}
+      tag: ${{ steps.v.outputs.tag }}
+      sha: ${{ steps.v.outputs.sha }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
       - id: v
         shell: bash
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          SOURCE: ${{ inputs.branch || github.ref_name }}
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          if [[ ! "$tag" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.]+)?$ ]]; then
-            echo "Tag ${GITHUB_REF_NAME} is not vMAJOR.MINOR.PATCH[-suffix]" >&2; exit 1
+          tag="${TAG#v}"
+          if [[ "${TAG}" != v* || ! "$tag" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "Tag ${TAG} is not vMAJOR.MINOR.PATCH[-suffix]" >&2; exit 1
           fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "name=${tag}" >> "$GITHUB_OUTPUT"
           # Android needs a monotonically increasing integer: 1.2.3 -> 10203.
           echo "code=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))" >> "$GITHUB_OUTPUT"
+          sha="$(git rev-parse HEAD)"
+          # Never ship different code under a tag that already exists.
+          if git rev-parse -q --verify "refs/tags/${TAG}" > /dev/null; then
+            tagged="$(git rev-parse "${TAG}^{commit}")"
+            if [[ "$tagged" != "$sha" ]]; then
+              echo "Tag ${TAG} already exists on ${tagged}, not on ${sha} (${SOURCE})" >&2; exit 1
+            fi
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
   test:
     name: Server tests
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -47,6 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -104,6 +142,8 @@ jobs:
           - { label: macos-x64, os: macos-15-intel }
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -123,9 +163,26 @@ jobs:
 
   publish:
     name: Draft the release
-    needs: [android, server]
+    needs: [version, android, server]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+      # Manual runs create the tag only now, once every build has passed. A tag pushed with the
+      # workflow token doesn't start another run of this workflow.
+      - name: Create the tag
+        shell: bash
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/${TAG}" > /dev/null; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "OttLib ${TAG#v}"
+          git push origin "refs/tags/${TAG}"
       - uses: actions/download-artifact@v4
         with:
           path: assets
@@ -135,7 +192,8 @@ jobs:
         run: sha256sum -- * | tee SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.version.outputs.tag }}
           draft: true
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.version.outputs.tag, '-') }}
           files: assets/*
