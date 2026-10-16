@@ -42,6 +42,7 @@ import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.describe
 import dev.ottlib.core.presentation.details.DetailsViewModel
+import dev.ottlib.core.presentation.details.RecommendedPoster
 import dev.ottlib.core.presentation.metadata.MetadataViewModel
 import dev.ottlib.core.presentation.formatPosition
 import dev.ottlib.core.presentation.metaLine
@@ -50,17 +51,19 @@ import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.AmbientBackdrop
 import dev.ottlib.tv.ui.components.ErrorMessage
 import dev.ottlib.tv.ui.components.LoadingMessage
+import dev.ottlib.tv.ui.components.PosterRow
 import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.tryRequestFocus
 
 @Composable
-fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onBack: () -> Unit) {
+fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onOpenMovie: (Long) -> Unit, onBack: () -> Unit) {
     val container = appContainer()
     val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId, container.playbackSequence, container.hiddenTitles) }
     val state by viewModel.movie.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
+    val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
         onPauseOrDispose { }
@@ -77,6 +80,8 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
             onPlay = { fromStart -> onPlay(movieId, fromStart) },
             onToggleWatched = viewModel::toggleWatched,
             hidden = hidden,
+            recommendations = recommendations,
+            onOpenMovie = onOpenMovie,
             onToggleHidden = viewModel::toggleHidden,
             onClearProgress = viewModel::clearProgress,
             streamUrl = viewModel::streamUrl,
@@ -85,7 +90,7 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
 }
 
 @Composable
-private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit, busy: Boolean, onPlay: (fromStart: Boolean) -> Unit, onToggleWatched: () -> Unit, hidden: Boolean, onToggleHidden: () -> Unit, onClearProgress: () -> Unit, streamUrl: () -> String?) {
+private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit, busy: Boolean, onPlay: (fromStart: Boolean) -> Unit, onToggleWatched: () -> Unit, hidden: Boolean, recommendations: List<RecommendedPoster>, onOpenMovie: (Long) -> Unit, onToggleHidden: () -> Unit, onClearProgress: () -> Unit, streamUrl: () -> String?) {
     val container = appContainer()
     val context = LocalContext.current
     val primary = remember { FocusRequester() }
@@ -138,6 +143,19 @@ private fun MovieDetails(movie: Movie, nextMovie: Movie?, onPlayNext: () -> Unit
             if (movie.watched) Text("âœ“ Watched", color = OttlibColors.Success)
             if (movie.cast.isNotEmpty()) Text("Starring ${movie.cast.take(5).joinToString(", ")}", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             TechnicalDetails(movie)
+            if (recommendations.isNotEmpty()) {
+                var focusedReason by remember(movie.id) { mutableStateOf<String?>(null) }
+                val byId = remember(recommendations) { recommendations.associateBy { it.poster.id } }
+                PosterRow(
+                    title = "More like this",
+                    items = recommendations.map { it.poster },
+                    onOpen = { onOpenMovie(it.id) },
+                    onFocused = { focusedReason = byId[it.id]?.reason },
+                    horizontalPadding = 0.dp,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                Text(focusedReason ?: " ", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted)
+            }
         }
     }
     LaunchedEffect(movie.id) { primary.tryRequestFocus() }

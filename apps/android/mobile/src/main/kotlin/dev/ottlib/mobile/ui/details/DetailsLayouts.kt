@@ -50,6 +50,7 @@ fun CompactDetails(movie: Movie, imageUrl: String?, posterUrl: String?, busy: Bo
         Column(Modifier.padding(horizontal = 16.dp).offset(y = (-24).dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionButtons(movie, busy, actions, fillWidth = true)
             MovieInfo(movie)
+            RecommendationsRow(actions.recommendations, actions.onOpenMovie)
         }
     }
 }
@@ -69,6 +70,7 @@ fun WideDetails(movie: Movie, imageUrl: String?, posterUrl: String?, busy: Boole
                 TitleBlock(movie)
                 ActionButtons(movie, busy, actions, fillWidth = false)
                 MovieInfo(movie)
+                RecommendationsRow(actions.recommendations, actions.onOpenMovie)
             }
         }
     }

@@ -25,6 +25,12 @@ function showKeyOf(row: { metadata_media_type: string | null; imdb_id: string | 
   return row.metadata_source && row.provider_id ? `tv:${row.metadata_source}:${row.provider_id}` : null;
 }
 
+/** Matched, available titles with just the fields recommendations compare. */
+export interface RecommendationPoolRow {
+  id: number; title: string; year: number | null; genres: string[]; cast: string[]; rating: number | null; mediaType: 'movie' | 'tv' | null;
+  showKey: string | null; imdbId: string | null; provider: string | null; providerId: string | null; season: number | null; episode: number | null;
+}
+
 export interface ScannedMovie { folderId: number; path: string; filename: string; title: string; year: number | null; size: number; mtimeMs: number; seenAt: string }
 export type ProbedMediaInfo = Omit<MediaInfo, 'tracks'>;
 export interface PlaybackMovie { id: number; path: string; folderPath: string; filename: string; missing: boolean }
@@ -48,6 +54,26 @@ export class MovieRepository {
     const sort = this.sort(query.sort).orderBy;
     const rows = this.db.prepare(`${this.selectSql()} WHERE ${clauses.join(' AND ')} ORDER BY ${sort}`).all(deviceId ?? '', ...values) as MovieRow[];
     return rows.map(this.map);
+  }
+
+  /** Episodes come first within a show so the first of each show is its natural representative. */
+  public listRecommendationPool(): RecommendationPoolRow[] {
+    const rows = this.db.prepare(`SELECT id, COALESCE(title_override, metadata_title, parsed_title) AS title, COALESCE(metadata_year, parsed_year) AS year, genres_json, cast_json, rating,
+      metadata_media_type, season, episode, imdb_id, metadata_source, provider_id FROM movies WHERE missing = 0 AND metadata_status = 'matched'
+      ORDER BY season IS NULL, season, episode, id`).all() as Array<{ id: number; title: string; year: number | null; genres_json: string; cast_json: string; rating: number | null; metadata_media_type: 'movie' | 'tv' | null;
+        season: number | null; episode: number | null; imdb_id: string | null; metadata_source: string | null; provider_id: string | null }>;
+    return rows.map((row) => ({
+      id: row.id, title: row.title, year: row.year, genres: JSON.parse(row.genres_json), cast: JSON.parse(row.cast_json), rating: row.rating, mediaType: row.metadata_media_type,
+      showKey: showKeyOf(row), imdbId: row.imdb_id, provider: row.metadata_source, providerId: row.provider_id, season: row.season, episode: row.episode
+    }));
+  }
+
+  /** List summaries for specific ids, in the order given; ids that do not exist are skipped. */
+  public summariesByIds(ids: number[], deviceId?: string): MovieListItem[] {
+    if (!ids.length) return [];
+    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE m.id IN (${ids.map(() => '?').join(', ')})`).all(deviceId ?? '', ...ids) as MovieListItemRow[];
+    const byId = new Map(rows.map((row) => [row.id, this.mapListItem(row)]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
   public listSummaries(deviceId: string | undefined, query: MovieListQuery = {}): MovieListPage {

@@ -69,6 +69,7 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
         composable(Routes.DETAILS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
             DetailsScreen(
                 movieId = entry.arguments!!.getLong("id"),
+                onOpenMovie = openMovie,
                 onPlay = { id, fromStart ->
                         if (id != entry.arguments!!.getLong("id")) {
                             nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }

@@ -38,11 +38,17 @@ class DetailsViewModel(
     val hidden: StateFlow<Boolean> = combine(state, hiddenTitles.keys) { movie, keys -> (movie as? LoadState.Loaded)?.value?.hideKey() in keys }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    private val suggested = MutableStateFlow<List<RecommendedPoster>>(emptyList())
+    /** "More like this", minus titles hidden on this device. */
+    val recommendations: StateFlow<List<RecommendedPoster>> = combine(suggested, hiddenTitles.keys) { items, hiddenKeys -> items.filterNot { it.poster.hideKey in hiddenKeys } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     private val next = MutableStateFlow<Movie?>(null)
     val nextMovie = next.asStateFlow()
     private var loading: Job? = null
     init {
         load()
+        loadRecommendations()
         viewModelScope.launch { api.libraryRevision.collect { if (it > 0) load() } }
     }
 
@@ -63,6 +69,14 @@ class DetailsViewModel(
                 catch (error: CancellationException) { throw error }
                 catch (_: Exception) { null }
             }
+        }
+    }
+
+    private fun loadRecommendations() {
+        viewModelScope.launch {
+            suggested.value = try { api.recommendations(movieId).map { it.toRecommendedPoster(api::resolve) } }
+            catch (error: CancellationException) { throw error }
+            catch (_: Exception) { emptyList() }
         }
     }
 

@@ -16,6 +16,7 @@ import { SkeletonDetail } from '../components/Skeleton';
 import { PosterImage } from '../components/PosterImage';
 import { DuplicateCompareDialog } from '../components/DuplicateCompareDialog';
 import { SubtitleDialog } from '../components/SubtitleDialog';
+import { RecommendationsRow } from '../components/RecommendationsRow';
 import { useHiddenTitles } from '../hooks/useHiddenTitles';
 import { useToast } from '../hooks/useToast';
 
@@ -95,6 +96,7 @@ export function MovieDetailPage() {
         <MediaInfoPanel mediaInfo={item.mediaInfo} filePath={item.filePath} />
       </div>
     </div>
+    {id && <RecommendationsRow movieId={id} />}
     <form onSubmit={(event) => { event.preventDefault(); actions.titleOverride.mutate({ id: item.id, titleOverride: activeTitle.trim() || null }); }} className="rounded-xl border border-border bg-surface p-5">
       <h2 className="font-semibold">Fix this match</h2>
       <div className="mt-3 flex flex-col gap-3 sm:flex-row">
