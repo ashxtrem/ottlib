@@ -16,11 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.presentation.player.AutoPlayState
+import dev.ottlib.core.presentation.player.message
 import dev.ottlib.core.presentation.player.nextLabel
 import dev.ottlib.core.presentation.theme.OttlibColors
 
 @Composable
-fun PlaybackEnded(next: Movie?, posterUrl: String?, warning: String?, error: String?, onRetry: () -> Unit, onPlay: (Long) -> Unit, onDetails: (Long) -> Unit, onClose: () -> Unit) {
+fun PlaybackEnded(next: Movie?, posterUrl: String?, warning: String?, error: String?, autoPlay: AutoPlayState, onRetry: () -> Unit, onCancelAutoPlay: () -> Unit, onPlay: (Long) -> Unit, onDetails: (Long) -> Unit, onClose: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
         Text("Playback finished", color = OttlibColors.Foreground)
         if (next != null) {
@@ -28,7 +30,9 @@ fun PlaybackEnded(next: Movie?, posterUrl: String?, warning: String?, error: Str
             Text(next.nextLabel(), color = OttlibColors.Muted)
             Text(next.title, color = OttlibColors.Foreground)
             warning?.let { Text(it, color = OttlibColors.Muted) }
+            autoPlay.message(next)?.let { Text(it, color = OttlibColors.Accent) }
             Button(onClick = { onPlay(next.id) }) { Text(if ((next.resumePositionMs ?: 0) > 0) "Resume next" else "Play next") }
+            if (autoPlay is AutoPlayState.Counting) OutlinedButton(onClick = onCancelAutoPlay) { Text("Cancel auto-play") }
             OutlinedButton(onClick = { onDetails(next.id) }) { Text("View details") }
         }
         if (error != null) {

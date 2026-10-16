@@ -17,6 +17,7 @@ import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
 import dev.ottlib.core.presentation.sync.LibrarySync
 import dev.ottlib.core.presentation.metadata.MetadataRefresh
+import dev.ottlib.core.presentation.player.AutoPlayStreak
 import dev.ottlib.core.presentation.player.PlaybackSequence
 import dev.ottlib.core.presentation.update.AppUpdates
 import dev.ottlib.core.presentation.update.InstalledApp
@@ -50,6 +51,7 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
     val api: OttlibApi = OttlibApi(httpClient) { connection.activeServer.value }
     val connection = ConnectionManager(ServerStore(context), authTokens, ServerAccess(api::serverInfo, api::authStatus, api::login))
     val playbackSequence = PlaybackSequence(api)
+    val autoPlayStreak = AutoPlayStreak()
     val discovery = ServerDiscovery(context)
     val playerFactory = OttlibPlayerFactory(context, httpClient)
     val librarySync = LibrarySync(appScope, api::startScan, api::scanStatus)

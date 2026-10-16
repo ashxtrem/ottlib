@@ -31,12 +31,13 @@ import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.languageName
 import dev.ottlib.core.presentation.Choice
 import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.player.autoPlaySummary
 import dev.ottlib.core.presentation.settings.SettingsViewModel
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.mobile.BuildConfig
 import dev.ottlib.mobile.ui.components.ChoiceDialog
 
-private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Picture }
+private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Picture, AutoPlay }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +76,7 @@ fun SettingsScreen(onChangeServer: () -> Unit) {
                 Setting("Skip back", "${playback.skipBackSeconds} seconds  ·  double-tap the left of the video") { dialog = SettingsDialog.SkipBack }
                 Setting("Skip forward", "${playback.skipForwardSeconds} seconds  ·  double-tap the right of the video") { dialog = SettingsDialog.SkipForward }
                 Setting("Default picture", "${playback.defaultPictureMode.label}  ·  ${playback.defaultPictureMode.description}") { dialog = SettingsDialog.Picture }
+                Setting("Auto-play next", autoPlaySummary(playback.autoPlayNextSeconds)) { dialog = SettingsDialog.AutoPlay }
                 Text(
                     "During playback: swipe up or down on the left for brightness and on the right for volume, swipe sideways to seek, " +
                         "and pinch to fill the screen. The picture button has every picture option.",
@@ -100,11 +102,13 @@ fun SettingsScreen(onChangeServer: () -> Unit) {
         SettingsDialog.SkipBack -> ChoiceDialog("Skip back", secondsChoices(PlaybackSettings.SKIP_BACK_CHOICES), playback.skipBackSeconds, onSelect = viewModel::setSkipBackSeconds, onDismiss = { dialog = null })
         SettingsDialog.SkipForward -> ChoiceDialog("Skip forward", secondsChoices(PlaybackSettings.SKIP_FORWARD_CHOICES), playback.skipForwardSeconds, onSelect = viewModel::setSkipForwardSeconds, onDismiss = { dialog = null })
         SettingsDialog.Picture -> ChoiceDialog("Default picture", PictureMode.entries.map { Choice("${it.label} — ${it.description}", it) }, playback.defaultPictureMode, onSelect = viewModel::setDefaultPictureMode, onDismiss = { dialog = null })
+        SettingsDialog.AutoPlay -> ChoiceDialog("Auto-play next", autoPlayChoices(), playback.autoPlayNextSeconds, onSelect = viewModel::setAutoPlayNextSeconds, onDismiss = { dialog = null })
         null -> Unit
     }
 }
 
 private fun secondsChoices(values: List<Int>) = values.map { Choice("$it seconds", it) }
+private fun autoPlayChoices() = PlaybackSettings.AUTO_PLAY_CHOICES.map { Choice(if (it == 0) "Off" else "After $it seconds", it) }
 
 @Composable
 private fun Setting(title: String, value: String, trailing: String? = null, onClick: () -> Unit) {
