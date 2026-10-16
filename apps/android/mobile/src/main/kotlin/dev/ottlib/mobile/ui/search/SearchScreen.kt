@@ -38,7 +38,7 @@ import dev.ottlib.mobile.ui.components.windowWidth
 @Composable
 fun SearchScreen(onOpenMovie: (Long) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { SearchViewModel(container.api) }
+    val viewModel = viewModel { SearchViewModel(container.api, container.hiddenTitles.keys) }
     val text by viewModel.text.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current

@@ -24,6 +24,8 @@ data class Movie(
     val mediaType: String?,
     val season: Int?,
     val episode: Int?,
+    /** Shared by every episode of a show; null for movies. See [hideKeyOf]. */
+    val showKey: String? = null,
     val fileSizeBytes: Long,
     val mediaInfo: MediaInfo?,
     val watched: Boolean,

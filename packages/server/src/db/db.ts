@@ -18,6 +18,7 @@ import { ensureTorrentSearchToggle } from './migrations/014_torrent_search_toggl
 import { accessPinMigration } from './migrations/015_access_pin.js';
 import { ensurePlaybackCollection } from './migrations/016_playback_collection.js';
 import { downloadedSubtitlesMigration } from './migrations/017_downloaded_subtitles.js';
+import { recommendationSignalsMigration } from './migrations/018_recommendation_signals.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -42,5 +43,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   db.exec(accessPinMigration);
   ensurePlaybackCollection(db);
   db.exec(downloadedSubtitlesMigration);
+  db.exec(recommendationSignalsMigration);
   return db;
 }

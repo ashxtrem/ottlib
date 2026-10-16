@@ -6,7 +6,7 @@ interface MovieRow {
   title_override: string | null; overview: string | null; poster_file: string | null; backdrop_file: string | null;
   genres_json: string; cast_json: string; rating: number | null; runtime: number | null; metadata_status: Movie['metadataStatus'];
   metadata_source: string | null; imdb_id: string | null; missing: number; added_at: string; watched: number; resume_position_ms: number | null;
-  metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; size: number;
+  metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; size: number; provider_id: string | null;
   media_probe_status: string; container_format: string | null; duration_ms: number | null; video_width: number | null; video_height: number | null;
   video_codec: string | null; video_profile: string | null; video_bit_rate: number | null; hdr_format: string | null;
 }
@@ -15,6 +15,20 @@ interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
   resume_position_ms: number | null; duration_ms: number | null; metadata_media_type: string | null;
+  imdb_id: string | null; metadata_source: string | null; provider_id: string | null;
+}
+
+/** Every episode of a show shares this key, so a client can treat the show as one hideable title. */
+function showKeyOf(row: { metadata_media_type: string | null; imdb_id: string | null; metadata_source: string | null; provider_id: string | null }): string | null {
+  if (row.metadata_media_type !== 'tv') return null;
+  if (row.imdb_id?.trim()) return `tv:imdb:${row.imdb_id.trim()}`;
+  return row.metadata_source && row.provider_id ? `tv:${row.metadata_source}:${row.provider_id}` : null;
+}
+
+/** Matched, available titles with just the fields recommendations compare. */
+export interface RecommendationPoolRow {
+  id: number; title: string; year: number | null; genres: string[]; cast: string[]; rating: number | null; mediaType: 'movie' | 'tv' | null;
+  showKey: string | null; imdbId: string | null; provider: string | null; providerId: string | null; season: number | null; episode: number | null;
 }
 
 export interface ScannedMovie { folderId: number; path: string; filename: string; title: string; year: number | null; size: number; mtimeMs: number; seenAt: string }
@@ -40,6 +54,26 @@ export class MovieRepository {
     const sort = this.sort(query.sort).orderBy;
     const rows = this.db.prepare(`${this.selectSql()} WHERE ${clauses.join(' AND ')} ORDER BY ${sort}`).all(deviceId ?? '', ...values) as MovieRow[];
     return rows.map(this.map);
+  }
+
+  /** Episodes come first within a show so the first of each show is its natural representative. */
+  public listRecommendationPool(): RecommendationPoolRow[] {
+    const rows = this.db.prepare(`SELECT id, COALESCE(title_override, metadata_title, parsed_title) AS title, COALESCE(metadata_year, parsed_year) AS year, genres_json, cast_json, rating,
+      metadata_media_type, season, episode, imdb_id, metadata_source, provider_id FROM movies WHERE missing = 0 AND metadata_status = 'matched'
+      ORDER BY season IS NULL, season, episode, id`).all() as Array<{ id: number; title: string; year: number | null; genres_json: string; cast_json: string; rating: number | null; metadata_media_type: 'movie' | 'tv' | null;
+        season: number | null; episode: number | null; imdb_id: string | null; metadata_source: string | null; provider_id: string | null }>;
+    return rows.map((row) => ({
+      id: row.id, title: row.title, year: row.year, genres: JSON.parse(row.genres_json), cast: JSON.parse(row.cast_json), rating: row.rating, mediaType: row.metadata_media_type,
+      showKey: showKeyOf(row), imdbId: row.imdb_id, provider: row.metadata_source, providerId: row.provider_id, season: row.season, episode: row.episode
+    }));
+  }
+
+  /** List summaries for specific ids, in the order given; ids that do not exist are skipped. */
+  public summariesByIds(ids: number[], deviceId?: string): MovieListItem[] {
+    if (!ids.length) return [];
+    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE m.id IN (${ids.map(() => '?').join(', ')})`).all(deviceId ?? '', ...ids) as MovieListItemRow[];
+    const byId = new Map(rows.map((row) => [row.id, this.mapListItem(row)]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
   public listSummaries(deviceId: string | undefined, query: MovieListQuery = {}): MovieListPage {
@@ -105,6 +139,9 @@ export class MovieRepository {
     const row = this.db.prepare(`SELECT COUNT(*) AS count FROM movies WHERE id IN (${placeholders})`).get(...uniqueIds) as { count: number };
     return row.count === uniqueIds.length;
   }
+
+  /** Removes the row; watch state, progress, tracks, candidates and shelf membership go with it (ON DELETE CASCADE). */
+  public deleteMovie(id: number): void { this.db.prepare('DELETE FROM movies WHERE id = ?').run(id); }
 
   public playbackMovie(id: number): PlaybackMovie | undefined {
     const row = this.db.prepare('SELECT m.id, m.canonical_path, f.path AS folder_path, m.raw_filename, m.missing FROM movies m JOIN folders f ON f.id = m.folder_id WHERE m.id = ?').get(id) as any;
@@ -294,7 +331,7 @@ export class MovieRepository {
 
   private summarySelectSql(): string {
     return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.metadata_media_type, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
+      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
   }
 
   /** Binds the device id once (first `?`) and exposes it to both per-device joins. */
@@ -396,7 +433,7 @@ export class MovieRepository {
     titleOverride: row.title_override, overview: row.overview, posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     backdropUrl: row.backdrop_file ? `/media/backdrops/${encodeURIComponent(row.backdrop_file)}` : null,
     genres: JSON.parse(row.genres_json), cast: JSON.parse(row.cast_json), rating: row.rating, runtime: row.runtime,
-    imdbId: row.imdb_id, metadataStatus: row.metadata_status, metadataSource: row.metadata_source, mediaType: row.metadata_media_type, season: row.season, episode: row.episode, fileSizeBytes: row.size,
+    imdbId: row.imdb_id, metadataStatus: row.metadata_status, metadataSource: row.metadata_source, mediaType: row.metadata_media_type, season: row.season, episode: row.episode, showKey: showKeyOf(row), fileSizeBytes: row.size,
     mediaInfo: row.media_probe_status === 'completed' ? {
       container: row.container_format, durationMs: row.duration_ms, width: row.video_width, height: row.video_height,
       videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: []
@@ -408,7 +445,7 @@ export class MovieRepository {
     nextUp: row.resume_position_ms === 0 ? (row.metadata_media_type === 'tv' ? 'episode' : 'collection') : null,
     id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
-    resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format,
+    resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format, showKey: showKeyOf(row),
     watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, durationMs: row.duration_ms,
     missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []
   });

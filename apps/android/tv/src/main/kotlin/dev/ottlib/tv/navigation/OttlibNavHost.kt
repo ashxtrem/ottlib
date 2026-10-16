@@ -13,8 +13,10 @@ import androidx.navigation.navArgument
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.sync.SyncOutcomeToasts
 import dev.ottlib.tv.ui.components.TopDestination
+import dev.ottlib.tv.ui.compare.CompareScreen
 import dev.ottlib.tv.ui.connect.ConnectScreen
 import dev.ottlib.tv.ui.details.DetailsScreen
+import dev.ottlib.tv.ui.hidden.HiddenTitlesScreen
 import dev.ottlib.tv.ui.home.HomeScreen
 import dev.ottlib.tv.ui.library.LibraryScreen
 import dev.ottlib.tv.ui.player.PlayerScreen
@@ -60,12 +62,24 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onNavigate = navigateTop,
+                onOpenHidden = { nav.navigate(Routes.HIDDEN) },
                 onChangeServer = { nav.navigate(Routes.connect(autoConnect = false)) { popUpTo(nav.graph.id) { inclusive = true } } },
+            )
+        }
+        composable(Routes.HIDDEN) { HiddenTitlesScreen(onOpenMovie = openMovie) }
+        composable(Routes.COMPARE, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+            CompareScreen(
+                movieId = entry.arguments!!.getLong("id"),
+                // The viewed copy was deleted: its details page is gone too, so continue on a surviving copy.
+                onOpenOther = { id -> nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } } },
+                onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.DETAILS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
             DetailsScreen(
                 movieId = entry.arguments!!.getLong("id"),
+                onOpenMovie = openMovie,
+                onCompare = { nav.navigate(Routes.compare(it)) },
                 onPlay = { id, fromStart ->
                         if (id != entry.arguments!!.getLong("id")) {
                             nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }

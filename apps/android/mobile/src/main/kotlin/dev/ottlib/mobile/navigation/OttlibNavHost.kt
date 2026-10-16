@@ -18,6 +18,7 @@ import androidx.navigation.navArgument
 import dev.ottlib.core.presentation.sync.SyncOutcomeToasts
 import dev.ottlib.mobile.ui.connect.ConnectScreen
 import dev.ottlib.mobile.ui.details.DetailsScreen
+import dev.ottlib.mobile.ui.hidden.HiddenTitlesScreen
 import dev.ottlib.mobile.ui.home.HomeScreen
 import dev.ottlib.mobile.ui.library.LibraryScreen
 import dev.ottlib.mobile.ui.player.PlayerScreen
@@ -58,11 +59,16 @@ fun OttlibNavHost() {
             composable(Routes.LIBRARY) { LibraryScreen(onOpenMovie = openMovie) }
             composable(Routes.SEARCH) { SearchScreen(onOpenMovie = openMovie) }
             composable(Routes.SETTINGS) {
-                SettingsScreen(onChangeServer = { nav.navigate(Routes.connect(autoConnect = false)) { popUpTo(nav.graph.id) { inclusive = true } } })
+                SettingsScreen(
+                    onOpenHidden = { nav.navigate(Routes.HIDDEN) },
+                    onChangeServer = { nav.navigate(Routes.connect(autoConnect = false)) { popUpTo(nav.graph.id) { inclusive = true } } },
+                )
             }
+            composable(Routes.HIDDEN) { HiddenTitlesScreen(onOpenMovie = openMovie, onBack = { nav.popBackStack() }) }
             composable(Routes.DETAILS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { backStackEntry ->
                 DetailsScreen(
                     movieId = backStackEntry.arguments!!.getLong("id"),
+                    onOpenMovie = openMovie,
                     onPlay = { id, fromStart ->
                         if (id != backStackEntry.arguments!!.getLong("id")) {
                             nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }

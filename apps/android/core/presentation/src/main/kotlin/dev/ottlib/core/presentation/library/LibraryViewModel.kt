@@ -6,15 +6,20 @@ import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.network.MovieSort
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.hidden.withoutHidden
 import dev.ottlib.core.presentation.sync.LibrarySync
 import dev.ottlib.core.presentation.sync.SyncOutcome
 import dev.ottlib.core.presentation.toPosterItem
 import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -36,9 +41,11 @@ data class LibraryUiState(
 )
 
 /** The full library as a filterable, cursor-paged grid (same query parameters as the web library). */
-class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewModel() {
+class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys: Flow<Set<String>> = flowOf(emptySet())) : ViewModel() {
     private val state = MutableStateFlow(LibraryUiState())
-    val uiState: StateFlow<LibraryUiState> = state.asStateFlow()
+    /** [state] minus titles hidden on this device; paging still follows the unfiltered [state]. */
+    val uiState: StateFlow<LibraryUiState> = combine(state, hiddenKeys) { current, hidden -> current.copy(items = current.items.withoutHidden(hidden)) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, state.value)
     private var page: Job? = null
     /** Restores focus to the same poster after returning from a movie. */
     var lastFocusedId: Long? = null
@@ -46,6 +53,8 @@ class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewMode
     init {
         loadGenres()
         reload()
+        // A page that is mostly hidden would leave nothing to focus on to trigger the next one.
+        viewModelScope.launch { uiState.collect { if (it.items.size < MIN_VISIBLE_ITEMS && it.nextCursor != null && !it.loading) loadMore() } }
         viewModelScope.launch {
             api.metadataRevision.collect { if (it > 0) { loadGenres(); reload() } }
         }
@@ -114,5 +123,8 @@ class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewMode
         }
     }
 
-    companion object { const val PAGE_SIZE = 48 }
+    companion object {
+        const val PAGE_SIZE = 48
+        private const val MIN_VISIBLE_ITEMS = 12
+    }
 }

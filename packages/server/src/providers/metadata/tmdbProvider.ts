@@ -42,6 +42,13 @@ export class TmdbProvider implements MetadataProvider {
     return { title: item.name ?? null, overview: item.overview || null, stillUrl: item.still_path ? `https://image.tmdb.org/t/p/w780${item.still_path}` : null, rating: item.vote_average ?? null };
   }
 
+  public async getRecommendations(providerId: string, mediaType: MediaType): Promise<string[]> {
+    const params = new URLSearchParams(); if (!this.isAccessToken()) params.set('api_key', this.apiKey);
+    const response = await this.request(`https://api.themoviedb.org/3/${mediaType}/${encodeURIComponent(providerId)}/recommendations?${params}`);
+    if (!response.ok) throw new Error(`TMDb recommendations failed (${response.status})`);
+    return ((await response.json() as any).results ?? []).slice(0, 40).map((item: any) => String(item.id));
+  }
+
   public async getByImdbId(imdbId: string): Promise<MetadataCandidate | null> {
     const params = new URLSearchParams({ external_source: 'imdb_id' }); if (!this.isAccessToken()) params.set('api_key', this.apiKey);
     const response = await this.request(`https://api.themoviedb.org/3/find/${encodeURIComponent(imdbId)}?${params}`);

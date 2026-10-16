@@ -47,7 +47,7 @@ private enum class LibraryDialog { Sort, Watched, Genre, Type }
 @Composable
 fun LibraryScreen(onOpenMovie: (Long) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { LibraryViewModel(container.api, container.librarySync) }
+    val viewModel = viewModel { LibraryViewModel(container.api, container.librarySync, container.hiddenTitles.keys) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var dialog by rememberSaveable { mutableStateOf<LibraryDialog?>(null) }
     val filters = state.filters

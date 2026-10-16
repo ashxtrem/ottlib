@@ -2,6 +2,7 @@ import { z } from 'zod';
 export * from './torrent.js';
 export * from './playback.js';
 export * from './auth.js';
+export * from './hiddenTitles.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -93,6 +94,7 @@ export const movieSchema = z.object({
   mediaType: z.enum(['movie', 'tv']).nullable(),
   season: z.number().int().positive().nullable(),
   episode: z.number().int().positive().nullable(),
+  showKey: z.string().nullable(),
   fileSizeBytes: z.number().int().nonnegative(),
   mediaInfo: mediaInfoSchema.nullable(),
   watched: z.boolean(),
@@ -110,12 +112,19 @@ export const movieListItemSchema = z.object({
   posterUrl: z.string().nullable(),
   resolution: z.string().nullable(),
   hdrFormat: z.string().nullable(),
+  showKey: z.string().nullable(),
   watched: z.boolean(),
   resumePositionMs: z.number().int().nonnegative().nullable(),
   durationMs: z.number().int().nullable(),
   missing: z.boolean(),
   metadataStatus: z.enum(['pending', 'suggested', 'matched', 'unmatched', 'error']),
   shelves: z.array(shelfMembershipSchema)
+});
+
+/** A title to watch next, with a short human-readable reason shown under its poster. */
+export const recommendationSchema = z.object({
+  movie: movieListItemSchema,
+  reason: z.string()
 });
 
 export const movieListPageSchema = z.object({
@@ -229,6 +238,7 @@ export const shelfDetailSchema = shelfSummarySchema.extend({ movies: z.array(mov
 export type Movie = z.infer<typeof movieSchema>;
 export type MovieListItem = z.infer<typeof movieListItemSchema>;
 export type MovieListPage = z.infer<typeof movieListPageSchema>;
+export type Recommendation = z.infer<typeof recommendationSchema>;
 export type MediaInfo = z.infer<typeof mediaInfoSchema>;
 export type MediaTrack = z.infer<typeof mediaTrackSchema>;
 export type ShelfMembership = z.infer<typeof shelfMembershipSchema>;

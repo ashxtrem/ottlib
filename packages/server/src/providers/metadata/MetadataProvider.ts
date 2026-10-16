@@ -11,4 +11,6 @@ export interface MetadataProvider {
   getDetails(providerId: string, mediaType: MediaType): Promise<MovieMetadata | null>;
   getByImdbId?(imdbId: string): Promise<MetadataCandidate | null>;
   getEpisodeDetails?(providerId: string, season: number, episode: number): Promise<EpisodeMetadata | null>;
+  /** Provider ids of titles viewers of this one also liked, best first. Optional: only some providers have the data. */
+  getRecommendations?(providerId: string, mediaType: MediaType): Promise<string[]>;
 }

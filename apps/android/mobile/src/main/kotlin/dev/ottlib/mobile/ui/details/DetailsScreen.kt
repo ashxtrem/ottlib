@@ -39,12 +39,14 @@ import dev.ottlib.mobile.ui.components.WindowWidth
 import dev.ottlib.mobile.ui.components.windowWidth
 
 @Composable
-fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onBack: () -> Unit) {
+fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onOpenMovie: (Long) -> Unit, onBack: () -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId, container.playbackSequence) }
+    val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId, container.playbackSequence, container.hiddenTitles) }
     val state by viewModel.movie.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
+    val hidden by viewModel.hidden.collectAsStateWithLifecycle()
+    val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var menuOpen by rememberSaveable(movieId) { mutableStateOf(false) }
     var metadataOpen by rememberSaveable(movieId) { mutableStateOf(false) }
@@ -63,6 +65,8 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
                     nextMovie = nextMovie,
                     onPlayNext = { nextMovie?.let { onPlay(it.id, false) } },
                     onToggleWatched = viewModel::toggleWatched,
+                    recommendations = recommendations,
+                    onOpenMovie = onOpenMovie,
                     onClearProgress = viewModel::clearProgress,
                     onManageMetadata = { metadataOpen = true },
                     onPlayElsewhere = {
@@ -79,6 +83,15 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
                     IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "More options") }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(text = { Text("Metadata") }, onClick = { menuOpen = false; metadataOpen = true })
+                        val isShow = current.value.showKey != null
+                        DropdownMenuItem(
+                            text = { Text(if (hidden) (if (isShow) "Unhide show" else "Unhide") else (if (isShow) "Hide show on this device" else "Hide on this device")) },
+                            onClick = {
+                                menuOpen = false
+                                viewModel.toggleHidden()
+                                Toast.makeText(context, if (hidden) "Visible again" else "Hidden on this device", Toast.LENGTH_SHORT).show()
+                            },
+                        )
                     }
                 }
                 if (metadataOpen) {
@@ -105,4 +118,6 @@ class DetailsActions(
     val onClearProgress: () -> Unit,
     val onManageMetadata: () -> Unit,
     val onPlayElsewhere: () -> Unit,
+    val recommendations: List<dev.ottlib.core.presentation.details.RecommendedPoster>,
+    val onOpenMovie: (Long) -> Unit,
 )

@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -24,17 +25,18 @@ fun PosterRow(
     modifier: Modifier = Modifier,
     onFocused: (PosterItem) -> Unit = {},
     itemModifier: @Composable (PosterItem) -> Modifier = { Modifier },
+    horizontalPadding: Dp = ScreenPadding,
 ) {
     Column(modifier) {
         Text(
             title,
             style = MaterialTheme.typography.titleMedium,
             color = OttlibColors.Foreground,
-            modifier = Modifier.padding(start = ScreenPadding, bottom = 12.dp),
+            modifier = Modifier.padding(start = horizontalPadding, bottom = 12.dp),
         )
         LazyRow(
             modifier = Modifier.focusRestorer(),
-            contentPadding = PaddingValues(horizontal = ScreenPadding, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             items(items, key = { it.id }) { item ->

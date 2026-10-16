@@ -30,7 +30,7 @@ import dev.ottlib.tv.ui.components.tryRequestFocus
 @Composable
 fun SearchScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { SearchViewModel(container.api) }
+    val viewModel = viewModel { SearchViewModel(container.api, container.hiddenTitles.keys) }
     val text by viewModel.text.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val field = remember { FocusRequester() }

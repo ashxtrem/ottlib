@@ -14,10 +14,13 @@ type MovieActionButtonsProps = {
   onSubtitles: () => void;
   onToggleWatched: () => void;
   watchPending: boolean;
+  hidden: boolean;
+  onToggleHidden: () => void;
 };
 
-export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitles, onToggleWatched, watchPending }: MovieActionButtonsProps) {
+export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitles, onToggleWatched, watchPending, hidden, onToggleHidden }: MovieActionButtonsProps) {
   const watchLabel = movie.watched ? 'Mark as unwatched' : 'Mark as watched';
+  const hideLabel = hidden ? (movie.showKey ? 'Unhide this show' : 'Unhide this title') : (movie.showKey ? 'Hide this show on this device' : 'Hide this title on this device');
   const torrentSearchEnabled = useTorrentSearchEnabled();
 
   return <div className="space-y-2">
@@ -37,6 +40,10 @@ export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitle
       <button type="button" onClick={onToggleWatched} disabled={watchPending} title={watchLabel} aria-label={watchLabel} className={secondaryButtonClassName}>
         {watchPending ? <svg aria-hidden="true" className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12a8 8 0 1 1-2.34-5.66" /></svg> : movie.watched ? <svg aria-hidden="true" className="h-5 w-5 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m5 12 4 4L19 6" /></svg> : <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="8.5" /><path d="m8.5 12 2.3 2.3 4.8-4.8" /></svg>}
         <span className="sr-only">{watchLabel}</span>
+      </button>
+      <button type="button" onClick={onToggleHidden} aria-pressed={hidden} title={hideLabel} aria-label={hideLabel} className={secondaryButtonClassName}>
+        {hidden ? <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg> : <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3l18 18M10.6 5.6A10 10 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a17 17 0 0 1-3.2 3.9M6.5 7.2A17 17 0 0 0 2 12s3.6 6.5 10 6.5a9.6 9.6 0 0 0 4-.9M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>}
+        <span className="sr-only">{hideLabel}</span>
       </button>
     </div>
   </div>;

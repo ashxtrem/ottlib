@@ -19,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.flow.map
 import dev.ottlib.core.data.PlaybackSettings
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.languageName
@@ -36,7 +37,7 @@ import dev.ottlib.tv.ui.components.TopNavigation
 private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Picture, AutoPlay }
 
 @Composable
-fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onChangeServer: () -> Unit) {
+fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onOpenHidden: () -> Unit, onChangeServer: () -> Unit) {
     val container = appContainer()
     val viewModel = viewModel { SettingsViewModel(container.connection, container.playbackPreferences, container.api, container.deviceIdentity) }
     val server by viewModel.server.collectAsStateWithLifecycle()
@@ -44,6 +45,7 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onChangeServer: () -> U
     val languages by viewModel.languageOptions.collectAsStateWithLifecycle()
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
+    val hiddenCount by remember { container.hiddenTitles.titles.map { it.size } }.collectAsStateWithLifecycle(initialValue = 0)
 
     Column(Modifier.fillMaxSize()) {
         TopNavigation(TopDestination.Settings, onNavigate)
@@ -114,6 +116,15 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onChangeServer: () -> U
                 style = MaterialTheme.typography.bodySmall,
                 color = OttlibColors.Muted,
                 modifier = Modifier.padding(start = 16.dp),
+            )
+
+            SectionTitle("Library")
+            ListItem(
+                selected = false,
+                onClick = onOpenHidden,
+                headlineContent = { Text("Hidden titles") },
+                supportingContent = { Text(if (hiddenCount == 0) "Nothing hidden on this TV" else "$hiddenCount hidden on this TV only") },
+                trailingContent = { Text("Manage", color = OttlibColors.Accent) },
             )
 
             SectionTitle("App updates")

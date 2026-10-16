@@ -1,5 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import type { ManualMatchCandidate, MatchCandidate, Movie, MovieFilterOptions, MovieListPage } from '@ottlib/shared';
+import type { ManualMatchCandidate, MatchCandidate, Movie, MovieFilterOptions, MovieListPage, Recommendation } from '@ottlib/shared';
 import { api } from './apiClient';
 import { useToast } from './useToast';
 
@@ -32,6 +32,20 @@ export function useMatchCandidates(id: string | undefined, enabled: boolean) {
 }
 export function useMovieDuplicates(id: string | undefined) {
   return useQuery({ queryKey: ['movie-duplicates', id], enabled: Boolean(id), queryFn: () => api<Movie[]>(`/api/movies/${id}/duplicates`) });
+}
+export function useMovieRecommendations(id: string | undefined) {
+  return useQuery({ queryKey: ['movie-recommendations', id], enabled: Boolean(id), staleTime: 5 * 60_000, queryFn: () => api<Recommendation[]>(`/api/movies/${id}/recommendations?limit=24`) });
+}
+export function useDeleteMovieFile() {
+  const client = useQueryClient(); const { show } = useToast();
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/api/movies/${id}/file`, { method: 'DELETE' }),
+    onSuccess: () => {
+      ['movies', 'movie', 'movie-duplicates', 'movie-recommendations', 'shelf', 'shelves', 'library-title-count', 'unavailable-movie-count', 'movie-filter-options'].forEach((key) => { void client.invalidateQueries({ queryKey: [key] }); });
+      show('The file was deleted from disk.', 'success');
+    },
+    onError: (error) => show(error.message, 'error')
+  });
 }
 export function useMovieActions() {
   const client = useQueryClient(); const { show } = useToast();

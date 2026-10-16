@@ -6,6 +6,7 @@ import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.hidden.withoutHidden
 import dev.ottlib.core.presentation.toPosterItem
 import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,23 +21,28 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /** Null results mean "nothing typed yet". */
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
-class SearchViewModel(private val api: OttlibApi) : ViewModel() {
+class SearchViewModel(private val api: OttlibApi, hiddenKeys: Flow<Set<String>> = flowOf(emptySet())) : ViewModel() {
     private val query = MutableStateFlow("")
     val text: StateFlow<String> = query.asStateFlow()
     var lastFocusedId: Long? = null
 
-    val results: StateFlow<LoadState<List<PosterItem>>?> = query
+    private val found: Flow<LoadState<List<PosterItem>>?> = query
         .map { it.trim() }
         .combine(api.libraryRevision) { term, revision -> term to revision }
         .debounce(350)
         .distinctUntilChanged()
         .flatMapLatest { search(it.first) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Search results minus titles hidden on this device. */
+    val results: StateFlow<LoadState<List<PosterItem>>?> = combine(found, hiddenKeys) { result, hidden ->
+        if (result is LoadState.Loaded && hidden.isNotEmpty()) LoadState.Loaded(result.value.withoutHidden(hidden)) else result
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     fun onTextChange(value: String) {
         query.value = value

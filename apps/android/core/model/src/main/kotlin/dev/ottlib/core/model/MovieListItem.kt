@@ -18,6 +18,7 @@ data class MovieListItem(
     val metadataStatus: String,
     val shelves: List<ShelfMembership>,
     val nextUp: String? = null,
+    val showKey: String? = null,
 )
 
 @Serializable

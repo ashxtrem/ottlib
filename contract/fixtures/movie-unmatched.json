@@ -18,6 +18,7 @@
   "mediaType": null,
   "season": null,
   "episode": null,
+  "showKey": null,
   "fileSizeBytes": 10,
   "mediaInfo": null,
   "watched": false,
