@@ -9,11 +9,13 @@ object Routes {
     const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val HIDDEN = "hidden"
+    const val COMPARE = "compare/{id}"
     const val DETAILS = "details/{id}"
     const val PLAYER = "player/{id}?fromStart={fromStart}"
 
     fun connect(autoConnect: Boolean) = "connect?auto=$autoConnect"
     fun details(id: Long) = "details/$id"
+    fun compare(id: Long) = "compare/$id"
     fun player(id: Long, fromStart: Boolean) = "player/$id?fromStart=$fromStart"
 
     fun of(destination: TopDestination) = when (destination) {

@@ -1,6 +1,10 @@
 import { formatBytes, formatMediaLanguage, formatResolution, formatRuntime, type MediaTrack, type Movie } from '@ottlib/shared';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
+import { DeleteCopyDialog } from './DeleteCopyDialog';
 import { Modal } from './Modal';
+import { focusRing } from './interactionStyles';
+import { useDeleteMovieFile } from '../hooks/useMovies';
 import { RevealInFolderButton } from './RevealInFolderButton';
 
 function valueOrDash(value: string | number | null | undefined): string | number { return value ?? '—'; }
@@ -22,9 +26,16 @@ function ComparisonRow({ label, movies, children }: { label: string; movies: Mov
   return <tr className="border-t border-border align-top"><th scope="row" className="sticky left-0 z-10 w-32 bg-surface-raised p-3 text-left text-xs font-semibold uppercase tracking-wide text-subtle">{label}</th>{movies.map((movie) => <td key={movie.id} className="min-w-52 p-3 text-sm text-foreground">{children(movie)}</td>)}</tr>;
 }
 
-export function DuplicateCompareDialog({ open, onClose, primary, duplicates }: { open: boolean; onClose: () => void; primary: Movie; duplicates: Movie[] }) {
+export function DuplicateCompareDialog({ open, onClose, primary, duplicates, onDeleted }: { open: boolean; onClose: () => void; primary: Movie; duplicates: Movie[]; onDeleted?: (deletedId: number, remaining: Movie[]) => void }) {
   const movies = [primary, ...duplicates.slice().sort((left, right) => (right.mediaInfo?.height ?? -1) - (left.mediaInfo?.height ?? -1) || left.id - right.id)];
-  return <Modal open={open} onClose={onClose} title="Compare copies" subtitle="Technical details for the copies in your library." maxWidthClassName="max-w-4xl" footer={<button type="button" onClick={onClose} className="rounded-lg border border-border-strong px-4 py-2 text-sm font-medium hover:bg-surface-raised">Close</button>}>
+  const [pendingDelete, setPendingDelete] = useState<Movie | null>(null);
+  const deleteFile = useDeleteMovieFile();
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    const deleted = pendingDelete;
+    deleteFile.mutate(deleted.id, { onSuccess: () => { setPendingDelete(null); onDeleted?.(deleted.id, movies.filter((movie) => movie.id !== deleted.id)); }, onError: () => setPendingDelete(null) });
+  };
+  return <><Modal open={open} onClose={onClose} title="Compare copies" subtitle="Technical details for the copies in your library. Deleting a copy removes its file from disk." maxWidthClassName="max-w-4xl" footer={<button type="button" onClick={onClose} className="rounded-lg border border-border-strong px-4 py-2 text-sm font-medium hover:bg-surface-raised">Close</button>}>
     <div className="min-h-0 flex-1 overflow-y-auto p-5">
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[900px] text-left">
@@ -42,10 +53,11 @@ export function DuplicateCompareDialog({ open, onClose, primary, duplicates }: {
             <ComparisonRow label="Watched" movies={movies}>{(movie) => movie.watched ? 'Watched' : 'Unwatched'}</ComparisonRow>
             <ComparisonRow label="Added" movies={movies}>{(movie) => new Date(movie.addedAt).toLocaleDateString()}</ComparisonRow>
             <ComparisonRow label="Availability" movies={movies}>{(movie) => movie.missing ? 'Missing' : 'Available'}</ComparisonRow>
+            <ComparisonRow label="Delete" movies={movies}>{(movie) => <button type="button" onClick={() => setPendingDelete(movie)} className={`rounded-lg border border-error/60 px-3 py-1.5 text-xs font-medium text-error hover:bg-error/10 ${focusRing}`}>Delete this copy…</button>}</ComparisonRow>
             <ComparisonRow label="File path" movies={movies}>{(movie) => <div className="flex items-start gap-2"><span className="min-w-0 break-all font-mono text-xs leading-5 text-muted">{movie.filePath}</span><RevealInFolderButton movieId={movie.id} /></div>}</ComparisonRow>
           </tbody>
         </table>
       </div>
     </div>
-  </Modal>;
+  </Modal><DeleteCopyDialog copy={pendingDelete} otherCopies={movies.length - 1} deleting={deleteFile.isPending} onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete} /></>;
 }

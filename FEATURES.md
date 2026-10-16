@@ -30,6 +30,7 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 - [x] Dark mode (Tailwind `dark:` variants)
 - [x] Hide titles — **per-device** (stored in the browser / app, never on the server, so hiding on the TV does not change the phone). A TV show hides as a whole. Unhide from the title page or the Hidden titles list (web: library link; Android: Settings → Hidden titles)
 - [x] Recommendations ("More like this" on the title page, web and Android) — scores the matched library by weighted genre overlap, shared top-billed cast, franchise/sequel match and (when a TMDb key is set) TMDb's own recommendations, with a one-line reason per title. Pick one to jump straight to it; hidden titles are left out
+- [x] Duplicate copies — a title with more than one file shows "N other copies" and a Compare view (web and Android TV) with the stronger picture marked. Any copy can be **deleted from disk** after a clear permanent-delete warning; the server refuses to delete the only copy of a title and only touches files inside library folders
 
 ## Playback
 - [x] Local PC playback — clicking Play launches the default player (VLC etc.) directly, no browser fiddling

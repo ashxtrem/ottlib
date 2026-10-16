@@ -4,6 +4,7 @@ import { MetadataMatchService } from '../services/metadataMatchService.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
 import { PlaybackProgressService } from '../services/playbackProgressService.js';
 import { LibraryService } from '../services/libraryService.js';
+import { LibraryDeletionService } from '../services/libraryDeletionService.js';
 
 function deviceId(headers: Record<string, unknown>): string | undefined { const parsed = deviceIdSchema.safeParse(headers['x-device-id']); return parsed.success ? parsed.data : undefined; }
 function minRating(value: string | undefined): number | undefined {
@@ -14,7 +15,7 @@ function limit(value: string | undefined): number {
   const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : 48;
 }
 
-export function registerLibraryRoutes(app: FastifyInstance, movies: MovieRepository, progress: PlaybackProgressService, matcher: MetadataMatchService, library: LibraryService): void {
+export function registerLibraryRoutes(app: FastifyInstance, movies: MovieRepository, progress: PlaybackProgressService, matcher: MetadataMatchService, library: LibraryService, deletion: LibraryDeletionService): void {
   app.get('/api/movies', async (request) => {
     const query = request.query as { search?: string; watched?: string; availability?: string; mediaType?: string; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: string; needsReview?: string; cursor?: string; limit?: string };
     const availability = query.availability === 'available' || query.availability === 'unavailable' ? query.availability : undefined;
@@ -55,6 +56,10 @@ export function registerLibraryRoutes(app: FastifyInstance, movies: MovieReposit
   app.get('/api/movies/:id/duplicates', async (request, reply) => {
     const id = Number((request.params as any).id); if (!movies.get(id)) return reply.code(404).send({ error: 'Movie not found' });
     return library.listDuplicates(id, deviceId(request.headers));
+  });
+  app.delete('/api/movies/:id/file', async (request, reply) => {
+    const result = await deletion.deleteCopy(Number((request.params as any).id));
+    return result.ok ? reply.code(204).send() : reply.code(result.status).send({ error: result.error });
   });
   app.post('/api/movies/:id/candidates/:candidateId/accept', async (request, reply) => {
     const id = Number((request.params as any).id); const candidateId = Number((request.params as any).candidateId);

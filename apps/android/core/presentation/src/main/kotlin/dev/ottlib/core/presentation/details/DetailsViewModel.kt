@@ -38,6 +38,10 @@ class DetailsViewModel(
     val hidden: StateFlow<Boolean> = combine(state, hiddenTitles.keys) { movie, keys -> (movie as? LoadState.Loaded)?.value?.hideKey() in keys }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    private val otherCopies = MutableStateFlow(0)
+    /** How many other available copies of this title the library has; the Compare button appears when above zero. */
+    val copies: StateFlow<Int> = otherCopies.asStateFlow()
+
     private val suggested = MutableStateFlow<List<RecommendedPoster>>(emptyList())
     /** "More like this", minus titles hidden on this device. */
     val recommendations: StateFlow<List<RecommendedPoster>> = combine(suggested, hiddenTitles.keys) { items, hiddenKeys -> items.filterNot { it.poster.hideKey in hiddenKeys } }
@@ -65,6 +69,7 @@ class DetailsViewModel(
             val fresh = try { LoadState.Loaded(api.movie(movieId)) } catch (error: CancellationException) { throw error } catch (error: Exception) { LoadState.Failed(error.userMessage()) }
             if (fresh is LoadState.Loaded || state.value !is LoadState.Loaded) state.value = fresh
             if (fresh is LoadState.Loaded) {
+                otherCopies.value = try { api.duplicates(movieId).size } catch (error: CancellationException) { throw error } catch (_: Exception) { 0 }
                 next.value = try { sequence.next(fresh.value) }
                 catch (error: CancellationException) { throw error }
                 catch (_: Exception) { null }
