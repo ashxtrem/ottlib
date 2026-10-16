@@ -6,7 +6,7 @@ interface MovieRow {
   title_override: string | null; overview: string | null; poster_file: string | null; backdrop_file: string | null;
   genres_json: string; cast_json: string; rating: number | null; runtime: number | null; metadata_status: Movie['metadataStatus'];
   metadata_source: string | null; imdb_id: string | null; missing: number; added_at: string; watched: number; resume_position_ms: number | null;
-  metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; size: number;
+  metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; size: number; provider_id: string | null;
   media_probe_status: string; container_format: string | null; duration_ms: number | null; video_width: number | null; video_height: number | null;
   video_codec: string | null; video_profile: string | null; video_bit_rate: number | null; hdr_format: string | null;
 }
@@ -15,6 +15,14 @@ interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
   resume_position_ms: number | null; duration_ms: number | null; metadata_media_type: string | null;
+  imdb_id: string | null; metadata_source: string | null; provider_id: string | null;
+}
+
+/** Every episode of a show shares this key, so a client can treat the show as one hideable title. */
+function showKeyOf(row: { metadata_media_type: string | null; imdb_id: string | null; metadata_source: string | null; provider_id: string | null }): string | null {
+  if (row.metadata_media_type !== 'tv') return null;
+  if (row.imdb_id?.trim()) return `tv:imdb:${row.imdb_id.trim()}`;
+  return row.metadata_source && row.provider_id ? `tv:${row.metadata_source}:${row.provider_id}` : null;
 }
 
 export interface ScannedMovie { folderId: number; path: string; filename: string; title: string; year: number | null; size: number; mtimeMs: number; seenAt: string }
@@ -294,7 +302,7 @@ export class MovieRepository {
 
   private summarySelectSql(): string {
     return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.metadata_media_type, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
+      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
   }
 
   /** Binds the device id once (first `?`) and exposes it to both per-device joins. */
@@ -396,7 +404,7 @@ export class MovieRepository {
     titleOverride: row.title_override, overview: row.overview, posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     backdropUrl: row.backdrop_file ? `/media/backdrops/${encodeURIComponent(row.backdrop_file)}` : null,
     genres: JSON.parse(row.genres_json), cast: JSON.parse(row.cast_json), rating: row.rating, runtime: row.runtime,
-    imdbId: row.imdb_id, metadataStatus: row.metadata_status, metadataSource: row.metadata_source, mediaType: row.metadata_media_type, season: row.season, episode: row.episode, fileSizeBytes: row.size,
+    imdbId: row.imdb_id, metadataStatus: row.metadata_status, metadataSource: row.metadata_source, mediaType: row.metadata_media_type, season: row.season, episode: row.episode, showKey: showKeyOf(row), fileSizeBytes: row.size,
     mediaInfo: row.media_probe_status === 'completed' ? {
       container: row.container_format, durationMs: row.duration_ms, width: row.video_width, height: row.video_height,
       videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: []
@@ -408,7 +416,7 @@ export class MovieRepository {
     nextUp: row.resume_position_ms === 0 ? (row.metadata_media_type === 'tv' ? 'episode' : 'collection') : null,
     id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
-    resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format,
+    resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format, showKey: showKeyOf(row),
     watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, durationMs: row.duration_ms,
     missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []
   });

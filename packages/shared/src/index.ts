@@ -2,6 +2,7 @@ import { z } from 'zod';
 export * from './torrent.js';
 export * from './playback.js';
 export * from './auth.js';
+export * from './hiddenTitles.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -93,6 +94,7 @@ export const movieSchema = z.object({
   mediaType: z.enum(['movie', 'tv']).nullable(),
   season: z.number().int().positive().nullable(),
   episode: z.number().int().positive().nullable(),
+  showKey: z.string().nullable(),
   fileSizeBytes: z.number().int().nonnegative(),
   mediaInfo: mediaInfoSchema.nullable(),
   watched: z.boolean(),
@@ -110,6 +112,7 @@ export const movieListItemSchema = z.object({
   posterUrl: z.string().nullable(),
   resolution: z.string().nullable(),
   hdrFormat: z.string().nullable(),
+  showKey: z.string().nullable(),
   watched: z.boolean(),
   resumePositionMs: z.number().int().nonnegative().nullable(),
   durationMs: z.number().int().nullable(),

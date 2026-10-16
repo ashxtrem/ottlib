@@ -206,6 +206,21 @@ describe('MovieRepository filters', () => {
     }
   });
 
+  it('gives every episode of a show the same show key and leaves movies without one', () => {
+    const { repository, close } = createRepository();
+    try {
+      ['Show.S01E01', 'Show.S01E02'].forEach((title, index) => repository.upsertScanned({ folderId: 1, path: `E:/TV/${title}.mkv`, filename: `${title}.mkv`, title, year: null, size: 1, mtimeMs: index + 2, seenAt: '2026-01-01T00:00:00.000Z' }));
+      const ids = repository.listSummaries(undefined, {}).items.filter((item) => item.title.startsWith('Show')).map((item) => item.id);
+      ids.forEach((id, index) => repository.applyMetadata(id, { source: 'tmdb', providerId: '1396', mediaType: 'tv', season: 1, episode: index + 1, title: `Show · S1E${index + 1}`, year: 2008, overview: null, posterFile: null, backdropFile: null, genres: [], cast: [], rating: null, runtime: null, imdbId: 'tt0903747' }));
+      const items = repository.listSummaries(undefined, {}).items;
+      expect(items.filter((item) => item.title.startsWith('Show')).map((item) => item.showKey)).toEqual(['tv:imdb:tt0903747', 'tv:imdb:tt0903747']);
+      expect(items.find((item) => item.title === 'Example')?.showKey).toBeNull();
+      expect(repository.get(ids[0])?.showKey).toBe('tv:imdb:tt0903747');
+    } finally {
+      close();
+    }
+  });
+
   it('returns lean, cursor-paginated list summaries', () => {
     const { repository, close } = createRepository();
     try {
@@ -217,7 +232,7 @@ describe('MovieRepository filters', () => {
       expect(first.nextCursor).toEqual(expect.any(String));
       expect(second).toMatchObject({ total: 3, nextCursor: null, items: [{ title: 'Example' }] });
       expect([...first.items, ...second.items].map((movie) => movie.title)).toEqual(['Bravo', 'Charlie', 'Example']);
-      expect(Object.keys(first.items[0]).sort()).toEqual(['durationMs', 'hdrFormat', 'id', 'metadataStatus', 'missing', 'nextUp', 'posterUrl', 'resolution', 'resumePositionMs', 'shelves', 'title', 'watched', 'year']);
+      expect(Object.keys(first.items[0]).sort()).toEqual(['durationMs', 'hdrFormat', 'id', 'metadataStatus', 'missing', 'nextUp', 'posterUrl', 'resolution', 'resumePositionMs', 'shelves', 'showKey', 'title', 'watched', 'year']);
     } finally {
       close();
     }

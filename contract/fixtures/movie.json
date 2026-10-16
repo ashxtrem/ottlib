@@ -24,6 +24,7 @@
   "mediaType": "movie",
   "season": null,
   "episode": null,
+  "showKey": null,
   "fileSizeBytes": 1000,
   "mediaInfo": {
     "container": "MKV",
