@@ -28,6 +28,7 @@ Feature checklist for the personal movie library app. Kept in sync with the plan
 - [x] Movie detail page — backdrop, poster, plot, cast, genres, rating, runtime, and IMDb link
 - [x] Watched / unwatched toggle — **per-device** (no login; each device gets a locally-generated ID, so phone and PC track watched status independently)
 - [x] Dark mode (Tailwind `dark:` variants)
+- [x] Hide titles — **per-device** (stored in the browser / app, never on the server, so hiding on the TV does not change the phone). A TV show hides as a whole. Unhide from the title page or the Hidden titles list (web: library link; Android: Settings → Hidden titles)
 
 ## Playback
 - [x] Local PC playback — clicking Play launches the default player (VLC etc.) directly, no browser fiddling

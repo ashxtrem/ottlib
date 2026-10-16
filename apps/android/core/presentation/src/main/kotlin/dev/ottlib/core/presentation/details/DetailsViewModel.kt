@@ -2,7 +2,9 @@ package dev.ottlib.core.presentation.details
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.ottlib.core.data.HiddenTitleStore
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.model.hideKey
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.presentation.ContinueWatchingPublisher
 import dev.ottlib.core.presentation.LoadState
@@ -11,8 +13,11 @@ import dev.ottlib.core.presentation.userMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 
@@ -22,11 +27,16 @@ class DetailsViewModel(
     private val backgroundScope: CoroutineScope,
     val movieId: Long,
     private val sequence: PlaybackSequence,
+    private val hiddenTitles: HiddenTitleStore,
 ) : ViewModel() {
     private val state = MutableStateFlow<LoadState<Movie>>(LoadState.Loading)
     val movie: StateFlow<LoadState<Movie>> = state.asStateFlow()
     private val working = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = working.asStateFlow()
+
+    /** Whether this title (or its whole show) is hidden on this device. */
+    val hidden: StateFlow<Boolean> = combine(state, hiddenTitles.keys) { movie, keys -> (movie as? LoadState.Loaded)?.value?.hideKey() in keys }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val next = MutableStateFlow<Movie?>(null)
     val nextMovie = next.asStateFlow()
@@ -67,6 +77,11 @@ class DetailsViewModel(
         api.clearProgress(movieId)
         backgroundScope.launch { continueWatching.remove(movieId) }
         state.value = LoadState.Loaded(api.movie(movieId))
+    }
+
+    fun toggleHidden() {
+        val current = (state.value as? LoadState.Loaded)?.value ?: return
+        viewModelScope.launch { if (hidden.value) hiddenTitles.unhide(current.hideKey()) else hiddenTitles.hide(current) }
     }
 
     fun streamUrl(): String? = api.resolve("/api/stream/$movieId")

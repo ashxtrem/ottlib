@@ -15,6 +15,7 @@ import dev.ottlib.core.presentation.sync.SyncOutcomeToasts
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.connect.ConnectScreen
 import dev.ottlib.tv.ui.details.DetailsScreen
+import dev.ottlib.tv.ui.hidden.HiddenTitlesScreen
 import dev.ottlib.tv.ui.home.HomeScreen
 import dev.ottlib.tv.ui.library.LibraryScreen
 import dev.ottlib.tv.ui.player.PlayerScreen
@@ -60,9 +61,11 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onNavigate = navigateTop,
+                onOpenHidden = { nav.navigate(Routes.HIDDEN) },
                 onChangeServer = { nav.navigate(Routes.connect(autoConnect = false)) { popUpTo(nav.graph.id) { inclusive = true } } },
             )
         }
+        composable(Routes.HIDDEN) { HiddenTitlesScreen(onOpenMovie = openMovie) }
         composable(Routes.DETAILS, arguments = listOf(navArgument("id") { type = NavType.LongType })) { entry ->
             DetailsScreen(
                 movieId = entry.arguments!!.getLong("id"),

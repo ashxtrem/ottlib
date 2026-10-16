@@ -4,6 +4,7 @@ import android.content.Context
 import dev.ottlib.core.data.AuthTokenStore
 import dev.ottlib.core.data.ConnectionManager
 import dev.ottlib.core.data.DeviceIdentity
+import dev.ottlib.core.data.HiddenTitleStore
 import dev.ottlib.core.data.PictureModeStore
 import dev.ottlib.core.data.PlaybackPreferences
 import dev.ottlib.core.data.ServerAccess
@@ -38,6 +39,7 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
     val playbackPreferences = PlaybackPreferences(context)
     val pictureModes = PictureModeStore(context)
     val trackChoices = TrackChoiceStore(context)
+    val hiddenTitles = HiddenTitleStore(context)
     val authTokens = AuthTokenStore(context)
 
     val httpClient: OkHttpClient = OkHttpClient.Builder()

@@ -48,7 +48,7 @@ private val typeChoices = LibraryChoices.type
 @Composable
 fun LibraryScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { LibraryViewModel(container.api, container.librarySync) }
+    val viewModel = viewModel { LibraryViewModel(container.api, container.librarySync, container.hiddenTitles.keys) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<LibraryDialog?>(null) }
     val firstPoster = remember { FocusRequester() }

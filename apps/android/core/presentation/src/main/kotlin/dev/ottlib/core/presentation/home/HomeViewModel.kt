@@ -7,6 +7,7 @@ import dev.ottlib.core.network.MovieSort
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.PosterItem
+import dev.ottlib.core.presentation.hidden.withoutHidden
 import dev.ottlib.core.presentation.sync.LibrarySync
 import dev.ottlib.core.presentation.sync.SyncOutcome
 import dev.ottlib.core.presentation.toPosterItem
@@ -15,9 +16,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
@@ -27,9 +32,13 @@ data class HomeRow(val key: String, val title: String, val items: List<PosterIte
 /** Which poster had focus, so returning from a movie puts focus back where the user was. */
 data class FocusTarget(val rowKey: String, val itemId: Long)
 
-class HomeViewModel(private val api: OttlibApi, sync: LibrarySync) : ViewModel() {
+class HomeViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys: Flow<Set<String>> = flowOf(emptySet())) : ViewModel() {
     private val state = MutableStateFlow<LoadState<List<HomeRow>>>(LoadState.Loading)
-    val rows: StateFlow<LoadState<List<HomeRow>>> = state.asStateFlow()
+    /** [state] minus titles hidden on this device; a row left empty disappears. */
+    val rows: StateFlow<LoadState<List<HomeRow>>> = combine(state, hiddenKeys) { current, hidden ->
+        if (current !is LoadState.Loaded || hidden.isEmpty()) current
+        else LoadState.Loaded(current.value.map { it.copy(items = it.items.withoutHidden(hidden)) }.filter { it.items.isNotEmpty() })
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, state.value)
     var lastFocus: FocusTarget? = null
     private var resumedOnce = false
     private var loading: Job? = null

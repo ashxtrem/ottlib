@@ -42,7 +42,7 @@ import dev.ottlib.mobile.ui.components.windowWidth
 @Composable
 fun HomeScreen(onOpenMovie: (Long) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { HomeViewModel(container.api, container.librarySync) }
+    val viewModel = viewModel { HomeViewModel(container.api, container.librarySync, container.hiddenTitles.keys) }
     val state by viewModel.rows.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()

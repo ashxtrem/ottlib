@@ -6,6 +6,7 @@ object Routes {
     const val LIBRARY = "library"
     const val SEARCH = "search"
     const val SETTINGS = "settings"
+    const val HIDDEN = "hidden"
     const val DETAILS = "details/{id}"
     const val PLAYER = "player/{id}?fromStart={fromStart}"
 

@@ -19,6 +19,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,12 +36,13 @@ import dev.ottlib.core.presentation.settings.SettingsViewModel
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.mobile.BuildConfig
 import dev.ottlib.mobile.ui.components.ChoiceDialog
+import kotlinx.coroutines.flow.map
 
 private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Picture }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onChangeServer: () -> Unit) {
+fun SettingsScreen(onOpenHidden: () -> Unit, onChangeServer: () -> Unit) {
     val container = appContainer()
     val viewModel = viewModel { SettingsViewModel(container.connection, container.playbackPreferences, container.api, container.deviceIdentity) }
     val server by viewModel.server.collectAsStateWithLifecycle()
@@ -48,6 +50,7 @@ fun SettingsScreen(onChangeServer: () -> Unit) {
     val languages by viewModel.languageOptions.collectAsStateWithLifecycle()
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
     var dialog by rememberSaveable { mutableStateOf<SettingsDialog?>(null) }
+    val hiddenCount by remember { container.hiddenTitles.titles.map { it.size } }.collectAsStateWithLifecycle(initialValue = 0)
 
     Scaffold(topBar = { TopAppBar(title = { Text("Settings") }) }) { padding ->
         // Settings read best as one column, so wide windows centre it instead of stretching rows across the screen.
@@ -82,6 +85,9 @@ fun SettingsScreen(onChangeServer: () -> Unit) {
                     color = OttlibColors.Muted,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
+
+                SectionTitle("Library")
+                Setting("Hidden titles", if (hiddenCount == 0) "Nothing hidden on this device" else "$hiddenCount hidden on this device only", trailing = "Manage", onClick = onOpenHidden)
 
                 SectionTitle("App updates")
                 UpdateSettingsSection(container.updates)
