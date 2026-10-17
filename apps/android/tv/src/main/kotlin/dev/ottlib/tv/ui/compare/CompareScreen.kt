@@ -102,6 +102,9 @@ private fun Copies(comparison: CopyComparison, onDelete: (CopyColumn) -> Unit) {
             Surface(shape = RoundedCornerShape(12.dp), colors = SurfaceDefaults.colors(containerColor = OttlibColors.Surface)) {
                 Column(Modifier.width(360.dp).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(column.heading, style = MaterialTheme.typography.labelLarge, color = OttlibColors.Accent)
+                    // Directly under the heading, never after the variable-height rows: every column then has its button at the
+                    // same height and on screen, so D-pad left/right always finds the neighbouring copy's button.
+                    OutlinedButton(onClick = { onDelete(column) }, modifier = Modifier.then(if (index == 0) Modifier.focusRequester(firstDelete) else Modifier)) { Text("Delete this copy…") }
                     Text(column.fileName, style = MaterialTheme.typography.titleSmall, color = OttlibColors.Foreground, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     comparison.rows.forEach { row ->
                         val cell = row.cells[index]
@@ -117,7 +120,6 @@ private fun Copies(comparison: CopyComparison, onDelete: (CopyColumn) -> Unit) {
                             )
                         }
                     }
-                    OutlinedButton(onClick = { onDelete(column) }, modifier = Modifier.padding(top = 8.dp).then(if (index == 0) Modifier.focusRequester(firstDelete) else Modifier)) { Text("Delete this copy…") }
                 }
             }
         }
