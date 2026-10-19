@@ -41,7 +41,7 @@ export function useDeleteMovieFile() {
   return useMutation({
     mutationFn: (id: number) => api<void>(`/api/movies/${id}/file`, { method: 'DELETE' }),
     onSuccess: () => {
-      ['movies', 'movie', 'movie-duplicates', 'movie-recommendations', 'shelf', 'shelves', 'library-title-count', 'unavailable-movie-count', 'movie-filter-options'].forEach((key) => { void client.invalidateQueries({ queryKey: [key] }); });
+      ['movies', 'movie', 'movie-duplicates', 'movie-recommendations', 'shelf', 'shelves', 'library-title-count', 'unavailable-movie-count', 'movie-filter-options', 'home-rows'].forEach((key) => { void client.invalidateQueries({ queryKey: [key] }); });
       show('The file was deleted from disk.', 'success');
     },
     onError: (error) => show(error.message, 'error')
@@ -68,7 +68,7 @@ export function useMovieActions() {
         action: { label: 'Undo', onClick: () => watch.mutate({ id: movie.id, watched: !variables.watched, silent: true }) }
       });
     },
-    onSettled: () => { void client.invalidateQueries({ queryKey: ['movies'], refetchType: 'active' }); void client.invalidateQueries({ queryKey: ['movie'], refetchType: 'active' }); void client.invalidateQueries({ queryKey: ['shelf'], refetchType: 'active' }); }
+    onSettled: () => { void client.invalidateQueries({ queryKey: ['movies'], refetchType: 'active' }); void client.invalidateQueries({ queryKey: ['movie'], refetchType: 'active' }); void client.invalidateQueries({ queryKey: ['shelf'], refetchType: 'active' }); void client.invalidateQueries({ queryKey: ['home-rows'], refetchType: 'active' }); }
   });
   const rematch = useMutation({ mutationFn: ({ id, title }: { id: number; title?: string }) => api<ManualMatchCandidate[]>(`/api/movies/${id}/rematch`, { method: 'POST', body: JSON.stringify({ title }) }), onError: (error) => show(error.message, 'error') });
   const acceptCandidate = useMutation({ mutationFn: ({ id, candidateId, season, episode }: { id: number; candidateId: number; season?: number; episode?: number }) => api(`/api/movies/${id}/candidates/${candidateId}/accept`, { method: 'POST', body: JSON.stringify({ season, episode }) }), onSuccess: (_data, variables) => { refresh(variables.id); show('Match accepted and saved.', 'success'); }, onError: (error) => show(error.message, 'error') });

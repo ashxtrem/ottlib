@@ -11,7 +11,7 @@ import { ShelfNameDialog } from '../components/ShelfNameDialog';
 import { ShelfSelectionDialog } from '../components/ShelfSelectionDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
 import { useShelf, useShelfActions } from '../hooks/useShelves';
-import { filterShelfMovies, initialShelfMovieFilters, shelfMovieFilterOptions, toShelfPosterItems, type ShelfMovieFilters } from '../utils/shelfMovieFilters';
+import { filterShelfMovies, initialShelfMovieFilters, shelfMovieFilterOptions, shelfSortOptions, toShelfPosterItems, type ShelfMovieFilters } from '../utils/shelfMovieFilters';
 import { SkeletonPosterGrid } from '../components/Skeleton';
 
 export function ShelfDetailPage() {
@@ -44,7 +44,7 @@ export function ShelfDetailPage() {
   const clearFilters = () => setFilters({ ...initialShelfMovieFilters });
   const deleteShelf = () => { if (window.confirm(`Delete “${item.name}”? This will not delete any movie files.`)) actions.removeShelf.mutate(item.id, { onSuccess: () => navigate('/shelves') }); };
   const toggleOrganizer = () => { setSelectedIds(new Set()); setOrganizing((current) => !current); };
-  const toolbar = <div className="min-w-0"><LibraryFilters values={filters} options={options} onSearchChange={(search) => updateFilters({ search })} onAvailabilityChange={(availability) => updateFilters({ availability })} onGenreChange={(genre) => updateFilters({ genre })} onActorChange={(actor) => updateFilters({ actor })} onQualityChange={(quality) => updateFilters({ quality })} onAudioLanguageChange={(audioLanguage) => updateFilters({ audioLanguage })} onMinRatingChange={(minRating) => updateFilters({ minRating })} onWatchedChange={(watched) => updateFilters({ watched })} onSortChange={(sort) => updateFilters({ sort })} onNeedsReviewChange={(needsReview) => updateFilters({ needsReview })} onClearFilters={clearFilters} idPrefix={`shelf-${item.id}`} searchLabel={`Search ${item.name} shelf`} searchPlaceholder={`Search ${item.name}`} trailingContent={<LibraryOverview titleCount={item.movieCount} unavailableCount={item.movies.filter((movie) => movie.missing).length} matchingTitleCount={filtersActive ? filteredMovies.length : undefined} acceptedMatchCount={undefined} className="mb-0" />} /></div>;
+  const toolbar = <div className="min-w-0"><LibraryFilters values={filters} options={options} onSearchChange={(search) => updateFilters({ search })} onAvailabilityChange={(availability) => updateFilters({ availability })} onGenreChange={(genre) => updateFilters({ genre })} onActorChange={(actor) => updateFilters({ actor })} onQualityChange={(quality) => updateFilters({ quality })} onAudioLanguageChange={(audioLanguage) => updateFilters({ audioLanguage })} onMinRatingChange={(minRating) => updateFilters({ minRating })} onWatchedChange={(watched) => updateFilters({ watched })} onSortChange={(sort) => updateFilters({ sort })} onNeedsReviewChange={(needsReview) => updateFilters({ needsReview })} onClearFilters={clearFilters} idPrefix={`shelf-${item.id}`} sortOptions={shelfSortOptions} searchLabel={`Search ${item.name} shelf`} searchPlaceholder={`Search ${item.name}`} trailingContent={<LibraryOverview titleCount={item.movieCount} unavailableCount={item.movies.filter((movie) => movie.missing).length} matchingTitleCount={filtersActive ? filteredMovies.length : undefined} acceptedMatchCount={undefined} className="mb-0" />} /></div>;
 
   return <section className="space-y-6">
     {!organizing && toolbarTarget && createPortal(toolbar, toolbarTarget)}
