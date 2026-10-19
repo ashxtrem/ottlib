@@ -14,8 +14,11 @@ export interface ShelfMovieFilters {
 }
 
 export const initialShelfMovieFilters: ShelfMovieFilters = {
-  search: '', availability: undefined, genre: '', actor: '', quality: '', audioLanguage: '', minRating: undefined, watched: undefined, sort: 'title', needsReview: false
+  search: '', availability: undefined, genre: '', actor: '', quality: '', audioLanguage: '', minRating: undefined, watched: undefined, sort: 'shelf', needsReview: false
 };
+
+/** Shelf order (the watch order set with Organize shelf) comes first: it is what the TV and phone apps show. */
+export const shelfSortOptions = [{ value: 'shelf', label: 'Shelf order' }, { value: 'title', label: 'Title' }, { value: 'year', label: 'Year' }, { value: 'added', label: 'Date added' }, { value: 'quality', label: 'Resolution' }];
 
 export function shelfMovieFilterOptions(movies: Movie[]): MovieFilterOptions {
   const uniqueSorted = (values: string[]) => [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((left, right) => left.localeCompare(right));
@@ -52,11 +55,23 @@ export function toShelfPosterItems(movies: Movie[]): MovieListItem[] {
   }));
 }
 
+const titleCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+/** Episodes of one show go by season and episode; everything else by title, with numbers compared as numbers (S1E2 before S1E10). */
+function compareTitles(left: Movie, right: Movie): number {
+  if (left.showKey !== null && left.showKey === right.showKey) {
+    const bySeason = (left.season ?? 0) - (right.season ?? 0); const byEpisode = (left.episode ?? 0) - (right.episode ?? 0);
+    if (bySeason || byEpisode) return bySeason || byEpisode;
+  }
+  return titleCollator.compare(left.title, right.title);
+}
+
 function compareMovies(left: Movie, right: Movie, sort: string): number {
-  if (sort === 'year') return (right.year ?? -1) - (left.year ?? -1) || left.title.localeCompare(right.title);
-  if (sort === 'added') return Date.parse(right.addedAt) - Date.parse(left.addedAt) || left.title.localeCompare(right.title);
-  if (sort === 'quality') return (left.mediaInfo?.height ?? -1) < (right.mediaInfo?.height ?? -1) ? 1 : (left.mediaInfo?.height ?? -1) > (right.mediaInfo?.height ?? -1) ? -1 : left.title.localeCompare(right.title);
-  return left.title.localeCompare(right.title);
+  if (sort === 'shelf') return 0;
+  if (sort === 'year') return (right.year ?? -1) - (left.year ?? -1) || compareTitles(left, right);
+  if (sort === 'added') return Date.parse(right.addedAt) - Date.parse(left.addedAt) || compareTitles(left, right);
+  if (sort === 'quality') return (left.mediaInfo?.height ?? -1) < (right.mediaInfo?.height ?? -1) ? 1 : (left.mediaInfo?.height ?? -1) > (right.mediaInfo?.height ?? -1) ? -1 : compareTitles(left, right);
+  return compareTitles(left, right);
 }
 
 function resolutionRank(value: string): number { return value === '4K' ? 2160 : Number.parseInt(value, 10) || 0; }

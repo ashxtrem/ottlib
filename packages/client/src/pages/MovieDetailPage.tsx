@@ -22,7 +22,7 @@ import { useToast } from '../hooks/useToast';
 
 
 function BrowseFilterChips({ label, values, parameter }: { label: string; values: string[]; parameter: 'genre' | 'actor' }) {
-  return <div><h2 className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{values.length ? values.map((value) => <Link key={value} to={`/?${parameter}=${encodeURIComponent(value)}`} className="rounded-full border border-accent-soft-border bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent-soft-foreground hover:bg-accent-soft/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={`Browse ${parameter} ${value}`}>{value}</Link>) : <span className="text-sm text-muted">—</span>}</div></div>;
+  return <div><h2 className="text-xs font-semibold uppercase tracking-wide text-subtle">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{values.length ? values.map((value) => <Link key={value} to={`/library?${parameter}=${encodeURIComponent(value)}`} className="rounded-full border border-accent-soft-border bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent-soft-foreground hover:bg-accent-soft/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-label={`Browse ${parameter} ${value}`}>{value}</Link>) : <span className="text-sm text-muted">—</span>}</div></div>;
 }
 
 export function MovieDetailPage() {

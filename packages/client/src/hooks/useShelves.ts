@@ -19,6 +19,7 @@ export function useShelfActions() {
     client.invalidateQueries({ queryKey: ['shelf'] });
     client.invalidateQueries({ queryKey: ['movies'] });
     client.invalidateQueries({ queryKey: ['movie'] });
+    client.invalidateQueries({ queryKey: ['home-rows'] });
   };
   const create = useMutation({
     mutationFn: ({ name, movieIds }: { name: string; movieIds: number[] }) => api<ShelfDetail>('/api/shelves', { method: 'POST', body: JSON.stringify({ name, movieIds }) }),

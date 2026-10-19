@@ -12,18 +12,18 @@ function cardTitleSize(title: string): string {
 
 export function PosterCard({ movie, onReview, onToggleWatched, selected = false, onSelectedChange, shelfId }: { movie: MovieListItem; onReview?: () => void; onToggleWatched: () => void; selected?: boolean; onSelectedChange?: (selected: boolean) => void; shelfId?: number }) {
   const navigate = useNavigate();
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const firstShelf = movie.shelves[0];
   const openMovie = (event: MouseEvent<HTMLAnchorElement>) => {
     if (shelfId !== undefined) {
       if (event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
       event.preventDefault(); event.currentTarget.querySelector('img')?.style.setProperty('view-transition-name', 'poster'); navigate(`/movie/${movie.id}`, { state: { fromShelf: true, shelfId, shelfScrollY: window.scrollY }, viewTransition: true }); window.setTimeout(() => event.currentTarget.querySelector('img')?.style.removeProperty('view-transition-name'), 500); return;
     }
-    saveLibraryScrollPosition();
+    if (pathname === '/library') saveLibraryScrollPosition();
     if (event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
     event.currentTarget.querySelector('img')?.style.setProperty('view-transition-name', 'poster');
-    navigate(`/movie/${movie.id}`, { state: { fromLibrary: true, libraryScrollY: window.scrollY, librarySearch: search }, viewTransition: true });
+    navigate(`/movie/${movie.id}`, { state: { fromLibrary: true, libraryPath: pathname, libraryScrollY: window.scrollY, librarySearch: search }, viewTransition: true });
     window.setTimeout(() => event.currentTarget.querySelector('img')?.style.removeProperty('view-transition-name'), 500);
   };
   const needsReview = movie.metadataStatus === 'suggested';

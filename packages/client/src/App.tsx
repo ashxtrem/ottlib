@@ -1,6 +1,7 @@
-import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { ScanStatusBanner } from './components/ScanStatusBanner';
+import { HomePage } from './pages/HomePage';
 import { LibraryPage } from './pages/LibraryPage';
 import { MovieDetailPage } from './pages/MovieDetailPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -26,9 +27,16 @@ function FloatingNavigationButtons() {
   const onBack = isShelfDetail ? () => navigate('/shelves') : backToLibrary;
   const backLabel = isShelfDetail ? 'Back to shelves' : backToLibraryLabel;
   const back = <button type="button" onClick={onBack} aria-label={backLabel} title={backLabel} className={`${floatingButtonClassName} animate-pop-in`}><BackIcon /><span className="sr-only">{backLabel}</span></button>;
-  if (pathname === '/') return <div key={pathname} className="fixed bottom-5 right-5 z-20 flex flex-col gap-3">{torrentSearchEnabled && <Link to="/torrents" viewTransition aria-label="Search torrents" title="Torrent search" className={`${floatingButtonClassName} animate-pop-in [animation-delay:80ms]`}><DownloadIcon /><span className="sr-only">Search torrents</span></Link>}<Link to="/shelves" viewTransition aria-label="Open shelves" title="Shelves" className={`${floatingButtonClassName} animate-pop-in [animation-delay:40ms]`}><ShelvesIcon /><span className="sr-only">Open shelves</span></Link><Link to="/settings" viewTransition aria-label="Open settings" title="Settings" className={`${floatingButtonClassName} animate-pop-in`}><SettingsIcon /><span className="sr-only">Open settings</span></Link></div>;
+  if (pathname === '/' || pathname === '/library') return <div key={pathname} className="fixed bottom-5 right-5 z-20 flex flex-col gap-3">{torrentSearchEnabled && <Link to="/torrents" viewTransition aria-label="Search torrents" title="Torrent search" className={`${floatingButtonClassName} animate-pop-in [animation-delay:80ms]`}><DownloadIcon /><span className="sr-only">Search torrents</span></Link>}<Link to="/shelves" viewTransition aria-label="Open shelves" title="Shelves" className={`${floatingButtonClassName} animate-pop-in [animation-delay:40ms]`}><ShelvesIcon /><span className="sr-only">Open shelves</span></Link><Link to="/settings" viewTransition aria-label="Open settings" title="Settings" className={`${floatingButtonClassName} animate-pop-in`}><SettingsIcon /><span className="sr-only">Open settings</span></Link></div>;
   if (pathname === '/shelves') return <div key={pathname} className="fixed bottom-5 right-5 z-20 flex gap-3"><Link to="/shelves?create=1" viewTransition aria-label="Create shelf" title="Create shelf" className={`${floatingButtonClassName} animate-pop-in [animation-delay:40ms]`}><PlusIcon /><span className="sr-only">Create shelf</span></Link>{back}</div>;
   return <div key={pathname} className="fixed bottom-5 right-5 z-20">{back}</div>;
+}
+
+const sectionLinkClassName = ({ isActive }: { isActive: boolean }) => `rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-fast ease-standard ${isActive ? 'bg-surface-raised text-foreground' : 'text-muted hover:text-foreground'} ${focusRing}`;
+
+/** Home (rows, like the TV and phone apps) first; the full library grid second. */
+function SectionLinks() {
+  return <nav aria-label="Sections" className="flex shrink-0 items-center gap-1"><NavLink to="/" end viewTransition className={sectionLinkClassName}>Home</NavLink><NavLink to="/library" viewTransition className={sectionLinkClassName}>Library</NavLink></nav>;
 }
 
 export function App() {
@@ -42,7 +50,6 @@ export function App() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, []);
-  const isLibrary = pathname === '/';
-  const hasMediaToolbar = isLibrary || /^\/shelves\/\d+$/.test(pathname);
-  return <PinGate><div className="min-h-screen"><div ref={scrollSentinel} className="h-px" aria-hidden="true" /><header className={`sticky top-0 z-30 bg-canvas/95 px-4 py-3 transition-[border-color,box-shadow] duration-fast ease-standard ${scrolled ? 'border-b border-border shadow-sm' : 'border-b border-transparent'}`}><div className={`mx-auto flex max-w-7xl items-center ${hasMediaToolbar ? 'gap-3' : ''}`}><Link to="/" viewTransition className={`shrink-0 rounded-full transition-transform duration-fast ease-emphasis hover:scale-105 ${focusRing}`}><img src="/icons/ottlib-192.png" alt="OttLib home" className="h-10 w-10" /></Link>{hasMediaToolbar && <div id="library-toolbar" className="min-w-0 flex-1" />}</div></header><ScanStatusBanner /><main className="mx-auto max-w-7xl px-4 py-6 pb-24"><Routes><Route path="/" element={<LibraryPage />} /><Route path="/movie/:id" element={<MovieDetailPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/torrents" element={<TorrentSearchPage />} /><Route path="/hidden" element={<HiddenTitlesPage />} /><Route path="/shelves" element={<ShelvesPage />} /><Route path="/shelves/:id" element={<ShelfDetailPage />} /></Routes></main><FloatingNavigationButtons /></div></PinGate>;
+  const hasMediaToolbar = pathname === '/library' || /^\/shelves\/\d+$/.test(pathname);
+  return <PinGate><div className="min-h-screen"><div ref={scrollSentinel} className="h-px" aria-hidden="true" /><header className={`sticky top-0 z-30 bg-canvas/95 px-4 py-3 transition-[border-color,box-shadow] duration-fast ease-standard ${scrolled ? 'border-b border-border shadow-sm' : 'border-b border-transparent'}`}><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3"><Link to="/" viewTransition className={`shrink-0 rounded-full transition-transform duration-fast ease-emphasis hover:scale-105 ${focusRing}`}><img src="/icons/ottlib-192.png" alt="OttLib home" className="h-10 w-10" /></Link><SectionLinks />{hasMediaToolbar && <div id="library-toolbar" className="w-full min-w-0 sm:w-auto sm:flex-1" />}</div></header><ScanStatusBanner /><main className="mx-auto max-w-7xl px-4 py-6 pb-24"><Routes><Route path="/" element={<HomePage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/movie/:id" element={<MovieDetailPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/torrents" element={<TorrentSearchPage />} /><Route path="/hidden" element={<HiddenTitlesPage />} /><Route path="/shelves" element={<ShelvesPage />} /><Route path="/shelves/:id" element={<ShelfDetailPage />} /></Routes></main><FloatingNavigationButtons /></div></PinGate>;
 }

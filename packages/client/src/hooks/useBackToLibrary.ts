@@ -11,6 +11,12 @@ function getTitleOriginSearch(state: unknown): string {
   return state.librarySearch.startsWith('?') ? state.librarySearch : '';
 }
 
+/** Where a title was opened from: the home rows ('/') or the library grid ('/library', the default). */
+function getTitleOriginPath(state: unknown): string {
+  if (typeof state !== 'object' || state === null || !('libraryPath' in state)) return '/library';
+  return state.libraryPath === '/' ? '/' : '/library';
+}
+
 function getTitleOriginShelfPath(state: unknown): string | undefined {
   if (typeof state !== 'object' || state === null || !('fromShelf' in state) || state.fromShelf !== true || !('shelfId' in state)) return undefined;
   return typeof state.shelfId === 'number' && Number.isInteger(state.shelfId) && state.shelfId > 0 ? `/shelves/${state.shelfId}` : undefined;
@@ -28,7 +34,8 @@ export function getLibraryRestoreScrollPosition(state: unknown): number | undefi
 
 export function useBackToLibraryLabel(): string {
   const { state } = useLocation();
-  return getTitleOriginShelfPath(state) ? 'Back to shelf' : 'Back to library';
+  if (getTitleOriginShelfPath(state)) return 'Back to shelf';
+  return getTitleOriginPath(state) === '/' ? 'Back to home' : 'Back to library';
 }
 
 export function useBackToLibrary(): () => void {
@@ -43,9 +50,9 @@ export function useBackToLibrary(): () => void {
     }
     const scrollPosition = getTitleOriginScrollPosition(state);
     if (scrollPosition !== undefined) {
-      navigate({ pathname: '/', search: getTitleOriginSearch(state) }, { state: { restoreLibraryScrollY: scrollPosition }, viewTransition: true });
+      navigate({ pathname: getTitleOriginPath(state), search: getTitleOriginSearch(state) }, { state: { restoreLibraryScrollY: scrollPosition }, viewTransition: true });
       return;
     }
-    navigate('/', { viewTransition: true });
+    navigate(getTitleOriginPath(state), { viewTransition: true });
   }, [navigate, state]);
 }

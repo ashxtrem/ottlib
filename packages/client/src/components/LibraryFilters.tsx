@@ -37,6 +37,7 @@ interface LibraryFiltersProps {
   searchLabel?: string;
   searchPlaceholder?: string;
   trailingContent?: ReactNode;
+  sortOptions?: Array<{ value: string; label: string }>;
 }
 
 interface ActiveFilter {
@@ -44,11 +45,13 @@ interface ActiveFilter {
   remove: () => void;
 }
 
+const librarySortOptions = [{ value: 'title', label: 'Title' }, { value: 'year', label: 'Year' }, { value: 'added', label: 'Date added' }, { value: 'quality', label: 'Resolution' }];
+
 export function countActiveFilters(values: LibraryFilterValues): number {
   return Number(Boolean(values.search.trim())) + Number(values.availability !== undefined) + Number(Boolean(values.mediaType)) + Number(Boolean(values.genre)) + Number(Boolean(values.actor)) + Number(Boolean(values.quality)) + Number(Boolean(values.audioLanguage)) + Number(values.minRating !== undefined) + Number(values.watched !== undefined) + Number(Boolean(values.needsReview));
 }
 
-function FilterFields({ values, options, onAvailabilityChange, onMediaTypeChange, onGenreChange, onActorChange, onQualityChange, onAudioLanguageChange, onMinRatingChange, onWatchedChange, onSortChange, onNeedsReviewChange, idPrefix }: Omit<LibraryFiltersProps, 'onSearchChange' | 'onClearFilters' | 'searchLabel' | 'searchPlaceholder'>) {
+function FilterFields({ values, options, onAvailabilityChange, onMediaTypeChange, onGenreChange, onActorChange, onQualityChange, onAudioLanguageChange, onMinRatingChange, onWatchedChange, onSortChange, onNeedsReviewChange, idPrefix, sortOptions = librarySortOptions }: Omit<LibraryFiltersProps, 'onSearchChange' | 'onClearFilters' | 'searchLabel' | 'searchPlaceholder'>) {
   const actorListId = `${idPrefix}-actors`;
   return <div className="grid gap-3 sm:grid-cols-2">
     <label className="block text-sm">Genre<select value={values.genre} onChange={(event) => onGenreChange(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">All genres</option>{options?.genres.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -60,7 +63,7 @@ function FilterFields({ values, options, onAvailabilityChange, onMediaTypeChange
     <label className="block text-sm">Watch status<select value={values.watched === undefined ? 'all' : String(values.watched)} onChange={(event) => onWatchedChange(event.target.value === 'all' ? undefined : event.target.value === 'true')} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="all">All</option><option value="false">Unwatched</option><option value="true">Watched</option></select></label>
     <label className="block text-sm">Availability<select value={values.availability ?? ''} onChange={(event) => onAvailabilityChange(event.target.value === 'available' || event.target.value === 'unavailable' ? event.target.value : undefined)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">All availability</option><option value="available">Available</option><option value="unavailable">Unavailable</option></select></label>
     {onMediaTypeChange && <label className="block text-sm">Media type<select value={values.mediaType ?? ''} onChange={(event) => onMediaTypeChange(event.target.value === 'movie' || event.target.value === 'tv' ? event.target.value : undefined)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">All</option><option value="movie">Movies</option><option value="tv">TV</option></select></label>}
-    <label className="block text-sm">Sort<select value={values.sort} onChange={(event) => onSortChange(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="title">Title</option><option value="year">Year</option><option value="added">Date added</option><option value="quality">Resolution</option></select></label>
+    <label className="block text-sm">Sort<select value={values.sort} onChange={(event) => onSortChange(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2">{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
     {onNeedsReviewChange && <label className="flex items-center gap-2 self-end rounded-lg border border-border px-3 py-2 text-sm"><input type="checkbox" checked={Boolean(values.needsReview)} onChange={(event) => onNeedsReviewChange(event.target.checked)} className="accent-accent" />Needs review</label>}
   </div>;
 }

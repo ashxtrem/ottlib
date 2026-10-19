@@ -32,4 +32,18 @@ describe('shelf movie filters', () => {
     expect(filtered.map((movie) => movie.id)).toEqual([1]);
     expect(toShelfPosterItems(filtered)).toEqual([expect.objectContaining({ id: 1, resolution: '4K', hdrFormat: 'HDR10', watched: false, shelves: [{ id: 7, name: 'Anime' }] })]);
   });
+  it('keeps shelf order by default, the order the TV and phone apps show', () => {
+    expect(filterShelfMovies([movies[1], movies[0]], initialShelfMovieFilters).map((movie) => movie.id)).toEqual([2, 1]);
+  });
+
+  it('sorts episodes of a show by season and episode, not as text', () => {
+    const episode = (id: number, season: number, number: number): Movie => ({ ...movies[0], id, title: `Dragon Ball Super · S${season}E${number} · Part ${id}`, mediaType: 'tv', showKey: 'tv:imdb:tt4644488', season, episode: number });
+    const shuffled = [episode(10, 1, 10), episode(2, 1, 2), episode(21, 2, 1), episode(1, 1, 1)];
+    expect(filterShelfMovies(shuffled, { ...initialShelfMovieFilters, sort: 'title' }).map((movie) => movie.id)).toEqual([1, 2, 10, 21]);
+  });
+
+  it('compares numbers in titles as numbers', () => {
+    const titled = (id: number, title: string): Movie => ({ ...movies[0], id, title });
+    expect(filterShelfMovies([titled(1, 'Part 10'), titled(2, 'Part 2')], { ...initialShelfMovieFilters, sort: 'title' }).map((movie) => movie.id)).toEqual([2, 1]);
+  });
 });
