@@ -15,7 +15,7 @@ export const nvencEncoder: VideoEncoder = {
       input: software ? [] : ['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda'],
       output: [
         ...(software ? softwareFilterArgs(o, 'yuv420p') : ['-vf', `scale_cuda=-2:${o.targetHeight}:format=yuv420p`]),
-        '-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-profile:v', 'high', '-forced-idr', '1',
+        '-c:v', 'h264_nvenc', '-preset', 'p4', '-rc', 'vbr', '-profile:v', 'high', '-forced-idr', '1', '-no-scenecut', '1',
         ...rateArgs(o.bitrateKbps), ...keyframeArgs(o.segmentSeconds)
       ]
     };

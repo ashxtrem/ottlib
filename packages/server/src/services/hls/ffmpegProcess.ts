@@ -43,7 +43,7 @@ export interface RunExit {
 
 /**
  * One ffmpeg process of a session. Its fragmented-MP4 stdout is cut into `init.mp4` and `seg-<n>.m4s`, each fragment
- * matched to the plan by its start time. Emits 'init', 'segment' (n) once a file is in place, and 'exit' (RunExit).
+ * matched to the plan by its start time. Emits 'init', 'segment' (n) once a complete file is in place, and 'exit' (RunExit).
  */
 export class FfmpegRun extends EventEmitter {
   /** Newest segment written by this run; startSegment - 1 before the first. */
@@ -93,7 +93,10 @@ export class FfmpegRun extends EventEmitter {
     }
   }
 
-  /** A fragment opens the next planned segment when it starts at (or past) its boundary; otherwise it joins the current one. */
+  /**
+   * A fragment opens the next planned segment when it starts at (or past) its boundary; otherwise it joins the current one.
+   * A segment is written only once it is complete: when the next one opens, or when ffmpeg ends cleanly.
+   */
   private addFragment(bytes: Buffer, startMs: number | null): void {
     const starts = this.options.segmentStarts;
     let index = this.current ? this.current.index : this.options.startSegment;
@@ -101,10 +104,17 @@ export class FfmpegRun extends EventEmitter {
       if (startMs === null) index += 1;
       else while (index + 1 < starts.length && startMs >= starts[index + 1] - boundaryToleranceMs) index += 1;
     }
-    if (!this.current || index !== this.current.index) this.current = { index, parts: [] };
+    if (!this.current || index !== this.current.index) {
+      this.flushCurrent();
+      this.current = { index, parts: [] };
+    }
     this.current.parts.push(bytes);
-    const parts = [...this.current.parts];
-    this.queue(() => this.writeSegment(index, parts));
+  }
+
+  private flushCurrent(): void {
+    const done = this.current;
+    this.current = null;
+    if (done) this.queue(() => this.writeSegment(done.index, done.parts));
   }
 
   private queue(task: () => Promise<void>): void {
@@ -119,7 +129,7 @@ export class FfmpegRun extends EventEmitter {
   }
 
   private async writeSegment(index: number, parts: Buffer[]): Promise<void> {
-    if (this.stopped) return;
+    if (this.stopped || this.failure !== null) return;
     await this.atomicWrite(join(this.options.dir, segmentFile(index)), Buffer.concat(parts));
     this.newest = Math.max(this.newest, index);
     this.emit('segment', index);
@@ -135,6 +145,8 @@ export class FfmpegRun extends EventEmitter {
     if (this.exited) return;
     this.exited = true;
     const failed = this.failure !== null || (!this.stopped && (spawnError !== undefined || code !== 0));
+    // The last segment is complete only when ffmpeg finished on its own; a stopped or failed run may have cut it short.
+    if (!failed && !this.stopped) this.flushCurrent();
     const reason = this.failure ?? spawnError ?? `exited with code ${code}`;
     const error = failed ? `ffmpeg ${reason}${this.stderr.length ? `: ${this.stderr.join('\n')}` : ''}` : undefined;
     void this.writes.then(() => this.emit('exit', { stopped: this.stopped && this.failure === null, ...(error ? { error } : {}) } satisfies RunExit));
