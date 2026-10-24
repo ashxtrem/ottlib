@@ -19,6 +19,11 @@ fi
 if [ -z "$FFPROBE_PATH" ] && ! command -v ffprobe >/dev/null 2>&1; then
   echo "Note: ffprobe was not found, so media details (codecs, tracks) will be unavailable. Install FFmpeg to enable them." >&2
 fi
+# Only the Windows and Linux bundles ship ffmpeg; elsewhere the server looks for it on the PATH.
+[ -x runtime/ffmpeg ] && export FFMPEG_PATH="$PWD/runtime/ffmpeg"
+if [ -z "$FFMPEG_PATH" ] && ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "Note: ffmpeg was not found, so the browser player can only play files it supports directly. Install FFmpeg to enable transcoding." >&2
+fi
 
 mkdir -p data/logs
 exec "$NODE" packages/server/dist/index.js

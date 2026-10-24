@@ -22,6 +22,7 @@ if exist "runtime\node.exe" (
 )
 
 if exist "runtime\ffprobe.exe" set "FFPROBE_PATH=%~dp0runtime\ffprobe.exe"
+if exist "runtime\ffmpeg.exe" set "FFMPEG_PATH=%~dp0runtime\ffmpeg.exe"
 if not exist "data\logs" mkdir "data\logs"
 
 echo OttLib is starting. Leave this window open; close it to stop the server.
