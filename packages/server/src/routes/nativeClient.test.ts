@@ -240,7 +240,7 @@ describe('native client endpoints', () => {
     try {
       const response = await app.inject({ method: 'GET', url: '/api/movies/1/playback?video=h264', headers });
       expect(response.statusCode).toBe(503);
-      expect(response.json()).toMatchObject({ code: 'TRANSCODE_BUSY' });
+      expect(response.json()).toMatchObject({ error: 'TRANSCODE_BUSY' });
       const noFfmpeg = playbackSourceSchema.parse((await bare.inject({ method: 'GET', url: '/api/movies/1/playback?video=h264', headers })).json());
       expect(noFfmpeg).toMatchObject({ kind: 'direct', mode: 'direct', streamUrl: '/api/stream/1' });
       expect(noFfmpeg.reasons).toContain('ffmpeg-missing');

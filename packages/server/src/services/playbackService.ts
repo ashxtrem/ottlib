@@ -15,6 +15,11 @@ export interface SubtitleFile { path: string; mimeType: string }
 
 function subtitleMimeType(path: string): string | undefined { return subtitleMimeTypes[extname(path).slice(1).toLowerCase()]; }
 
+/** The movie row is gone, flagged missing, outside its folder, or its file cannot be read; routes answer 404. */
+export class MovieUnavailableError extends Error {
+  public constructor() { super('Movie file is unavailable'); }
+}
+
 export class PlaybackService {
   private readonly playlist = new LanPlaylist();
   /** [streamQuery] adds the per-movie key external players need when an access PIN is set ('' otherwise). */
@@ -22,8 +27,8 @@ export class PlaybackService {
 
   public async movieFile(id: number): Promise<PlaybackMovie> {
     const movie = this.movies.playbackMovie(id);
-    if (!movie || movie.missing || !isWithinRoot(movie.folderPath, movie.path)) throw new Error('Movie file is unavailable');
-    await stat(movie.path); return movie;
+    if (!movie || movie.missing || !isWithinRoot(movie.folderPath, movie.path)) throw new MovieUnavailableError();
+    await stat(movie.path).catch(() => { throw new MovieUnavailableError(); }); return movie;
   }
   public hasVlc(): boolean { return this.local.hasVlc(); }
   public async playLocal(id: number, startSec = 0): Promise<void> { this.local.open(await this.movieFile(id), startSec); }
