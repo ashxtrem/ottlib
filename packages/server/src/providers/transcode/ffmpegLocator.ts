@@ -19,7 +19,7 @@ export interface FfmpegBinary {
 }
 
 export const spawnExec: ExecFn = (command, args, timeoutMs) => new Promise((resolve, reject) => {
-  const child = spawn(command, args, { windowsHide: true });
+  const child = spawn(command, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = ''; let stderr = ''; let settled = false;
   const finish = (callback: () => void) => { if (!settled) { settled = true; clearTimeout(timeout); callback(); } };
   const timeout = setTimeout(() => { child.kill(); finish(() => reject(new Error(`${command} timed out after ${timeoutMs} ms`))); }, timeoutMs);

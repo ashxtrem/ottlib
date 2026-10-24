@@ -11,10 +11,11 @@ export const amfEncoder: VideoEncoder = {
   probe: (ffmpeg) => testEncode(ffmpeg, 'h264_amf', 'nv12'),
   args(o) {
     return {
-      input: usesSoftwareFrames(o) ? [] : ['-hwaccel', 'd3d11va'],
+      // D3D11VA exists only on Windows; elsewhere AMF gets CPU-decoded frames.
+      input: usesSoftwareFrames(o) || process.platform !== 'win32' ? [] : ['-hwaccel', 'd3d11va'],
       output: [
         ...softwareFilterArgs(o, 'nv12'),
-        '-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'speed', '-rc', 'vbr_peak', '-profile:v', 'high',
+        '-c:v', 'h264_amf', '-usage', 'transcoding', '-quality', 'speed', '-rc', 'vbr_peak', '-profile:v', 'high', '-forced_idr', '1',
         ...rateArgs(o.bitrateKbps), ...keyframeArgs(o.segmentSeconds)
       ]
     };

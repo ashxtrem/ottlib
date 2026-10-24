@@ -52,8 +52,9 @@ export class PlaybackPlanner {
     }
     const plan = this.describe(decision.mode, decision.reasons, tracks, decision);
     if (decision.mode === 'direct') return plan;
+    const audioChannels = tracks.find((track) => track.type === 'audio' && track.order === decision.audioOrder)?.channels ?? null;
     const handle = await this.options.sessions!.open({
-      movie: file, mediaInfo: info, decision, deviceId, startMs: request.startMs, keyframesMs: decision.mode === 'remux' ? keyframes ?? [] : [], maxHeight: request.maxHeight
+      movie: file, mediaInfo: info, decision, deviceId, startMs: request.startMs, keyframesMs: decision.mode === 'remux' ? keyframes ?? [] : [], maxHeight: request.maxHeight, audioChannels
     });
     return { ...plan, hls: handle };
   }

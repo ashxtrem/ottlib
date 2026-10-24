@@ -14,7 +14,7 @@ export const qsvEncoder: VideoEncoder = {
     return {
       input: software ? [] : ['-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv'],
       output: [
-        ...(software ? softwareFilterArgs(o, 'nv12') : ['-vf', `scale_qsv=w=-1:h=${o.targetHeight}:format=nv12`]),
+        ...(software ? softwareFilterArgs(o, 'nv12') : ['-vf', `scale_qsv=w=-2:h=${o.targetHeight}:format=nv12`]),
         '-c:v', 'h264_qsv', '-preset', 'veryfast', '-profile:v', 'high', '-forced_idr', '1',
         ...rateArgs(o.bitrateKbps), ...keyframeArgs(o.segmentSeconds)
       ]

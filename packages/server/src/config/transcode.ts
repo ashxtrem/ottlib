@@ -1,6 +1,8 @@
+import { transcodeEncoderSchema, type TranscodeEncoder } from '@ottlib/shared';
+
 /** Which video encoder the transcoder uses. `auto` = the first in registry order whose test encode passes. */
-export type TranscodeEncoderSetting = 'auto' | 'nvenc' | 'qsv' | 'amf' | 'x264';
-export const transcodeEncoderSettings: readonly TranscodeEncoderSetting[] = ['auto', 'nvenc', 'qsv', 'amf', 'x264'];
+export type TranscodeEncoderSetting = TranscodeEncoder;
+export const transcodeEncoderSettings: readonly TranscodeEncoderSetting[] = transcodeEncoderSchema.options;
 export const defaultTranscodeEncoder: TranscodeEncoderSetting = 'auto';
 
 /** ffmpeg binary: `FFMPEG_PATH`, else `ffmpeg` on PATH (mirrors FFPROBE_PATH). */
@@ -57,10 +59,22 @@ export const transcodeSessionLimits = {
   segmentWaitWindow: 4,
 };
 
-/** Transcode segment length; also drives forced keyframes (`-force_key_frames expr:gte(t,n_forced*4)`). */
-export const transcodeSegmentSeconds = 4;
-/** Remux of a Matroska file with an average Cue gap above this falls back to fixed-length segments. */
-export const maxAverageCueGapSeconds = 10;
-export const keyframeCacheSize = 50;
+/** Temp root for session folders (`<root>/<sessionId>`); default `os.tmpdir()/ottlib-hls`. */
+export const transcodeDirEnvVar = 'OTTLIB_TRANSCODE_DIR';
+export const transcodeDirName = 'ottlib-hls';
+/** Lines of ffmpeg stderr kept for the error message when a session's ffmpeg fails. */
+export const ffmpegStderrLines = 50;
+/**
+ * Every session's output timestamps are shifted by this much, so the first B-frames and the AAC priming of the film's start
+ * (slightly negative) stay positive and every session, whatever segment it starts at, writes the same timeline.
+ */
+export const timelineOffsetSeconds = 10;
+/**
+ * A copy-mode restart seeks this far past the segment's keyframe (or to 1 ms before the next one, when closer): ffmpeg seeks
+ * to the keyframe at or before the target, but backs off about 130 ms first for files with B-frames.
+ */
+export const copySeekLeadMs = 200;
+/** A fragment whose start is within this of the next planned boundary opens that segment; earlier ones join the current one. */
+export const boundaryToleranceMs = 100;
 /** Embedded subtitles still being extracted answer 503 with this Retry-After. */
 export const embeddedSubtitleRetryAfterSeconds = 2;

@@ -14,6 +14,8 @@ export interface HlsSessionInput {
   keyframesMs: number[];
   /** The client's `maxHeight` cap, when it sent one. */
   maxHeight?: number;
+  /** Channel count of the chosen audio track (picks the AAC layout when it is re-encoded). */
+  audioChannels?: number | null;
 }
 
 export interface HlsSessionHandle {

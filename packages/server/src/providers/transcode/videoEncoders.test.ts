@@ -61,13 +61,14 @@ describe('hardware paths', () => {
   it('QSV decodes and scales on Quick Sync', () => {
     const { input, output } = qsvEncoder.args(hardware);
     expect(input).toEqual(['-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv']);
-    expect(value(output, '-vf')).toBe('scale_qsv=w=-1:h=1080:format=nv12');
+    expect(value(output, '-vf')).toBe('scale_qsv=w=-2:h=1080:format=nv12');
   });
 
-  it('AMF decodes with D3D11VA and scales on the CPU', () => {
+  it('AMF decodes with D3D11VA (Windows only), scales on the CPU and forces IDR keyframes', () => {
     const { input, output } = amfEncoder.args(hardware);
-    expect(input).toEqual(['-hwaccel', 'd3d11va']);
+    expect(input).toEqual(process.platform === 'win32' ? ['-hwaccel', 'd3d11va'] : []);
     expect(value(output, '-vf')).toBe('scale=-2:1080,format=nv12');
+    expect(value(output, '-forced_idr')).toBe('1');
   });
 
   it('x264 uses the veryfast preset in 8-bit 4:2:0', () => {

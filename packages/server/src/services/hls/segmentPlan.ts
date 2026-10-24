@@ -20,10 +20,12 @@ export type SegmentPlanInput =
 function boundaries(input: SegmentPlanInput): number[] {
   const { durationMs } = input;
   if (input.mode === 'remux') {
-    const cuts = [...new Set(input.keyframesMs)].filter((time) => time > 0 && time < durationMs).sort((a, b) => a - b);
-    return [0, ...cuts];
+    const keyframes = [...new Set(input.keyframesMs)].filter((time) => time >= 0 && time < durationMs).sort((a, b) => a - b);
+    // ffmpeg's first segment starts at the first keyframe whenever that is, so a late first keyframe opens segment 0.
+    return [0, ...keyframes.slice(1)];
   }
-  const step = input.segmentMs ?? transcodeSegmentMs;
+  const requested = input.segmentMs ?? transcodeSegmentMs;
+  const step = Number.isFinite(requested) && requested > 0 ? requested : transcodeSegmentMs;
   const starts: number[] = [];
   for (let start = 0; start < durationMs; start += step) starts.push(start);
   return starts;
