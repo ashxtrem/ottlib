@@ -30,7 +30,11 @@ fun MediaItem.withSubtitlesFrom(previous: MediaItem?): MediaItem {
     return if (kept.isEmpty()) this else buildUpon().setSubtitleConfigurations(own + kept).build()
 }
 
+/** Embedded text subtitles answer 202 + JSON while the server extracts them, so they can't be side-loaded. */
+private const val EMBEDDED_SUBTITLE_PATH = "/subtitles/embedded/"
+
 internal fun SubtitleSource.toConfiguration(resolve: (String) -> String): MediaItem.SubtitleConfiguration? {
+    if (url.contains(EMBEDDED_SUBTITLE_PATH)) return null
     val mimeType = subtitleMimeType(codec) ?: return null
     return MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(url)))
         .setId(url.substringBefore('?'))

@@ -15,13 +15,17 @@ interface ProgressOptions {
  * and the last one survives the page closing.
  */
 export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, fallbackDurationMs, shelfId }: ProgressOptions): void {
-  const fallback = useRef(fallbackDurationMs); fallback.current = fallbackDurationMs;
+  // Keeps the last known duration of this movie: a track switch renders the page without a source (null) while the
+  // emptied element reports NaN, and the switch-time leave still needs a duration.
+  const fallback = useRef<{ movieId: number; ms: number | null }>({ movieId, ms: fallbackDurationMs });
+  if (fallback.current.movieId !== movieId) fallback.current = { movieId, ms: fallbackDurationMs };
+  else if (fallbackDurationMs !== null && Number.isFinite(fallbackDurationMs) && fallbackDurationMs > 0) fallback.current.ms = fallbackDurationMs;
   useEffect(() => {
     if (!video) return;
     let lastSentAt: number | null = null;
     // The last position seen on timeupdate/seeked: VideoSurface may unmount first and reset currentTime to 0.
     const lastPosition = { ms: video.currentTime * 1000 };
-    const durationMs = () => (Number.isFinite(video.duration) && video.duration > 0 ? video.duration * 1000 : fallback.current ?? Number.NaN);
+    const durationMs = () => (Number.isFinite(video.duration) && video.duration > 0 ? video.duration * 1000 : fallback.current.ms ?? Number.NaN);
     const shelfQuery = shelfId === undefined ? '' : `?shelfId=${shelfId}`;
     const send = (trigger: ProgressTrigger, positionMs = video.currentTime * 1000) => {
       const duration = durationMs(); const now = Date.now();
