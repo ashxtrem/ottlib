@@ -19,6 +19,7 @@ import { accessPinMigration } from './migrations/015_access_pin.js';
 import { ensurePlaybackCollection } from './migrations/016_playback_collection.js';
 import { downloadedSubtitlesMigration } from './migrations/017_downloaded_subtitles.js';
 import { recommendationSignalsMigration } from './migrations/018_recommendation_signals.js';
+import { ensureProfiles } from './migrations/019_profiles.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -44,5 +45,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   ensurePlaybackCollection(db);
   db.exec(downloadedSubtitlesMigration);
   db.exec(recommendationSignalsMigration);
+  ensureProfiles(db);
   return db;
 }
