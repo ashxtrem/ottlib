@@ -17,9 +17,15 @@ function getTitleOriginPath(state: unknown): string {
   return state.libraryPath === '/' ? '/' : '/library';
 }
 
-function getTitleOriginShelfPath(state: unknown): string | undefined {
+/** The shelf a title was opened from, if any. */
+export function getTitleOriginShelfId(state: unknown): number | undefined {
   if (typeof state !== 'object' || state === null || !('fromShelf' in state) || state.fromShelf !== true || !('shelfId' in state)) return undefined;
-  return typeof state.shelfId === 'number' && Number.isInteger(state.shelfId) && state.shelfId > 0 ? `/shelves/${state.shelfId}` : undefined;
+  return typeof state.shelfId === 'number' && Number.isInteger(state.shelfId) && state.shelfId > 0 ? state.shelfId : undefined;
+}
+
+function getTitleOriginShelfPath(state: unknown): string | undefined {
+  const shelfId = getTitleOriginShelfId(state);
+  return shelfId === undefined ? undefined : `/shelves/${shelfId}`;
 }
 
 function getTitleOriginShelfScrollPosition(state: unknown): number | undefined {
