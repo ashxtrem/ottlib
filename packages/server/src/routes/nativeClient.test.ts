@@ -170,7 +170,9 @@ describe('native client endpoints', () => {
         movies.upsertScanned({ folderId: 1, path: join(media, `${id}.mkv`), filename: `${id}.mkv`, title: 'Dragon Ball Z', year: 1989, size: 1, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
         movies.applyMetadata(id, { source: 'tmdb', providerId: '12971', mediaType: 'tv', season: 1, episode: id - 2, title: `Dragon Ball Z · S1E${id - 2}`, year: 1989, overview: null, posterFile: null, backdropFile: null, genres: ['Animation'], cast: [], rating: null, runtime: 24, imdbId: null });
       }
-      expect((await app.inject({ method: 'GET', url: '/api/movies/3/next' })).statusCode).toBe(400);
+      // No x-device-id is fine (the only profile is used); a malformed one is still refused.
+      expect((await app.inject({ method: 'GET', url: '/api/movies/3/next' })).statusCode).toBe(200);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/3/next', headers: { 'x-device-id': 'not-a-uuid' } })).statusCode).toBe(400);
       expect((await app.inject({ method: 'GET', url: '/api/movies/999/next', headers })).statusCode).toBe(404);
       expect((await app.inject({ method: 'GET', url: '/api/movies/3/next?shelfId=bad', headers })).statusCode).toBe(400);
       const next = await app.inject({ method: 'GET', url: '/api/movies/3/next', headers });
@@ -209,7 +211,9 @@ describe('native client endpoints', () => {
   it('records progress, lists continue watching, and clears it when marked watched', async () => {
     const { app, db, media } = fixture();
     try {
-      expect((await app.inject({ method: 'PUT', url: '/api/movies/1/progress', payload: { positionMs: 1_830_000, durationMs: 6_960_000 } })).statusCode).toBe(400);
+      expect((await app.inject({ method: 'PUT', url: '/api/movies/1/progress', headers: { 'x-device-id': 'not-a-uuid' }, payload: { positionMs: 1_830_000, durationMs: 6_960_000 } })).statusCode).toBe(400);
+      // Without x-device-id the single PIN-less profile is used; the progress is the profile's, not the device's.
+      expect((await app.inject({ method: 'PUT', url: '/api/movies/1/progress', payload: { positionMs: 600_000, durationMs: 6_960_000 } })).statusCode).toBe(200);
       const saved = await app.inject({ method: 'PUT', url: '/api/movies/1/progress', headers, payload: { positionMs: 1_830_000, durationMs: 6_960_000 } });
       expect(saved.statusCode).toBe(200);
       await snapshot('progress-result', playbackProgressResultSchema.parse(saved.json()), media);

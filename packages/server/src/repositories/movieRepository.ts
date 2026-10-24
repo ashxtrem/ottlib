@@ -49,10 +49,10 @@ type MovieListCursor =
 export class MovieRepository {
   public constructor(private readonly db: Database.Database) {}
 
-  public list(deviceId?: string, query: MovieListQuery = {}): Movie[] {
+  public list(profileId?: number, query: MovieListQuery = {}): Movie[] {
     const { clauses, values } = this.filters(query);
     const sort = this.sort(query.sort).orderBy;
-    const rows = this.db.prepare(`${this.selectSql()} WHERE ${clauses.join(' AND ')} ORDER BY ${sort}`).all(deviceId ?? '', ...values) as MovieRow[];
+    const rows = this.db.prepare(`${this.selectSql()} WHERE ${clauses.join(' AND ')} ORDER BY ${sort}`).all(profileId ?? 0, ...values) as MovieRow[];
     return rows.map(this.map);
   }
 
@@ -69,20 +69,20 @@ export class MovieRepository {
   }
 
   /** List summaries for specific ids, in the order given; ids that do not exist are skipped. */
-  public summariesByIds(ids: number[], deviceId?: string): MovieListItem[] {
+  public summariesByIds(ids: number[], profileId?: number): MovieListItem[] {
     if (!ids.length) return [];
-    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE m.id IN (${ids.map(() => '?').join(', ')})`).all(deviceId ?? '', ...ids) as MovieListItemRow[];
+    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE m.id IN (${ids.map(() => '?').join(', ')})`).all(profileId ?? 0, ...ids) as MovieListItemRow[];
     const byId = new Map(rows.map((row) => [row.id, this.mapListItem(row)]));
     return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
-  public listSummaries(deviceId: string | undefined, query: MovieListQuery = {}): MovieListPage {
+  public listSummaries(profileId: number | undefined, query: MovieListQuery = {}): MovieListPage {
     const sort = this.sort(query.sort); const cursor = this.decodeCursor(query.cursor, sort.name); const filters = this.filters(query); const clauses = [...filters.clauses]; const values = [...filters.values];
     if (cursor) this.addCursorClause(clauses, values, cursor);
     const limit = Math.min(Math.max(Math.floor(query.limit ?? 48), 1), 100);
-    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE ${clauses.join(' AND ')} ORDER BY ${sort.orderBy} LIMIT ?`).all(deviceId ?? '', ...values, limit + 1) as MovieListItemRow[];
+    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE ${clauses.join(' AND ')} ORDER BY ${sort.orderBy} LIMIT ?`).all(profileId ?? 0, ...values, limit + 1) as MovieListItemRow[];
     const items = rows.slice(0, limit).map(this.mapListItem);
-    const total = (this.db.prepare(`SELECT COUNT(*) AS count FROM movies m LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = ? WHERE ${filters.clauses.join(' AND ')}`).get(deviceId ?? '', ...filters.values) as { count: number }).count;
+    const total = (this.db.prepare(`SELECT COUNT(*) AS count FROM movies m LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.profile_id = ? WHERE ${filters.clauses.join(' AND ')}`).get(profileId ?? 0, ...filters.values) as { count: number }).count;
     return { items, nextCursor: rows.length > limit ? this.encodeCursor(sort.name, rows[limit - 1]) : null, total };
   }
 
@@ -100,15 +100,15 @@ export class MovieRepository {
     };
   }
 
-  public get(id: number, deviceId?: string): Movie | undefined {
-    const row = this.db.prepare(`${this.selectSql()} WHERE m.id = ?`).get(deviceId ?? '', id) as MovieRow | undefined;
+  public get(id: number, profileId?: number): Movie | undefined {
+    const row = this.db.prepare(`${this.selectSql()} WHERE m.id = ?`).get(profileId ?? 0, id) as MovieRow | undefined;
     return row ? this.map(row) : undefined;
   }
 
-  public listByIds(ids: number[], deviceId?: string): Movie[] {
+  public listByIds(ids: number[], profileId?: number): Movie[] {
     if (!ids.length) return [];
     const placeholders = ids.map(() => '?').join(', ');
-    const rows = this.db.prepare(`${this.selectSql()} WHERE m.id IN (${placeholders})`).all(deviceId ?? '', ...ids) as MovieRow[];
+    const rows = this.db.prepare(`${this.selectSql()} WHERE m.id IN (${placeholders})`).all(profileId ?? 0, ...ids) as MovieRow[];
     const byId = new Map(rows.map((row) => [row.id, this.map(row)]));
     return ids.flatMap((id) => {
       const movie = byId.get(id);
@@ -116,8 +116,8 @@ export class MovieRepository {
     });
   }
 
-  public listContinueWatching(deviceId: string, limit: number): MovieListItem[] {
-    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE pp.movie_id IS NOT NULL AND m.missing = 0 ORDER BY pp.updated_at DESC, m.id DESC LIMIT ?`).all(deviceId, limit) as MovieListItemRow[];
+  public listContinueWatching(profileId: number, limit: number): MovieListItem[] {
+    const rows = this.db.prepare(`${this.summarySelectSql()} WHERE pp.movie_id IS NOT NULL AND m.missing = 0 ORDER BY pp.updated_at DESC, m.id DESC LIMIT ?`).all(profileId, limit) as MovieListItemRow[];
     return rows.map(this.mapListItem);
   }
 
@@ -325,20 +325,20 @@ export class MovieRepository {
   }
 
   private selectSql(): string {
-    return `SELECT m.*, f.path AS folder_path, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}
+    return `SELECT m.*, f.path AS folder_path, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}
       JOIN folders f ON f.id = m.folder_id`;
   }
 
   private summarySelectSql(): string {
     return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.deviceScopedJoins()}`;
+      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}`;
   }
 
-  /** Binds the device id once (first `?`) and exposes it to both per-device joins. */
-  private deviceScopedJoins(): string {
-    return `(SELECT ? AS device_id) device CROSS JOIN movies m
-      LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.device_id = device.device_id
-      LEFT JOIN playback_progress pp ON pp.movie_id = m.id AND pp.device_id = device.device_id`;
+  /** Binds the profile id once (first `?`) and exposes it to both per-profile joins. */
+  private profileScopedJoins(): string {
+    return `(SELECT ? AS profile_id) viewer CROSS JOIN movies m
+      LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.profile_id = viewer.profile_id
+      LEFT JOIN playback_progress pp ON pp.movie_id = m.id AND pp.profile_id = viewer.profile_id`;
   }
 
   private filters(query: MovieListQuery): { clauses: string[]; values: unknown[] } {

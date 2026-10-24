@@ -29,8 +29,8 @@ export class PlaybackService {
   public async playlistFor(id: number, origin: string): Promise<string> { return this.playlist.playlist(origin, await this.movieFile(id), this.streamQuery(id)); }
 
   /** What an embedded player should load. URLs are server-relative; the client resolves them against its server origin. */
-  public async source(id: number, deviceId: string | undefined): Promise<PlaybackSource> {
-    const file = await this.movieFile(id); const movie = this.movies.get(id, deviceId); const query = this.streamQuery(id);
+  public async source(id: number, profileId: number | undefined): Promise<PlaybackSource> {
+    const file = await this.movieFile(id); const movie = this.movies.get(id, profileId); const query = this.streamQuery(id);
     const downloaded = await this.subtitleLibrary?.list(id) ?? [];
     const subtitles = (await this.sideloadableSubtitles(file)).filter(subtitle => !downloaded.some(record => record.sidecar_path === subtitle.path)).map(({ track }) => ({
       url: `/api/movies/${id}/subtitles/${track.order}${query}`, language: track.language, codec: track.codec, title: track.title, isForced: track.isForced, isHearingImpaired: track.isHearingImpaired

@@ -20,6 +20,7 @@ import { ensurePlaybackCollection } from './migrations/016_playback_collection.j
 import { downloadedSubtitlesMigration } from './migrations/017_downloaded_subtitles.js';
 import { recommendationSignalsMigration } from './migrations/018_recommendation_signals.js';
 import { ensureProfiles } from './migrations/019_profiles.js';
+import { ensureProfileScope } from './migrations/020_profile_scope.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -46,5 +47,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   db.exec(downloadedSubtitlesMigration);
   db.exec(recommendationSignalsMigration);
   ensureProfiles(db);
+  ensureProfileScope(db);
   return db;
 }

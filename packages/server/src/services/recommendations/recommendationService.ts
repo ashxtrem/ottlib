@@ -12,7 +12,7 @@ const watchedFactor = 0.75;
 export class RecommendationService {
   public constructor(private readonly movies: MovieRepository, private readonly signals: RecommendationSignalRepository, private readonly settings: () => Settings, private readonly now: () => Date = () => new Date()) {}
 
-  public async forMovie(id: number, deviceId: string | undefined, limit: number): Promise<Recommendation[]> {
+  public async forMovie(id: number, profileId: number | undefined, limit: number): Promise<Recommendation[]> {
     const pool = this.movies.listRecommendationPool();
     const anchor = pool.find((title) => title.id === id);
     if (!anchor) return [];
@@ -21,12 +21,12 @@ export class RecommendationService {
     const signal = await this.signalFor(anchor);
     const candidates = titles.filter((title) => title.id !== anchor.id && !sameTitle(anchor, title));
     const ranked = rank(candidates.map((candidate) => scoreCandidate(anchor, candidate, frequencies, titles.length, signal))).slice(0, limit * 2);
-    return this.present(ranked, deviceId, limit);
+    return this.present(ranked, profileId, limit);
   }
 
-  /** Already-watched titles are shown, just later: the point is something new to watch. */
-  private present(ranked: ScoredTitle[], deviceId: string | undefined, limit: number): Recommendation[] {
-    const summaries = new Map(this.movies.summariesByIds(ranked.map((entry) => entry.title.id), deviceId).map((item) => [item.id, item]));
+  /** Titles this profile already watched are shown, just later: the point is something new to watch. */
+  private present(ranked: ScoredTitle[], profileId: number | undefined, limit: number): Recommendation[] {
+    const summaries = new Map(this.movies.summariesByIds(ranked.map((entry) => entry.title.id), profileId).map((item) => [item.id, item]));
     return ranked.flatMap((entry) => {
       const movie = summaries.get(entry.title.id);
       return movie ? [{ entry, movie, score: entry.score * (movie.watched ? watchedFactor : 1) }] : [];

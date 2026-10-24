@@ -36,6 +36,9 @@ export const profileMeSchema = z.object({ profile: profileSummarySchema });
 export const profilePatchSchema = z.object({ name: profileNameSchema.optional(), color: profileColorSchema.optional() });
 /** `pin: null` clears the PIN. `currentPin` is needed when a profile changes its own existing PIN. */
 export const profilePinUpdateSchema = z.object({ currentPin: z.string().max(32).optional(), pin: profilePinSchema.nullable() });
+/** Announces a play handed off to a player; `positionMs` defaults to the profile's resume point. */
+export const playStartSchema = z.object({ method: z.enum(playMethods), positionMs: z.number().int().nonnegative().optional() });
+export const playStartResultSchema = z.object({ playId: z.number().int() });
 export const localResetResultSchema = z.object({ ownerPinCleared: z.boolean(), accessPinCleared: z.boolean() });
 
 export type ProfileColor = (typeof profileColors)[number];
@@ -46,4 +49,6 @@ export type ProfileCreate = z.infer<typeof profileCreateSchema>;
 export type ProfileSelectResult = z.infer<typeof profileSelectResultSchema>;
 export type ProfilePatch = z.infer<typeof profilePatchSchema>;
 export type ProfilePinUpdate = z.infer<typeof profilePinUpdateSchema>;
+export type PlayStart = z.infer<typeof playStartSchema>;
+export type PlayStartResult = z.infer<typeof playStartResultSchema>;
 export type LocalResetResult = z.infer<typeof localResetResultSchema>;
