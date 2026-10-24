@@ -63,7 +63,7 @@ export class EmbeddedSubtitleService {
       if (result.code !== 0) throw new Error(`Subtitle extraction failed: ${result.stderr.trim().split(/\r?\n/).pop() || `ffmpeg exited with ${result.code}`}`);
       await rename(temp, target);
     } catch (error) {
-      await rm(temp, { force: true });
+      await rm(temp, { force: true, maxRetries: 3, retryDelay: 200 }).catch(() => {});
       throw error;
     }
   }
