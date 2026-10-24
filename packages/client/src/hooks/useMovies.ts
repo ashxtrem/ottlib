@@ -36,12 +36,16 @@ export function useMovieDuplicates(id: string | undefined) {
 export function useMovieRecommendations(id: string | undefined) {
   return useQuery({ queryKey: ['movie-recommendations', id], enabled: Boolean(id), staleTime: 5 * 60_000, queryFn: () => api<Recommendation[]>(`/api/movies/${id}/recommendations?limit=24`) });
 }
+/** The next episode, or the next title of the shelf it was opened from (null when there is none). */
+export function useNextTitle(id: string | undefined, shelfId?: number) {
+  return useQuery({ queryKey: ['movie-next', id, shelfId], enabled: Boolean(id), queryFn: () => api<Movie | null>(`/api/movies/${id}/next${shelfId === undefined ? '' : `?shelfId=${shelfId}`}`) });
+}
 export function useDeleteMovieFile() {
   const client = useQueryClient(); const { show } = useToast();
   return useMutation({
     mutationFn: (id: number) => api<void>(`/api/movies/${id}/file`, { method: 'DELETE' }),
     onSuccess: () => {
-      ['movies', 'movie', 'movie-duplicates', 'movie-recommendations', 'shelf', 'shelves', 'library-title-count', 'unavailable-movie-count', 'movie-filter-options', 'home-rows'].forEach((key) => { void client.invalidateQueries({ queryKey: [key] }); });
+      ['movies', 'movie', 'movie-duplicates', 'movie-recommendations', 'movie-next', 'shelf', 'shelves', 'library-title-count', 'unavailable-movie-count', 'movie-filter-options', 'home-rows'].forEach((key) => { void client.invalidateQueries({ queryKey: [key] }); });
       show('The file was deleted from disk.', 'success');
     },
     onError: (error) => show(error.message, 'error')

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { formatRuntime, hiddenDisplayTitle, hideKeyOf, type ManualMatchCandidate } from '@ottlib/shared';
 import { MatchCandidateRow } from '../components/MatchCandidateRow';
 import { MovieActionButtons } from '../components/MovieActionButtons';
 import { MediaInfoPanel } from '../components/MediaInfoPanel';
-import { useMatchCandidates, useMovie, useMovieActions, useMovieDuplicates } from '../hooks/useMovies';
+import { useMatchCandidates, useMovie, useMovieActions, useMovieDuplicates, useNextTitle } from '../hooks/useMovies';
+import { NextTitlePanel } from '../components/NextTitlePanel';
 import { MovieShelfDialog } from '../components/MovieShelfDialog';
 import { useShelfActions, useShelves } from '../hooks/useShelves';
-import { useBackToLibrary, useBackToLibraryLabel } from '../hooks/useBackToLibrary';
+import { getTitleOriginShelfId, useBackToLibrary, useBackToLibraryLabel } from '../hooks/useBackToLibrary';
 import { NoArtworkCard } from '../components/NoArtworkCard';
 import { ErrorState } from '../components/ErrorState';
 import { MetadataRefreshDialog } from '../components/MetadataRefreshDialog';
@@ -30,6 +31,8 @@ export function MovieDetailPage() {
   const navigate = useNavigate();
   const movie = useMovie(id);
   const duplicates = useMovieDuplicates(id);
+  const shelfId = getTitleOriginShelfId(useLocation().state);
+  const next = useNextTitle(id, shelfId);
   const actions = useMovieActions();
   const [override, setOverride] = useState<string>();
   const [manualCandidates, setManualCandidates] = useState<ManualMatchCandidate[] | null>(null);
@@ -91,6 +94,7 @@ export function MovieDetailPage() {
             </a>
           </h1><p className="mt-2 text-sm text-muted">{[runtime, item.rating ? `★ ${item.rating.toFixed(1)}` : null, item.metadataSource ?? 'Unmatched'].filter(Boolean).join(' · ')}</p>{duplicates.data?.length ? <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted"><span>{duplicates.data.length} other cop{duplicates.data.length === 1 ? 'y' : 'ies'} in your library</span><button type="button" onClick={() => setCompareOpen(true)} className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-raised">Compare</button></div> : null}</div>
           <MovieActionButtons imdbUrl={imdbUrl} movie={item} onManageShelves={() => setShelfManagerOpen(true)} onSubtitles={() => setSubtitlesOpen(true)} onToggleWatched={() => actions.watch.mutate({ id: item.id, watched: !item.watched })} watchPending={actions.watch.isPending} hidden={hiddenTitles.isHidden(item)} onToggleHidden={toggleHidden} />
+          {next.data && <NextTitlePanel current={item} next={next.data} shelfId={shelfId} />}
           {item.overview && <p className="max-w-3xl leading-7 text-foreground/90">{item.overview}</p>}
           <div className="grid gap-5 sm:grid-cols-2"><BrowseFilterChips label="Genres" values={item.genres} parameter="genre" /><BrowseFilterChips label="Cast" values={item.cast} parameter="actor" /></div>
         </div>
