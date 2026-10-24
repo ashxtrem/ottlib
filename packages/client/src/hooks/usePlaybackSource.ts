@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlaybackSource } from '@ottlib/shared';
 import { api } from './apiClient';
+import { startSessionKeepAlive } from '../utils/sessionKeepAlive';
 import { playbackQuery, type PlaybackCapabilities, type PlaybackSwitch } from '../utils/browserCaps';
 
 export interface PlaybackSourceState {
@@ -16,6 +17,11 @@ function stopSession(sessionUrl: string | undefined): void {
   if (sessionUrl) void api(sessionUrl, { method: 'DELETE', keepalive: true }).catch(() => undefined);
 }
 
+/** Keep-alive ping: no body (Fastify rejects an empty JSON body), same auth headers as the DELETE. */
+function pingSession(url: string): Promise<unknown> {
+  return api(url, { method: 'POST' });
+}
+
 /**
  * GET /api/movies/:id/playback with the browser's capabilities as the query. The server may open a transcode session
  * (`sessionUrl`); it is deleted on unmount, `pagehide` and when switching to another source.
@@ -24,6 +30,8 @@ export function usePlaybackSource(movieId: number, capabilities: PlaybackCapabil
   const [change, setChange] = useState<PlaybackSwitch>({});
   const [state, setState] = useState<Omit<PlaybackSourceState, 'switchTo'>>({ source: null, error: null, loading: true });
   const session = useRef<string | undefined>(undefined);
+  const stopKeepAlive = useRef<(() => void) | undefined>(undefined);
+  const endKeepAlive = () => { stopKeepAlive.current?.(); stopKeepAlive.current = undefined; };
 
   useEffect(() => {
     if (!capabilities) return;
@@ -36,6 +44,7 @@ export function usePlaybackSource(movieId: number, capabilities: PlaybackCapabil
         // Safe: the server issues a distinct sessionUrl per request, so this never stops the current session.
         if (!active) { stopSession(source.sessionUrl); return; }
         session.current = source.sessionUrl;
+        if (source.sessionUrl) stopKeepAlive.current = startSessionKeepAlive(source.sessionUrl, { post: pingSession });
         setState({ source, error: null, loading: false });
       })
       .catch((error: unknown) => {
@@ -43,13 +52,14 @@ export function usePlaybackSource(movieId: number, capabilities: PlaybackCapabil
       });
     return () => {
       active = false;
+      endKeepAlive();
       stopSession(session.current);
       session.current = undefined;
     };
   }, [movieId, capabilities, change]);
 
   useEffect(() => {
-    const onPageHide = () => { stopSession(session.current); session.current = undefined; };
+    const onPageHide = () => { endKeepAlive(); stopSession(session.current); session.current = undefined; };
     // Back from the browser's page cache: the session was stopped on pagehide, so ask again.
     const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) setChange((previous) => ({ ...previous })); };
     window.addEventListener('pagehide', onPageHide);
