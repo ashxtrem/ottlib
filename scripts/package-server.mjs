@@ -71,5 +71,7 @@ if (variant === 'full') {
 
 const archive = isWindows ? `${name}.zip` : `${name}.tar.gz`;
 rmSync(join(outDir, archive), { force: true });
-run('tar', isWindows ? ['-a', '-cf', archive, name] : ['-czf', archive, name], outDir);
+// bsdtar on the windows-latest runner crashes (access violation) while writing the zip, so use PowerShell there.
+if (isWindows) run('powershell', ['-NoProfile', '-Command', `Compress-Archive -Path '${name}' -DestinationPath '${archive}' -Force`], outDir);
+else run('tar', ['-czf', archive, name], outDir);
 console.log(`\nCreated ${join(outDir, archive)}`);
