@@ -7,6 +7,7 @@ import { isWithinRoot } from './scanner/walker.js';
 import { findExternalSubtitleFiles, type ExternalSubtitleFile } from './scanner/externalSubtitleScanner.js';
 import { LanPlaylist } from '../providers/playback/lanPlaylist.js';
 import { LocalLaunch } from '../providers/playback/localLaunch.js';
+import type { LocalPlaybackHandoff } from '../providers/playback/PlaybackHandoff.js';
 import { SubtitleLibraryService, downloadedSubtitleOrder } from './subtitles/subtitleLibraryService.js';
 
 export interface SubtitleFile { path: string; mimeType: string }
@@ -14,23 +15,23 @@ export interface SubtitleFile { path: string; mimeType: string }
 function subtitleMimeType(path: string): string | undefined { return subtitleMimeTypes[extname(path).slice(1).toLowerCase()]; }
 
 export class PlaybackService {
-  private readonly local = new LocalLaunch();
   private readonly playlist = new LanPlaylist();
   /** [streamQuery] adds the per-movie key external players need when an access PIN is set ('' otherwise). */
-  public constructor(private readonly movies: MovieRepository, private readonly streamQuery: (id: number) => string = () => '', private readonly subtitleLibrary?: SubtitleLibraryService) {}
+  public constructor(private readonly movies: MovieRepository, private readonly streamQuery: (id: number) => string = () => '', private readonly subtitleLibrary?: SubtitleLibraryService, private readonly local: LocalPlaybackHandoff = new LocalLaunch()) {}
 
   public async movieFile(id: number): Promise<PlaybackMovie> {
     const movie = this.movies.playbackMovie(id);
     if (!movie || movie.missing || !isWithinRoot(movie.folderPath, movie.path)) throw new Error('Movie file is unavailable');
     await stat(movie.path); return movie;
   }
-  public async playLocal(id: number): Promise<void> { this.local.open(await this.movieFile(id)); }
+  public hasVlc(): boolean { return this.local.hasVlc(); }
+  public async playLocal(id: number, startSec = 0): Promise<void> { this.local.open(await this.movieFile(id), startSec); }
   public async reveal(id: number): Promise<void> { this.local.reveal(await this.movieFile(id)); }
-  public async playlistFor(id: number, origin: string): Promise<string> { return this.playlist.playlist(origin, await this.movieFile(id), this.streamQuery(id)); }
+  public async playlistFor(id: number, origin: string, startSec = 0): Promise<string> { return this.playlist.playlist(origin, await this.movieFile(id), this.streamQuery(id), startSec); }
 
   /** What an embedded player should load. URLs are server-relative; the client resolves them against its server origin. */
-  public async source(id: number, deviceId: string | undefined): Promise<PlaybackSource> {
-    const file = await this.movieFile(id); const movie = this.movies.get(id, deviceId); const query = this.streamQuery(id);
+  public async source(id: number, profileId: number | undefined): Promise<PlaybackSource> {
+    const file = await this.movieFile(id); const movie = this.movies.get(id, profileId); const query = this.streamQuery(id);
     const downloaded = await this.subtitleLibrary?.list(id) ?? [];
     const subtitles = (await this.sideloadableSubtitles(file)).filter(subtitle => !downloaded.some(record => record.sidecar_path === subtitle.path)).map(({ track }) => ({
       url: `/api/movies/${id}/subtitles/${track.order}${query}`, language: track.language, codec: track.codec, title: track.title, isForced: track.isForced, isHearingImpaired: track.isHearingImpaired

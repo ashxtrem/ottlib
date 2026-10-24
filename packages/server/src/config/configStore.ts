@@ -1,5 +1,6 @@
+import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 const bootstrapSchema = z.object({
@@ -11,7 +12,22 @@ const bootstrapSchema = z.object({
 
 export type BootstrapConfig = z.infer<typeof bootstrapSchema> & { absoluteAppDataPath: string };
 
-export async function loadBootstrapConfig(rootPath = process.cwd()): Promise<BootstrapConfig> {
+const hasConfig = (directory: string) => existsSync(join(directory, 'config', 'config.json')) || existsSync(join(directory, 'config', 'config.example.json'));
+
+/**
+ * The folder that holds `config/` (and, by default, `data/`): `start` or the nearest parent with a `config/config.json`
+ * or `config/config.example.json`, else `start` itself. `npm start` and the release bundle run in that folder already;
+ * `npm run dev` and `npm run reset-pins` run in packages/server and find the repository root from there, so the server
+ * and the CLI always open the same library.
+ */
+export function resolveAppRoot(start = process.cwd()): string {
+  for (let directory = resolve(start); ; directory = dirname(directory)) {
+    if (hasConfig(directory)) return directory;
+    if (dirname(directory) === directory) return resolve(start);
+  }
+}
+
+export async function loadBootstrapConfig(rootPath = resolveAppRoot()): Promise<BootstrapConfig> {
   const configPath = resolve(rootPath, 'config', 'config.json');
   const examplePath = resolve(rootPath, 'config', 'config.example.json');
   try { await readFile(configPath); } catch {

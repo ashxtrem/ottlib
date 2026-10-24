@@ -3,6 +3,7 @@ export * from './torrent.js';
 export * from './playback.js';
 export * from './auth.js';
 export * from './hiddenTitles.js';
+export * from './profiles.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',

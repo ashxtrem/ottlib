@@ -43,3 +43,7 @@ export function DragHandleIcon(props: SVGProps<SVGSVGElement>) {
 export function PlayIcon(props: SVGProps<SVGSVGElement>) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5" {...props}><path d="M7 4.5v15l13-7.5-13-7.5Z" /></svg>;
 }
+
+export function LockIcon(props: SVGProps<SVGSVGElement>) {
+  return <Icon {...props}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></Icon>;
+}

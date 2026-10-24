@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createDatabase } from '../db/db.js';
 import { MovieRepository, type ScannedMovie } from './movieRepository.js';
 import { PlaybackProgressRepository } from './playbackProgressRepository.js';
+import { ProfileRepository } from './profileRepository.js';
 import { ShelfMovieRepository } from './shelfMovieRepository.js';
 import { WatchStateRepository } from './watchStateRepository.js';
 
@@ -69,17 +70,18 @@ describe('MovieRepository metadata invalidation', () => {
     const shelves = new ShelfMovieRepository(db);
     db.prepare('INSERT INTO shelves (name) VALUES (?)').run('Favorites');
     shelves.addMovies(1, [1]);
-    watches.set(1, 'device-a', true);
-    watches.set(1, 'device-b', false);
-    progress.set(1, 'device-b', 180_000, 900_000, 1);
-    const savedProgress = progress.get(1, 'device-b');
+    const owner = new ProfileRepository(db).getOwner()!.id; const kid = new ProfileRepository(db).create({ name: 'Kid', color: '#17c964', pinHash: null }).id;
+    watches.set(1, owner, true);
+    watches.set(1, kid, false);
+    progress.set(1, kid, null, 180_000, 900_000, 1);
+    const savedProgress = progress.get(1, kid);
     movies.updateTitleOverride(1, 'My title');
 
     movies.upsertScanned({ ...original, size: 101, title: 'Replacement', year: 2025 });
 
-    expect(movies.get(1, 'device-a')).toMatchObject({ ...emptyMetadata, title: 'My title', titleOverride: 'My title', year: 2025, watched: true });
-    expect(movies.get(1, 'device-b')).toMatchObject({ watched: false, resumePositionMs: 180_000 });
-    expect(progress.get(1, 'device-b')).toEqual(savedProgress);
+    expect(movies.get(1, owner)).toMatchObject({ ...emptyMetadata, title: 'My title', titleOverride: 'My title', year: 2025, watched: true });
+    expect(movies.get(1, kid)).toMatchObject({ watched: false, resumePositionMs: 180_000 });
+    expect(progress.get(1, kid)).toEqual(savedProgress);
     expect(shelves.listMovieIds(1)).toEqual([1]);
     expect(shelves.listCoverMovies(1)).toEqual([{ id: 1, title: 'My title', posterUrl: null }]);
   });
