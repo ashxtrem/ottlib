@@ -16,6 +16,7 @@ import dev.ottlib.core.model.PinLoginRequest
 import dev.ottlib.core.model.PinLoginResult
 import dev.ottlib.core.model.PlaybackProgressResult
 import dev.ottlib.core.model.PlaybackProgressUpdate
+import dev.ottlib.core.model.PlaybackRequest
 import dev.ottlib.core.model.PlaybackSource
 import dev.ottlib.core.model.Recommendation
 import dev.ottlib.core.model.ScanStatus
@@ -83,7 +84,14 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     suspend fun filterOptions(): MovieFilterOptions = get(url("/api/movies/filter-options"))
     suspend fun shelves(): List<ShelfSummary> = get(url("/api/shelves"))
     suspend fun shelf(id: Long): ShelfDetail = get(url("/api/shelves/$id"))
-    suspend fun playbackSource(id: Long): PlaybackSource = get(url("/api/movies/$id/playback"))
+    /** The plain direct source, or with [request] the server's direct/remux/transcode answer for those capabilities (503 when every transcode slot is busy). */
+    suspend fun playbackSource(id: Long, request: PlaybackRequest? = null): PlaybackSource =
+        get(url("/api/movies/$id/playback").let { base -> request?.applyTo(base.newBuilder())?.build() ?: base })
+    /** Stops a remux/transcode session; [sessionUrl] is the server-relative `sessionUrl` of an `hls` source. */
+    suspend fun stopSession(sessionUrl: String) {
+        val target = resolve(sessionUrl)?.toHttpUrlOrNull() ?: return
+        client.newCall(Request.Builder().url(target).delete().build()).awaitBody()
+    }
     suspend fun subtitleOptions(): SubtitleOptions = get(url("/api/subtitles/options"))
     suspend fun searchSubtitles(id: Long, search: SubtitleSearch): SubtitleSearchResponse =
         send("POST", url("/api/movies/$id/subtitles/search"), subtitleRequestJson.encodeToString(SubtitleSearch.serializer(), search))

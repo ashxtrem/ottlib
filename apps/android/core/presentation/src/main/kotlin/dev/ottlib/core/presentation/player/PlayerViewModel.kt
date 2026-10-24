@@ -22,6 +22,7 @@ import dev.ottlib.core.player.TrackMemory
 import dev.ottlib.core.player.hasOnlyUnsupportedAudio
 import dev.ottlib.core.player.hasOnlyUnsupportedVideo
 import dev.ottlib.core.player.toMediaItem
+import dev.ottlib.core.player.withSubtitlesFrom
 import dev.ottlib.core.presentation.ContinueWatchingEntry
 import dev.ottlib.core.presentation.ContinueWatchingPublisher
 import dev.ottlib.core.presentation.userMessage
@@ -52,6 +53,8 @@ sealed interface PlaybackProblem {
     data class UnsupportedAudio(override val message: String) : PlaybackProblem
     data class UnsupportedVideo(override val message: String) : PlaybackProblem
     data class Error(override val message: String) : PlaybackProblem
+    /** "Play via server" was refused ([message] says why); the dialog keeps [original]'s other choices. */
+    data class ServerUnavailable(override val message: String, val original: PlaybackProblem) : PlaybackProblem
 }
 
 class PlayerViewModel(
@@ -91,6 +94,9 @@ class PlayerViewModel(
     private var session: PlaybackSession? = null
     private val player: ExoPlayer? get() = session?.player
     private var startup: Job? = null
+    private var fallback: Job? = null
+    /** The server's remux/transcode session behind the current HLS source; stopped on release or a new source. */
+    private var serverSession: String? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
     val subtitles = SubtitleSearchController(api, movieId, viewModelScope,
@@ -228,6 +234,42 @@ class PlayerViewModel(
         player?.run { prepare(); play() }
     }
 
+    /**
+     * Swaps to the server's remux/transcode of this title from the current position, on the same player, so progress
+     * reporting, remembered tracks and side-loaded subtitles carry on. The HLS timeline is the whole film, so positions
+     * stay film positions. A refusal (busy, no ffmpeg) is shown in the problem dialog instead.
+     */
+    fun playViaServer() {
+        val shown = currentProblem.value ?: return
+        val exo = player ?: return
+        val request = serverFallbackRequest(shown, exo.currentPosition.coerceAtLeast(0)) ?: return
+        currentProblem.value = null
+        exo.pause()
+        fallback?.cancel()
+        fallback = viewModelScope.launch {
+            val source = try { api.playbackSource(movieId, request) }
+            catch (error: CancellationException) { throw error }
+            catch (error: Exception) { currentProblem.value = PlaybackProblem.ServerUnavailable(error.userMessage(), shown); return@launch }
+            val refusal = serverFallbackRefusal(source)
+            val active = player
+            if (refusal != null || active == null) {
+                source.sessionUrl?.let(::stopServerSession)
+                if (refusal != null) currentProblem.value = PlaybackProblem.ServerUnavailable(refusal, shown)
+                return@launch
+            }
+            serverSession?.let(::stopServerSession)
+            serverSession = source.sessionUrl
+            val item = source.toMediaItem(movieId, title) { api.resolve(it)!! }.withSubtitlesFrom(active.currentMediaItem)
+            active.setMediaItem(item, request.startMs ?: 0)
+            active.prepare()
+            active.playWhenReady = true
+        }
+    }
+
+    private fun stopServerSession(sessionUrl: String) {
+        backgroundScope.launch { runCatching { api.stopSession(sessionUrl) } }
+    }
+
     fun saveCompletion() {
         backgroundScope.launch {
             saving.withLock {
@@ -265,8 +307,11 @@ class PlayerViewModel(
         countdown.cancel()
         subtitles.cancel()
         startup?.cancel()
+        fallback?.cancel()
         session?.release()
         session = null
+        serverSession?.let(::stopServerSession)
+        serverSession = null
     }
 
     override fun onCleared() = releasePlayback()

@@ -33,6 +33,12 @@ private fun Response.bodyOrThrow(): String = use {
     text
 }
 
+/** The `{ error }` text; when `error` is a code (`TRANSCODE_BUSY`) and a `message` comes with it, the message. */
 private fun errorMessage(body: String): String? = runCatching {
-    OttlibJson.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content
+    val json = OttlibJson.parseToJsonElement(body).jsonObject
+    val error = json["error"]?.jsonPrimitive?.content
+    val message = json["message"]?.jsonPrimitive?.content
+    if (error != null && message != null && errorCode.matches(error)) message else error
 }.getOrNull()
+
+private val errorCode = Regex("^[A-Z][A-Z0-9_]+$")

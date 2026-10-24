@@ -18,6 +18,8 @@ kotlin { jvmToolchain(17) }
 dependencies {
     api(project(":core:model"))
     api(libs.media3.exoplayer)
+    // HLS playlists from the server's remux/transcode fallback ("Play via server").
+    implementation(libs.media3.exoplayer.hls)
     // PlayerView, for PictureModeController (both apps draw video through it).
     api(libs.media3.ui)
     implementation(libs.media3.datasource.okhttp)

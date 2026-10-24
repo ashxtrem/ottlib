@@ -1,6 +1,7 @@
 package dev.ottlib.core.network
 
 import dev.ottlib.core.model.PlaybackProgressUpdate
+import dev.ottlib.core.model.PlaybackRequest
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -92,6 +93,45 @@ class OttlibApiTest {
         } catch (error: ApiException) {
             assertEquals(404, error.statusCode)
             assertEquals("Movie file is unavailable", error.message)
+        }
+    }
+
+    @Test
+    fun playbackSourceWithCapabilitiesBuildsTheQuery() = runTest {
+        server.enqueue(MockResponse().setBody("""{"kind":"hls","streamUrl":"/api/hls/s1/index.m3u8","mimeType":"application/vnd.apple.mpegurl","durationMs":6000000,"resumePositionMs":null,"subtitles":[],"mode":"transcode","reasons":["video-codec"],"sessionUrl":"/api/hls/s1"}"""))
+        val source = api.playbackSource(7, PlaybackRequest(video = listOf("h264"), audio = listOf("aac"), hdr = false, maxHeight = 1080, audioOrder = 2, startMs = 61_000))
+        val request = server.takeRequest()
+        assertEquals("/api/movies/7/playback?video=h264&audio=aac&hdr=false&maxHeight=1080&audioOrder=2&startMs=61000", request.path)
+        assertEquals(deviceId, request.getHeader("x-device-id"))
+        assertEquals("hls", source.kind)
+        assertEquals("/api/hls/s1", source.sessionUrl)
+
+        server.enqueue(MockResponse().setBody("""{"kind":"direct","streamUrl":"/api/stream/7","mimeType":"video/mp4","durationMs":null,"resumePositionMs":null,"subtitles":[]}"""))
+        api.playbackSource(7, PlaybackRequest(containers = listOf("mp4", "webm"), video = listOf("h264", "hevc")))
+        assertEquals("/api/movies/7/playback?containers=mp4%2Cwebm&video=h264%2Chevc", server.takeRequest().path)
+        server.enqueue(MockResponse().setBody("""{"kind":"direct","streamUrl":"/api/stream/7","mimeType":"video/mp4","durationMs":null,"resumePositionMs":null,"subtitles":[]}"""))
+        api.playbackSource(7)
+        assertEquals("/api/movies/7/playback", server.takeRequest().path)
+    }
+
+    @Test
+    fun stopsATranscodeSessionWithADelete() = runTest {
+        server.enqueue(MockResponse().setResponseCode(204))
+        api.stopSession("/api/hls/s1")
+        val request = server.takeRequest()
+        assertEquals("DELETE", request.method)
+        assertEquals("/api/hls/s1", request.path)
+    }
+
+    @Test
+    fun showsTheMessageOfACodedError() = runTest {
+        server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":"TRANSCODE_BUSY","message":"All transcode sessions are busy"}"""))
+        try {
+            api.playbackSource(1, PlaybackRequest(video = listOf("h264")))
+            fail("expected ApiException")
+        } catch (error: ApiException) {
+            assertEquals(503, error.statusCode)
+            assertEquals("All transcode sessions are busy", error.message)
         }
     }
 
