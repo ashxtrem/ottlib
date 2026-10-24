@@ -10,6 +10,7 @@ export const hlsRoutes = {
   init: '/api/hls/:id/:sessionId/init.mp4',
   segment: '/api/hls/:id/:sessionId/seg-:n(^\\d+).m4s',
   session: '/api/hls/:id/:sessionId',
+  keepalive: '/api/hls/:id/:sessionId/keepalive',
 } as const;
 
 interface HlsParams { id: string; sessionId: string; n?: string }
@@ -47,6 +48,9 @@ export function registerHlsRoutes(app: FastifyInstance, sessions: TranscodeSessi
   });
   app.delete<{ Params: HlsParams }>(hlsRoutes.session, async (request, reply) => {
     try { await sessions.close(Number(request.params.id), request.params.sessionId); return reply.code(204).send(); } catch (error) { return sendError(reply, error); }
+  });
+  app.post<{ Params: HlsParams }>(hlsRoutes.keepalive, async (request, reply) => {
+    try { sessions.touch(Number(request.params.id), request.params.sessionId); return reply.code(204).send(); } catch (error) { return sendError(reply, error); }
   });
   app.get('/api/transcode/encoders', async () => info.get());
 }

@@ -65,6 +65,16 @@ describe('HLS routes', () => {
     } finally { await app.close(); db.close(); }
   });
 
+  it('answers a keep-alive POST with 204 for an open session and 404 for an unknown one or another movie id', async () => {
+    const { app, db, open } = fixture();
+    try {
+      const base = (await open()).sessionUrl;
+      expect((await app.inject({ method: 'POST', url: `${base}/keepalive` })).statusCode).toBe(204);
+      expect((await app.inject({ method: 'POST', url: '/api/hls/1/nope/keepalive' })).statusCode).toBe(404);
+      expect((await app.inject({ method: 'POST', url: `${base.replace('/hls/1/', '/hls/2/')}/keepalive` })).statusCode).toBe(404);
+    } finally { await app.close(); db.close(); }
+  });
+
   it('answers 404 for a segment whose file is gone from disk', async () => {
     const { app, db, open, runs, root } = fixture();
     try {
@@ -99,6 +109,8 @@ describe('HLS routes', () => {
       expect((await app.inject({ method: 'GET', url: `${base}/init.mp4${query}` })).statusCode).toBe(200);
       expect((await app.inject({ method: 'DELETE', url: `${base}${query}` })).statusCode).toBe(401);
       expect((await app.inject({ method: 'GET', url: '/api/transcode/encoders' })).statusCode).toBe(401);
+      expect((await app.inject({ method: 'POST', url: `${base}/keepalive${query}` })).statusCode).toBe(401);
+      expect((await app.inject({ method: 'POST', url: `${base}/keepalive`, headers: { cookie } })).statusCode).toBe(204);
       expect((await app.inject({ method: 'DELETE', url: base, headers: { cookie } })).statusCode).toBe(204);
     } finally { await app.close(); db.close(); }
   });
