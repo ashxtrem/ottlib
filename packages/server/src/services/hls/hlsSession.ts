@@ -98,7 +98,8 @@ export class HlsSession {
     await rm(this.options.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined);
   }
 
-  private touch(): void { this.lastAccessMs = this.options.now(); }
+  /** Resets the idle clock without a segment request (the player's keep-alive ping while it is paused). */
+  public touch(): void { this.lastAccessMs = this.options.now(); }
 
   /**
    * Not yet written by the running ffmpeg but at most a few segments past its newest one. A missing segment at or before

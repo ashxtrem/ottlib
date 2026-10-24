@@ -142,6 +142,9 @@ export class TranscodeSessionService implements HlsSessionOpener {
     await this.closeSession(id);
   }
 
+  /** Resets the session's idle clock; throws `SessionNotFoundError` when it is gone. */
+  public touch(movieId: number, id: string): void { this.get(movieId, id).touch(); }
+
   /** Kills sessions with no request for `idleTimeoutMs`. Runs every `sweepIntervalMs` once started. */
   public async sweep(): Promise<void> {
     const cutoff = this.now() - limits.idleTimeoutMs;

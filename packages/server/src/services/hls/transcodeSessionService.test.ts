@@ -141,6 +141,18 @@ describe('TranscodeSessionService', () => {
     await expect(service.segment(7, id, 0)).rejects.toThrow(SessionNotFoundError);
   });
 
+  it('keeps a session alive past the sweep while it is touched, and rejects touching an unknown one', async () => {
+    const { service, clock } = fixture();
+    const id = sessionId((await service.open(input())).playlistUrl);
+    clock.now += 44_000; service.touch(7, id);
+    clock.now += 44_000; await service.sweep();
+    expect(service.sessionCount()).toBe(1);
+    clock.now += 46_000; await service.sweep();
+    expect(service.sessionCount()).toBe(0);
+    expect(() => service.touch(7, id)).toThrow(SessionNotFoundError);
+    expect(() => service.touch(7, 'nope')).toThrow(SessionNotFoundError);
+  });
+
   it('ends a device\'s previous session when it opens a new one', async () => {
     const { service, root } = fixture();
     const device = '3f1c2a52-8a3b-4f0e-9a51-2d6f0f5d9c11';
