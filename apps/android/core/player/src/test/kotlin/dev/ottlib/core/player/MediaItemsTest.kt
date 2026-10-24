@@ -31,6 +31,12 @@ class MediaItemsTest {
     }
 
     @Test
+    fun dropsEmbeddedSubtitlesThatTheServerStillExtracts() {
+        val item = source("hls", "/p.m3u8", listOf(subtitle("/api/movies/1/subtitles/embedded/2.vtt"), subtitle("/a.srt"))).toMediaItem(1, "Film", resolve)
+        assertEquals(listOf("/a.srt"), item.localConfiguration?.subtitleConfigurations?.map { it.id })
+    }
+
+    @Test
     fun keepsSubtitlesTheNewItemDoesNotCarry() {
         val previous = source("direct", "/api/stream/1", listOf(subtitle("/a.srt"), subtitle("/found.srt"))).toMediaItem(1, "Film", resolve)
         val next = source("hls", "/p.m3u8", listOf(subtitle("/a.srt"))).toMediaItem(1, "Film", resolve).withSubtitlesFrom(previous)

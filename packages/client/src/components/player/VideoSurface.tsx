@@ -86,7 +86,11 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
     ref={videoRef}
     playsInline
     autoPlay
-    onError={(event) => { if (event.currentTarget.error && event.currentTarget.getAttribute('src')) onPlaybackError('media'); }}
+    onError={(event) => {
+      // With hls.js the element's error is the same MSE failure hls.js reports: its fatal callback (after the retries) is the reporter.
+      if (source.kind !== 'direct' && hlsEngine === 'hlsjs') return;
+      if (event.currentTarget.error && event.currentTarget.getAttribute('src')) onPlaybackError('media');
+    }}
     className="h-full w-full bg-black object-contain"
   >
     {textTracks.map((subtitle, index) => <track
