@@ -9,8 +9,16 @@ export function rateArgs(bitrateKbps: number): string[] {
   return ['-b:v', `${kbps}k`, '-maxrate', `${Math.round(kbps * maxrateFactor)}k`, '-bufsize', `${Math.round(kbps * bufsizeFactor)}k`];
 }
 
+/** Highest frame rate the GOP cap allows for: no source runs faster, so the encoder never adds a keyframe of its own. */
+const maxFramesPerSecond = 240;
+
+/**
+ * Keyframes exactly every segment: forced at each boundary, with a GOP longer than a segment at any frame rate so the
+ * encoder adds none in between (each encoder file also turns scene-cut keyframes off where it has the option).
+ */
 export function keyframeArgs(segmentSeconds: number): string[] {
-  return ['-force_key_frames', `expr:gte(t,n_forced*${segmentSeconds})`];
+  const gop = String(Math.ceil(segmentSeconds * maxFramesPerSecond));
+  return ['-force_key_frames', `expr:gte(t,n_forced*${segmentSeconds})`, '-g', gop, '-keyint_min', gop];
 }
 
 /** True when frames go through system memory (explicit flag, or software filters to run). */

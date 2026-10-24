@@ -50,7 +50,7 @@ describe('HLS routes', () => {
       expect(playlist.headers['content-type']).toBe('application/vnd.apple.mpegurl');
       expect(playlist.body).toContain('seg-2.m4s');
       const segment = app.inject({ method: 'GET', url: `${base}/seg-0.m4s` });
-      runs[0].produce([0]);
+      runs[0].produce([0, 4000]);
       const served = await segment;
       expect(served.statusCode).toBe(200);
       expect(served.headers['content-type']).toBe('video/mp4');
@@ -80,7 +80,7 @@ describe('HLS routes', () => {
       expect(playlist.statusCode).toBe(200);
       expect(playlist.body).toContain(`seg-0.m4s${query}`);
       const segment = app.inject({ method: 'GET', url: `${base}/seg-0.m4s${query}` });
-      runs[0].produce([0]);
+      runs[0].produce([0, 4000]);
       expect((await segment).statusCode).toBe(200);
       expect((await app.inject({ method: 'GET', url: `${base}/init.mp4${query}` })).statusCode).toBe(200);
       expect((await app.inject({ method: 'DELETE', url: `${base}${query}` })).statusCode).toBe(401);

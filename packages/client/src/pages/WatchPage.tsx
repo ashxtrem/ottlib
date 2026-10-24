@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BackIcon } from '../components/icons';
 import { focusRing } from '../components/interactionStyles';
@@ -74,6 +74,24 @@ function WatchPlayer({ movieId, shelfId }: { movieId: number; shelfId?: number }
     switchTo({ ...change, startMs: positionMs });
   }, [video, switchStartMs, source?.resumePositionMs, switchTo]);
   const tracks = usePlayerTracks({ video, source, reopen });
+
+  // A session the server ended (e.g. reaped while paused) fails the hls stream: reopen once at the position before
+  // showing the error. The once-flag resets as soon as playback runs again.
+  const reopenedAfterFailure = useRef(false);
+  useEffect(() => {
+    if (!video) return;
+    const onPlaying = () => { reopenedAfterFailure.current = false; };
+    video.addEventListener('playing', onPlaying);
+    return () => video.removeEventListener('playing', onPlaying);
+  }, [video]);
+  const onPlaybackError = useCallback((reason: PlaybackFailure) => {
+    if (reason === 'media' && source?.kind === 'hls' && !reopenedAfterFailure.current) {
+      reopenedAfterFailure.current = true;
+      reopen({ audioOrder: source.audioOrder, burnSubtitleOrder: source.burnSubtitleOrder });
+      return;
+    }
+    setFailure(reason);
+  }, [source, reopen]);
   const upNext = useUpNext({ movieId, shelfId, positionMs: state.positionMs, durationMs: state.durationMs, ended: state.ended });
 
   usePlayerShortcuts({
@@ -93,7 +111,7 @@ function WatchPlayer({ movieId, shelfId }: { movieId: number; shelfId?: number }
   return <div ref={setContainer} onPointerMove={controls.show} className={`fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-black text-white ${controls.visible ? '' : 'cursor-none'}`}>
     {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} />
       : source ? <>
-        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={setVideo} onPlaybackError={setFailure} />
+        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={setVideo} onPlaybackError={onPlaybackError} />
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls
           state={state} visible={controls.visible} fullscreen={screen.fullscreen} onBack={leave}

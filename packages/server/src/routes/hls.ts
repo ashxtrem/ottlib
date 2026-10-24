@@ -16,6 +16,8 @@ interface HlsParams { id: string; sessionId: string; n?: string }
 
 function sendError(reply: FastifyReply, error: unknown) {
   if (error instanceof SessionNotFoundError || error instanceof SegmentNotFoundError) return reply.code(404).send({ error: error.message });
+  // The file went away between the session answering and the read (deleted behind the player, or the session closed).
+  if ((error as NodeJS.ErrnoException | null)?.code === 'ENOENT') return reply.code(404).send({ error: 'Segment is no longer available' });
   return reply.code(500).send({ error: error instanceof Error ? error.message : 'Transcoding failed' });
 }
 

@@ -51,6 +51,8 @@ export class HlsSession {
   /** Starts (or restarts) ffmpeg at segment n. */
   public start(segment: number): void {
     if (this.closed) return;
+    // The first run starts where the player will ask first, so "far ahead of the player" counts from there.
+    if (!this.run) this.lastRequested = segment;
     void this.run?.stop();
     this.restartPoint = segment;
     this.rejectWaiters((waiter) => waiter.segment !== 'init' && (waiter.segment < segment || waiter.segment > segment + limits.segmentWaitWindow), 'Playback moved elsewhere');
@@ -95,10 +97,13 @@ export class HlsSession {
 
   private touch(): void { this.lastAccessMs = this.options.now(); }
 
-  /** Between the restart point and a few segments past the newest one the running ffmpeg has written. */
+  /**
+   * Not yet written by the running ffmpeg but at most a few segments past its newest one. A missing segment at or before
+   * the newest (deleted behind the player, or skipped) never arrives from this run, so it is not near.
+   */
   private isNear(index: number): boolean {
     if (!this.run?.running) return false;
-    return index >= this.restartPoint && index <= this.run.newest + limits.segmentWaitWindow;
+    return index >= this.restartPoint && index > this.run.newest && index <= this.run.newest + limits.segmentWaitWindow;
   }
 
   /** A run stopped for being far ahead resumes where it stopped when the request is just past that; else at the request. */

@@ -23,6 +23,9 @@ describe.each(videoEncoders.map((encoder) => [encoder.name, encoder] as const))(
     expect(value(output, '-maxrate')).toBe('18000k');
     expect(value(output, '-bufsize')).toBe('24000k');
     expect(value(output, '-force_key_frames')).toBe('expr:gte(t,n_forced*4)');
+    // A GOP longer than a 4 s segment at 240 fps: the encoder adds no keyframe between the forced ones.
+    expect(value(output, '-g')).toBe('960');
+    expect(value(output, '-keyint_min')).toBe('960');
   });
 
   it('runs software filters before a CPU scale and drops hardware decode', () => {
@@ -56,6 +59,7 @@ describe('hardware paths', () => {
     const { input, output } = nvencEncoder.args(hardware);
     expect(input).toEqual(['-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda']);
     expect(value(output, '-vf')).toBe('scale_cuda=-2:1080:format=yuv420p');
+    expect(value(output, '-no-scenecut')).toBe('1');
   });
 
   it('QSV decodes and scales on Quick Sync', () => {
@@ -76,5 +80,6 @@ describe('hardware paths', () => {
     expect(input).toEqual([]);
     expect(value(output, '-preset')).toBe('veryfast');
     expect(value(output, '-vf')).toBe('scale=-2:1080,format=yuv420p');
+    expect(value(output, '-sc_threshold')).toBe('0');
   });
 });

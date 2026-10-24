@@ -131,8 +131,8 @@ export const transcodeEncodersSchema = z.object({
 });
 
 export type TranscodeEncoders = z.infer<typeof transcodeEncodersSchema>;
-export type PlayLocalRequest =z.infer<typeof playLocalRequestSchema>;
-export type PlaybackProgressUpdate =z.infer<typeof playbackProgressUpdateSchema>;
+export type PlayLocalRequest = z.infer<typeof playLocalRequestSchema>;
+export type PlaybackProgressUpdate = z.infer<typeof playbackProgressUpdateSchema>;
 export type PlaybackProgressResult = z.infer<typeof playbackProgressResultSchema>;
 export type SubtitleSource = z.infer<typeof subtitleSourceSchema>;
 export type PlaybackSource = z.infer<typeof playbackSourceSchema>;

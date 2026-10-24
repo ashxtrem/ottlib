@@ -50,6 +50,8 @@ export function segmentAt(plan: SegmentPlan, ms: number | undefined): number {
 export class TranscodeSessionService implements HlsSessionOpener {
   public readonly root: string;
   private readonly sessions = new Map<string, HlsSession>();
+  /** Opens past the limit check that have not added their session yet. */
+  private readonly opening = { remux: 0, transcode: 0 };
   private readonly spawn: SpawnFn;
   private readonly now: () => number;
   private readonly log: (message: string) => void;
@@ -92,10 +94,20 @@ export class TranscodeSessionService implements HlsSessionOpener {
       const previous = [...this.sessions.values()].filter((session) => session.options.deviceId === input.deviceId);
       await Promise.all(previous.map((session) => this.closeSession(session.id)));
     }
+    // Check and reserve in one synchronous step, so opens that overlap across the awaits below cannot pass the cap together.
     const max = mode === 'transcode' ? limits.maxTranscodeSessions : limits.maxRemuxSessions;
-    if ([...this.sessions.values()].filter((session) => session.options.mode === mode).length >= max) {
+    if ([...this.sessions.values()].filter((session) => session.options.mode === mode).length + this.opening[mode] >= max) {
       throw new SessionBusyError(`All ${max} ${mode} sessions are in use; stop playback on another device and try again`);
     }
+    this.opening[mode] += 1;
+    try {
+      return await this.create(input, mode, durationMs, ffmpeg);
+    } finally {
+      this.opening[mode] -= 1;
+    }
+  }
+
+  private async create(input: HlsSessionInput, mode: 'remux' | 'transcode', durationMs: number, ffmpeg: FfmpegBinary): Promise<HlsSessionHandle> {
     const plan = mode === 'remux' ? planSegments({ mode, durationMs, keyframesMs: input.keyframesMs }) : planSegments({ mode, durationMs });
     const video = await this.videoFor(input, ffmpeg);
     const id = randomBytes(8).toString('hex');

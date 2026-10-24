@@ -60,11 +60,11 @@ describe('TranscodeSessionService', () => {
     const { service, runs, logs } = fixture();
     const id = sessionId((await service.open(input())).playlistUrl);
     const init = service.init(7, id); const first = service.segment(7, id, 0);
-    runs[0].produce([0]);
+    runs[0].produce([0, 2000]); // segment 0 is complete once segment 1 opens
     expect(readFileSync(await first).equals(fragment(0))).toBe(true);
     expect(existsSync(await init)).toBe(true);
     const near = service.segment(7, id, 4); // newest is 0; up to 4 past it waits
-    runs[0].produce([2000, 4000, 6000, 8000], false);
+    runs[0].produce([4000, 6000, 8000, 10_000], false);
     expect(existsSync(await near)).toBe(true);
     expect(runs).toHaveLength(1);
     expect(logs.some((line) => /remux session .*first segment \(0\) after \d+ ms/.test(line))).toBe(true);
@@ -74,14 +74,57 @@ describe('TranscodeSessionService', () => {
   it('restarts ffmpeg at a far segment', async () => {
     const { service, runs } = fixture();
     const id = sessionId((await service.open(input())).playlistUrl);
-    runs[0].produce([0]);
+    runs[0].produce([0, 2000]);
     await service.segment(7, id, 0);
     const far = service.segment(7, id, 100);
     expect(runs).toHaveLength(2);
     expect(runs[0].killed).toBe(true);
     expect(runs[1].args[runs[1].args.indexOf('-ss') + 1]).toBe('200.200');
-    runs[1].produce([200_000]);
+    runs[1].produce([200_000, 202_000]);
     expect(readFileSync(await far).equals(fragment(200_000))).toBe(true);
+    await service.shutdown();
+  });
+
+  it('restarts ffmpeg on a backward seek to a segment already deleted behind the player', async () => {
+    const { service, runs, root } = fixture();
+    const id = sessionId((await service.open(input())).playlistUrl);
+    const first = service.segment(7, id, 0);
+    runs[0].produce(keyframes.slice(0, 41));
+    await first;
+    await vi.waitFor(() => expect(existsSync(join(root, id, 'seg-39.m4s'))).toBe(true), { timeout: 5_000, interval: 10 });
+    await service.segment(7, id, 38); // deletes segments more than 30 behind it
+    await vi.waitFor(() => expect(existsSync(join(root, id, 'seg-5.m4s'))).toBe(false), { timeout: 5_000, interval: 10 });
+    const back = service.segment(7, id, 5);
+    expect(runs).toHaveLength(2);
+    expect(runs[1].args[runs[1].args.indexOf('-ss') + 1]).toBe('10.200');
+    runs[1].produce([10_000, 12_000]);
+    expect(readFileSync(await back).equals(fragment(10_000))).toBe(true);
+    await service.shutdown();
+  });
+
+  it('keeps ffmpeg running after the first segment of a session opened deep in the film', async () => {
+    const { service, runs, root } = fixture();
+    const id = sessionId((await service.open(input('remux', { startMs: 400_000 }))).playlistUrl);
+    runs[0].produce([400_000, 402_000, 404_000]); // before the player asks for anything
+    await vi.waitFor(() => expect(existsSync(join(root, id, 'seg-201.m4s'))).toBe(true), { timeout: 5_000, interval: 10 });
+    expect(runs[0].killed).toBe(false);
+    expect(runs).toHaveLength(1);
+    await service.shutdown();
+  });
+
+  it('serves a segment made of several fragments only once it is complete, and the last one when ffmpeg ends', async () => {
+    const { service, runs } = fixture();
+    const id = sessionId((await service.open(input('remux', { keyframesMs: [0, 2000], mediaInfo: { ...input().mediaInfo, durationMs: 4_000 } }))).playlistUrl);
+    let served = false;
+    const first = service.segment(7, id, 0).then((path) => { served = true; return path; });
+    const last = service.segment(7, id, 1);
+    runs[0].produce([0, 1000]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(served).toBe(false);
+    runs[0].produce([2000, 3000], false);
+    expect(readFileSync(await first).equals(Buffer.concat([fragment(0), fragment(1000)]))).toBe(true);
+    runs[0].exit(0);
+    expect(readFileSync(await last).equals(Buffer.concat([fragment(2000), fragment(3000)]))).toBe(true);
     await service.shutdown();
   });
 
@@ -115,6 +158,16 @@ describe('TranscodeSessionService', () => {
     await expect(service.open(input('remux'))).rejects.toBeInstanceOf(SessionBusyError);
     for (let index = 0; index < 3; index += 1) await service.open(input('transcode'));
     await expect(service.open(input('transcode'))).rejects.toBeInstanceOf(SessionBusyError);
+    await service.shutdown();
+  });
+
+  it('lets only one of two overlapping opens take the last free slot', async () => {
+    const { service } = fixture();
+    for (let index = 0; index < 5; index += 1) await service.open(input('remux'));
+    const results = await Promise.allSettled([service.open(input('remux')), service.open(input('remux'))]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.find((result) => result.status === 'rejected')).toMatchObject({ reason: expect.any(SessionBusyError) });
+    expect(service.sessionCount()).toBe(6);
     await service.shutdown();
   });
 
