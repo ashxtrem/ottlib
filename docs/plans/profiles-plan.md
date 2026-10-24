@@ -2,7 +2,8 @@
 
 Up to 6 profiles per library, each with an optional PIN. Watch progress, watched state, hides and play history belong to a
 profile instead of a device, so playback started on one device resumes on another. Shelves and settings stay shared.
-Android support is the follow-up run (Phase 1b); this run keeps today's Android app working unchanged.
+Android support is the follow-up run (Phase 1b). Today's Android app keeps working while the library has one PIN-less
+profile (§3 fallback); once a second profile or a PIN exists it gets 409 `PROFILE_REQUIRED` until Phase 1b ships.
 
 ## Decisions (agreed with the user)
 - Profile PIN keeps family members out of each other's lists. It is **not** a security boundary: stream URLs stay per-movie
@@ -58,7 +59,9 @@ playback_history(id INTEGER PK AUTOINCREMENT, profile_id INTEGER NOT NULL REFERE
 - PINs: 4–8 digits, hashed with the access-PIN hasher. Colors: a fixed list of 6 in shared.
 - Token: random 32 bytes, sent by clients as `x-profile-session`; only its SHA-256 is stored. `last_seen_at` updates at
   most once a minute.
-- CLI `src/scripts/resetPins.ts` (`npm run reset-pins`): same effect as `reset-local`, prints what it cleared.
+- CLI: new folder `packages/server/src/scripts/`, file `resetPins.ts`, plus `"reset-pins": "tsx src/scripts/resetPins.ts"` in
+  `packages/server/package.json`. Same effect as `reset-local` (shared service function), prints what it cleared.
+- `isLoopback` is private in `routes/playback.ts:5`: move it to its own file (`routes/loopback.ts`) and import it in both.
 
 ## 3. Profile resolution
 A Fastify hook (own file, e.g. `routes/profileContext.ts`) sets `request.profileId` from `x-profile-session`.
@@ -70,13 +73,16 @@ Profile-scoped routes call `requireProfile(request)`:
 ## 4. Scope switch (device → profile)
 Every read/write of progress, watch state, continue-watching, next-up, recommendations' watched signals, and the
 device-scoped joins in `movieRepository.ts` (around `deviceScopedJoins`) use `profileId` instead of `x-device-id`.
-`x-device-id` is still accepted and stored as "last device". Routes known to read `x-device-id`: `playbackProgress.ts`,
-`playback.ts`, `nextPlayback.ts`, `library.ts`, `shelves.ts`, `recommendations.ts`.
+`x-device-id` becomes optional (still validated as a UUID when sent) and is stored as "last device". Routes known to read
+`x-device-id`: `playbackProgress.ts`, `playback.ts`, `nextPlayback.ts`, `library.ts`, `shelves.ts`, `recommendations.ts`.
+Also `movieRepository.ts:85` (a `ws.device_id` count outside `deviceScopedJoins`) and the per-device watched factor in
+`services/recommendations/recommendationService.ts:10,28-32`. `nativeClient.test.ts:212` expects 400 without the header:
+change it to the new behaviour (200 via the single-profile fallback).
 
 ## 5. Hides and plays
 - `GET /api/hides` → `{keys: string[]}`; `POST /api/hides {key}`; `DELETE /api/hides {key}`;
   `POST /api/hides/import {keys: string[]}` (adds, ignores duplicates). Cap 2000 per profile (oldest dropped). Keys are the
-  shared `hideKey` values (`packages/shared/src/hiddenTitles.ts`).
+  shared `hideKeyOf` values (`packages/shared/src/hiddenTitles.ts:4`).
 - `POST /api/movies/:id/plays {method, positionMs?}` → `{playId}`: inserts a `playback_history` row.
 - When progress is saved (`PUT /api/movies/:id/progress`), the latest open history row for (profile, movie) started in the
   last 12 h gets `end_position_ms`, `ended_at`; reaching the watched threshold sets `completed=1`.
@@ -85,11 +91,11 @@ device-scoped joins in `movieRepository.ts` (around `deviceScopedJoins`) use `pr
 ## 6. VLC handoff
 - `providers/playback/vlcLocator.ts`: finds VLC once and caches it. Windows: `%ProgramFiles%\VideoLAN\VLC\vlc.exe`,
   `%ProgramFiles(x86)%\...`, then `where vlc`. macOS: `/Applications/VLC.app/Contents/MacOS/VLC`. Linux: `which vlc`.
-- `localLaunch.ts`: with VLC found, spawn it detached with the stream URL and `--start-time=<sec>`; otherwise the old
-  `start`/`xdg-open` path. `POST /api/movies/:id/play-local {startSec?, requireVlc?}` returns 409 `VLC_NOT_FOUND` when
+- `localLaunch.ts` (today it opens `movie.path`, the local file, with `start`/`xdg-open`): with VLC found, spawn VLC detached
+  on the same local file with `--start-time=<sec>`; otherwise the old path. `playbackService.ts:27 playLocal` passes the start. `POST /api/movies/:id/play-local {startSec?, requireVlc?}` returns 409 `VLC_NOT_FOUND` when
   `requireVlc` and VLC is missing.
-- `lanPlaylist.ts`: `GET /api/stream/:id/playlist.m3u?start=<sec>` adds `#EXTVLCOPT:start-time=<sec>` before the URL line
-  (start > 0 only).
+- m3u: the route is `routes/stream.ts:18-23`; `lanPlaylist.ts:6` formats the body. `GET /api/stream/:id/playlist.m3u?start=<sec>`
+  makes the body `#EXTM3U`, `#EXTVLCOPT:start-time=<sec>` (start > 0 only), then the URL line. `start` is a non-negative integer.
 - `providers/playback/androidIntent.ts` is dead code: delete it.
 
 ## 7. Web
