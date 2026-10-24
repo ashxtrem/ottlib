@@ -153,6 +153,10 @@ export const scanRunSchema = z.object({
   errorSummary: z.string().nullable()
 });
 
+/** Which video encoder the on-the-fly web player transcode uses; `auto` probes for the best available. */
+export const transcodeEncoderSchema = z.enum(['auto', 'nvenc', 'qsv', 'amf', 'x264']);
+export type TranscodeEncoder = z.infer<typeof transcodeEncoderSchema>;
+
 export const settingsSchema = z.object({
   tmdbApiKey: z.string(),
   omdbApiKey: z.string(),
@@ -172,7 +176,8 @@ export const settingsSchema = z.object({
   ignoredPatterns: z.array(z.string()),
   excludedFolders: z.array(z.string()),
   scheduleEnabled: z.boolean(),
-  scheduleCron: z.string()
+  scheduleCron: z.string(),
+  transcodeEncoder: transcodeEncoderSchema
 });
 
 export const updateSettingsSchema = settingsSchema.partial();
