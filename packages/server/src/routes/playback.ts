@@ -1,8 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdSchema } from '@ottlib/shared';
 import { PlaybackService } from '../services/playbackService.js';
-
-function isLoopback(address: string | undefined): boolean { return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'; }
+import { isLoopback } from './loopback.js';
 
 export function registerPlaybackRoutes(app: FastifyInstance, playback: PlaybackService): void {
   app.post('/api/movies/:id/play-local', async (request, reply) => {

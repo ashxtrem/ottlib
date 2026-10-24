@@ -2,8 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { AccessPinService } from '../services/accessPinService.js';
 import { sessionToken } from './sessionCookie.js';
 
-/** Routes that answer without signing in: discovery/compatibility probing and the sign-in itself. */
-const publicRoutes = new Set(['/api/server-info', '/api/auth/status', '/api/auth/login']);
+/**
+ * Routes that answer without signing in: discovery/compatibility probing, the sign-in itself, and the PIN reset
+ * (which only answers loopback requests, so a forgotten access PIN can be cleared on the server machine).
+ */
+const publicRoutes = new Set(['/api/server-info', '/api/auth/status', '/api/auth/login', '/api/profiles/reset-local']);
 /** Routes an external player may open with the per-movie `?key=` from the playback source instead of a session. */
 const streamKeyRoutes = new Set(['/api/stream/:id', '/api/stream/:id/playlist.m3u', '/api/movies/:id/subtitles/:order']);
 

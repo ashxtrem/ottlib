@@ -56,6 +56,13 @@ export class AccessPinService {
     this.pins.clear(); this.sessions.clear();
   }
 
+  /** Clears the PIN without the current one, for resets from the server machine. Returns whether a PIN was set. */
+  public resetPin(): boolean {
+    const wasEnabled = this.enabled();
+    this.pins.clear(); this.sessions.clear();
+    return wasEnabled;
+  }
+
   /** Query string that lets a stream or subtitle URL for this movie play without a session, or '' when no PIN is set. */
   public streamQuery(movieId: number): string {
     const record = this.pins.get();

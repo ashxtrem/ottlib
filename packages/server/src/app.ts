@@ -58,6 +58,15 @@ import { SubtitleLibraryService } from './services/subtitles/subtitleLibraryServ
 import { SubtitleService } from './services/subtitles/subtitleService.js';
 import { subtitleProviders } from './providers/subtitles/subtitleProviders.js';
 import { registerSubtitleRoutes } from './routes/subtitles.js';
+import { ProfileRepository } from './repositories/profileRepository.js';
+import { ProfileSessionRepository } from './repositories/profileSessionRepository.js';
+import { ProfileError } from './services/profileError.js';
+import { ProfilePinCheck } from './services/profilePinCheck.js';
+import { ProfileService } from './services/profileService.js';
+import { ProfileSessionService } from './services/profileSessionService.js';
+import { LocalResetService } from './services/localResetService.js';
+import { registerProfileContext, sendProfileError } from './routes/profileContext.js';
+import { registerProfileRoutes } from './routes/profiles.js';
 
 export function buildApp(db: Database.Database, appDataPath: string, port: number) {
   const app = Fastify({ logger: true, trustProxy: false });
@@ -73,7 +82,9 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
-  registerAuthGuard(app, pins); registerAuthRoutes(app, pins);
+  const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessions = new ProfileSessionService(profileRecords, new ProfileSessionRepository(db), profilePins);
+  registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
+  registerProfileRoutes(app, new ProfileService(profileRecords, profilePins), profileSessions, new LocalResetService(profileRecords, pins));
   registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback);
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
@@ -86,6 +97,6 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
   scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
-  app.setErrorHandler((error, _request, reply) => reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
+  app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }
