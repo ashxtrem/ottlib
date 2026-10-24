@@ -1,6 +1,7 @@
 import type { Movie } from '@ottlib/shared';
 import { Link } from 'react-router-dom';
 import { PlayButton } from './PlayButton';
+import { PlayMoreMenu } from './PlayMoreMenu';
 import { RevealInFolderButton } from './RevealInFolderButton';
 import { focusRing, pressable } from './interactionStyles';
 import { useTorrentSearchEnabled } from '../hooks/useTorrentSearchEnabled';
@@ -24,7 +25,10 @@ export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitle
   const torrentSearchEnabled = useTorrentSearchEnabled();
 
   return <div className="space-y-2">
-    <PlayButton movie={movie} />
+    <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1"><PlayButton movie={movie} /></div>
+      <PlayMoreMenu movie={movie} />
+    </div>
     <button type="button" onClick={onSubtitles} disabled={movie.missing} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised disabled:opacity-50 ${focusRing}`}>Find subtitles</button>
     {torrentSearchEnabled && <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>}
     <div className="flex flex-wrap items-center gap-2">
