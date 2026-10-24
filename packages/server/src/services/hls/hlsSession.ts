@@ -39,6 +39,8 @@ export class HlsSession {
   private readonly openedAt: number;
   private firstSegmentLogged = false;
   private closed = false;
+  /** The last failed run: from its start to the segment it could not get past, so requests there do not respawn it in a loop. */
+  private failure: { start: number; point: number; message: string; atMs: number } | null = null;
 
   public constructor(public readonly options: HlsSessionOptions) {
     this.openedAt = options.now(); this.lastAccessMs = this.openedAt;
@@ -54,6 +56,7 @@ export class HlsSession {
     // The first run starts where the player will ask first, so "far ahead of the player" counts from there.
     if (!this.run) this.lastRequested = segment;
     void this.run?.stop();
+    this.failure = null;
     this.restartPoint = segment;
     this.rejectWaiters((waiter) => waiter.segment !== 'init' && (waiter.segment < segment || waiter.segment > segment + limits.segmentWaitWindow), 'Playback moved elsewhere');
     const run = new FfmpegRun({
@@ -72,7 +75,7 @@ export class HlsSession {
     this.touch(); this.lastRequested = index;
     void this.deleteBehind(index);
     if (!this.produced.has(index)) {
-      if (!this.isNear(index)) this.start(this.resumePoint(index));
+      if (!this.isNear(index)) this.startUnlessFailed(this.resumePoint(index));
       await this.waitFor(index);
     } else if (!this.running) this.resumeIfClose();
     return join(this.options.dir, segmentFile(index));
@@ -81,7 +84,7 @@ export class HlsSession {
   public async init(): Promise<string> {
     this.touch();
     if (!this.hasInit) {
-      if (!this.running) this.start(this.lastRequested);
+      if (!this.running) this.startUnlessFailed(this.lastRequested);
       await this.waitFor('init');
     }
     return join(this.options.dir, initFile);
@@ -114,7 +117,23 @@ export class HlsSession {
 
   private resumeIfClose(): void {
     const newest = this.run?.newest ?? -1;
-    if (newest + 1 < this.segmentCount && this.lastRequested >= newest - limits.restartWithinSegments && this.produced.has(newest)) this.start(newest + 1);
+    if (newest + 1 < this.segmentCount && this.lastRequested >= newest - limits.restartWithinSegments && this.produced.has(newest) && !this.failedAt(newest + 1)) {
+      this.start(newest + 1);
+    }
+  }
+
+  /** Starts a run at n, unless the last run failed there recently: then the request fails with that run's error. */
+  private startUnlessFailed(segment: number): void {
+    if (this.failedAt(segment)) throw new Error(this.failure!.message);
+    this.start(segment);
+  }
+
+  /** Whether a run starting at n would start where the last run failed, within `failedRunRetryMs` of the failure. */
+  private failedAt(segment: number): boolean {
+    const failure = this.failure;
+    if (!failure) return false;
+    if (this.options.now() - failure.atMs >= limits.failedRunRetryMs) { this.failure = null; return false; }
+    return segment >= failure.start && segment <= failure.point + limits.segmentWaitWindow;
   }
 
   private onSegment(run: FfmpegRun, index: number): void {
@@ -131,6 +150,7 @@ export class HlsSession {
   private onExit(run: FfmpegRun, exit: RunExit): void {
     if (exit.error) this.options.log(`HLS session ${this.id}: ${exit.error}`);
     if (run !== this.run) return;
+    if (exit.error) this.failure = { start: this.restartPoint, point: run.newest + 1, message: exit.error, atMs: this.options.now() };
     if (!exit.stopped) this.rejectWaiters(() => true, exit.error ?? 'ffmpeg finished without this segment');
   }
 
