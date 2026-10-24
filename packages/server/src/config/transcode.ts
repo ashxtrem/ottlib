@@ -76,5 +76,13 @@ export const timelineOffsetSeconds = 10;
 export const copySeekLeadMs = 200;
 /** A fragment whose start is within this of the next planned boundary opens that segment; earlier ones join the current one. */
 export const boundaryToleranceMs = 100;
-/** Embedded subtitles still being extracted answer 503 with this Retry-After. */
+/** Embedded subtitles still being extracted answer 202 with this Retry-After. */
 export const embeddedSubtitleRetryAfterSeconds = 2;
+/** Embedded text subtitles are extracted to WebVTT under `<appData>/subtitles/embedded`. */
+export const embeddedSubtitleDirName = 'embedded';
+/** Extraction reads the whole file, so a big one on a slow disk may take minutes. */
+export const embeddedSubtitleExtractTimeoutMs = 15 * 60_000;
+/** A failed extraction is answered again from memory for this long (until the file changes) instead of re-running ffmpeg on every poll. */
+export const embeddedSubtitleFailureMemoryMs = 60_000;
+/** Text subtitle codecs (as the probe labels them, lower-cased) ffmpeg can convert to WebVTT. */
+export const embeddedTextSubtitleCodecs: ReadonlySet<string> = new Set(['srt', 'subrip', 'ass', 'ssa', 'mov_text', 'webvtt', 'text']);
