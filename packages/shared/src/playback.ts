@@ -23,7 +23,7 @@ export const subtitleSourceSchema = z.object({
   isHearingImpaired: z.boolean()
 });
 
-/** One audio track a client can pick; `order` is the 0-based index among the file's audio streams. */
+/** One audio track a client can pick; `order` is the ffprobe stream index (what `audioOrder` takes). */
 export const audioTrackSourceSchema = z.object({
   order: z.number().int().nonnegative(),
   language: z.string().nullable(),

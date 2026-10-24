@@ -17,6 +17,9 @@ import { AuthSessionRepository } from './repositories/authSessionRepository.js';
 import { FolderService } from './services/folderService.js';
 import { MetadataMatchService } from './services/metadataMatchService.js';
 import { PlaybackService } from './services/playbackService.js';
+import { PlaybackPlanner } from './services/playbackPlanner.js';
+import type { HlsSessionOpener } from './services/hls/sessionOpener.js';
+import { FfmpegLocator } from './providers/transcode/ffmpegLocator.js';
 import { PosterCacheService } from './services/posterCacheService.js';
 import { ScanService } from './services/scanService.js';
 import { SchedulerService } from './services/schedulerService.js';
@@ -74,7 +77,10 @@ import { PlaybackHistoryService } from './services/playbackHistoryService.js';
 import { registerHideRoutes } from './routes/hides.js';
 import { registerPlayRoutes } from './routes/plays.js';
 
-export function buildApp(db: Database.Database, appDataPath: string, port: number) {
+/** Collaborators a test (or the HLS wiring) can replace. */
+export interface AppOverrides { sessions?: HlsSessionOpener; ffmpegAvailable?: () => Promise<boolean> }
+
+export function buildApp(db: Database.Database, appDataPath: string, port: number, overrides: AppOverrides = {}) {
   const app = Fastify({ logger: true, trustProxy: false });
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
     const text = typeof body === 'string' ? body : body.toString('utf8');
@@ -83,9 +89,11 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   });
   const movies = new MovieRepository(db); const folders = new FolderRepository(db); const settings = new SettingRepository(db); const watches = new WatchStateRepository(db); const runs = new ScanRunRepository(db); const shelfRecords = new ShelfRepository(db); const shelfMovies = new ShelfMovieRepository(db); const mediaTracks = new MediaTrackRepository(db); runs.failAbandonedRuns();
   const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
-  const scanner = new ScanService(folders, movies, runs, settings, metadata, new MediaInfoService(movies, mediaTracks, new MediaProbeService())); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
+  const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
   const subtitleLibrary = new SubtitleLibraryService(new DownloadedSubtitleRepository(db), appDataPath, id => pins.streamQuery(id));
-  const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary);
+  const ffmpeg = new FfmpegLocator();
+  const planner = new PlaybackPlanner({ movies, tracks: mediaTracks, mediaInfo, sessions: overrides.sessions, ffmpegAvailable: overrides.ffmpegAvailable ?? (async () => (await ffmpeg.locate()) !== null) });
+  const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary, undefined, planner);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
