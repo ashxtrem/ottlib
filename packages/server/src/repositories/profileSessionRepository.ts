@@ -1,4 +1,8 @@
+import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
+
+/** How a session token is stored: its SHA-256, hex-encoded. */
+export const sessionTokenHash = (token: string): string => createHash('sha256').update(token).digest('hex');
 
 export interface ProfileSession { profileId: number; deviceId: string | null; lastSeenAt: string }
 
@@ -26,5 +30,10 @@ export class ProfileSessionRepository {
 
   public deleteForProfile(profileId: number): void {
     this.db.prepare('DELETE FROM profile_sessions WHERE profile_id = ?').run(profileId);
+  }
+
+  /** Signs a profile out everywhere except the one session with `keepTokenHash`. */
+  public deleteForProfileExcept(profileId: number, keepTokenHash: string): void {
+    this.db.prepare('DELETE FROM profile_sessions WHERE profile_id = ? AND token_hash <> ?').run(profileId, keepTokenHash);
   }
 }

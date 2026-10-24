@@ -9,8 +9,8 @@ export const MAX_PROFILES = 6;
 /** How a title was handed off to a player, recorded in playback history. */
 export const playMethods = ['android_app', 'm3u', 'intent', 'local_launch'] as const;
 
-/** Error codes the profile API sends as `{ error }` with status 409. */
-export const profileErrorCodes = ['PROFILE_REQUIRED', 'PROFILE_LIMIT', 'PROFILE_NAME_TAKEN'] as const;
+/** Error codes the profile API sends as `{ error, message }`: 409 for the first three, 403 for a wrong profile PIN. */
+export const profileErrorCodes = ['PROFILE_REQUIRED', 'PROFILE_LIMIT', 'PROFILE_NAME_TAKEN', 'PROFILE_PIN_INVALID'] as const;
 
 /** Header a client sends its profile session token in. */
 export const PROFILE_SESSION_HEADER = 'x-profile-session';
@@ -29,7 +29,7 @@ export const profileSummarySchema = z.object({
 });
 
 export const profileCreateSchema = z.object({ name: profileNameSchema, color: profileColorSchema, pin: profilePinSchema.optional() });
-/** Any typed PIN is accepted here; a wrong one is answered with 401, not a validation error. */
+/** Any typed PIN is accepted here; a wrong one is answered with 403 PROFILE_PIN_INVALID, not a validation error. */
 export const profileSelectSchema = z.object({ pin: z.string().max(32).optional() });
 export const profileSelectResultSchema = z.object({ token: z.string(), profile: profileSummarySchema });
 export const profileMeSchema = z.object({ profile: profileSummarySchema });
