@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { deviceIdSchema } from '@ottlib/shared';
 import { PlaybackService } from '../services/playbackService.js';
 import { isLoopback } from './loopback.js';
+import { requireProfile } from './profileContext.js';
 
 export function registerPlaybackRoutes(app: FastifyInstance, playback: PlaybackService): void {
   app.post('/api/movies/:id/play-local', async (request, reply) => {
@@ -13,7 +13,7 @@ export function registerPlaybackRoutes(app: FastifyInstance, playback: PlaybackS
     try { await playback.reveal(Number((request.params as any).id)); return reply.code(204).send(); } catch (error) { return reply.code(404).send({ error: error instanceof Error ? error.message : 'Movie file is unavailable' }); }
   });
   app.get('/api/movies/:id/playback', async (request, reply) => {
-    const device = deviceIdSchema.safeParse(request.headers['x-device-id']);
-    try { return await playback.source(Number((request.params as any).id), device.success ? device.data : undefined); } catch (error) { return reply.code(404).send({ error: error instanceof Error ? error.message : 'Movie file is unavailable' }); }
+    const profileId = requireProfile(request);
+    try { return await playback.source(Number((request.params as any).id), profileId); } catch (error) { return reply.code(404).send({ error: error instanceof Error ? error.message : 'Movie file is unavailable' }); }
   });
 }

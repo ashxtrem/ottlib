@@ -67,6 +67,12 @@ import { ProfileSessionService } from './services/profileSessionService.js';
 import { LocalResetService } from './services/localResetService.js';
 import { registerProfileContext, sendProfileError } from './routes/profileContext.js';
 import { registerProfileRoutes } from './routes/profiles.js';
+import { HideRepository } from './repositories/hideRepository.js';
+import { PlaybackHistoryRepository } from './repositories/playbackHistoryRepository.js';
+import { HideService } from './services/hideService.js';
+import { PlaybackHistoryService } from './services/playbackHistoryService.js';
+import { registerHideRoutes } from './routes/hides.js';
+import { registerPlayRoutes } from './routes/plays.js';
 
 export function buildApp(db: Database.Database, appDataPath: string, port: number) {
   const app = Fastify({ logger: true, trustProxy: false });
@@ -80,12 +86,12 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const scanner = new ScanService(folders, movies, runs, settings, metadata, new MediaInfoService(movies, mediaTracks, new MediaProbeService())); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
   const subtitleLibrary = new SubtitleLibraryService(new DownloadedSubtitleRepository(db), appDataPath, id => pins.streamQuery(id));
   const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary);
-  const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
+  const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
-  registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
+  registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerHideRoutes(app, new HideService(new HideRepository(db))); registerPlayRoutes(app, movies, playHistory); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback);
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));

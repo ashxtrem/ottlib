@@ -23,11 +23,12 @@ export class PlaybackHistoryRepository {
 
   /** The most recent unfinished session for this title that started at or after `sinceIso`. */
   public latestOpen(profileId: number, movieId: number, sinceIso: string): PlaybackHistoryEntry | null {
-    const row = this.db.prepare(`SELECT id, profile_id AS profileId, movie_id AS movieId, device_id AS deviceId, method, started_at AS startedAt, ended_at AS endedAt,
-        start_position_ms AS startPositionMs, end_position_ms AS endPositionMs, completed
-      FROM playback_history WHERE profile_id = ? AND movie_id = ? AND ended_at IS NULL AND started_at >= ?
-      ORDER BY started_at DESC, id DESC LIMIT 1`).get(profileId, movieId, sinceIso) as HistoryRow | undefined;
-    return row ? { ...row, completed: row.completed === 1 } : null;
+    return this.latestWhere('ended_at IS NULL', profileId, movieId, sinceIso);
+  }
+
+  /** The most recent session not yet watched to the end (ended or not) that started at or after `sinceIso`. */
+  public latestIncomplete(profileId: number, movieId: number, sinceIso: string): PlaybackHistoryEntry | null {
+    return this.latestWhere('completed = 0', profileId, movieId, sinceIso);
   }
 
   public finish(id: number, result: FinishPlayback): void {
@@ -42,5 +43,13 @@ export class PlaybackHistoryRepository {
   public lastPlayedAt(profileId: number, movieId: number): string | null {
     const row = this.db.prepare('SELECT MAX(started_at) AS lastPlayedAt FROM playback_history WHERE profile_id = ? AND movie_id = ?').get(profileId, movieId) as { lastPlayedAt: string | null };
     return row.lastPlayedAt;
+  }
+
+  private latestWhere(condition: 'ended_at IS NULL' | 'completed = 0', profileId: number, movieId: number, sinceIso: string): PlaybackHistoryEntry | null {
+    const row = this.db.prepare(`SELECT id, profile_id AS profileId, movie_id AS movieId, device_id AS deviceId, method, started_at AS startedAt, ended_at AS endedAt,
+        start_position_ms AS startPositionMs, end_position_ms AS endPositionMs, completed
+      FROM playback_history WHERE profile_id = ? AND movie_id = ? AND ${condition} AND started_at >= ?
+      ORDER BY started_at DESC, id DESC LIMIT 1`).get(profileId, movieId, sinceIso) as HistoryRow | undefined;
+    return row ? { ...row, completed: row.completed === 1 } : null;
   }
 }

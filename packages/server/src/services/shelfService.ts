@@ -18,12 +18,12 @@ export class ShelfService {
     return this.shelves.list().map((shelf) => this.summary(shelf));
   }
 
-  public get(id: number, deviceId?: string): ShelfDetail | undefined {
+  public get(id: number, profileId?: number): ShelfDetail | undefined {
     const shelf = this.shelves.get(id);
-    return shelf && this.detail(shelf, deviceId);
+    return shelf && this.detail(shelf, profileId);
   }
 
-  public create(name: string, movieIds: number[], deviceId?: string): ShelfResult<ShelfDetail> {
+  public create(name: string, movieIds: number[], profileId?: number): ShelfResult<ShelfDetail> {
     if (this.shelves.nameExists(name)) return { error: 'name-conflict' };
     if (!this.movies.hasAll(movieIds)) return { error: 'movie-not-found' };
     const shelf = this.shelves.transaction(() => {
@@ -31,7 +31,7 @@ export class ShelfService {
       this.shelfMovies.addMovies(created.id, unique(movieIds));
       return created;
     });
-    return { value: this.detail(shelf, deviceId) };
+    return { value: this.detail(shelf, profileId) };
   }
 
   public rename(id: number, name: string): ShelfResult<ShelfSummary> {
@@ -45,17 +45,17 @@ export class ShelfService {
     return this.shelves.remove(id) ? { value: undefined } : { error: 'shelf-not-found' };
   }
 
-  public addMovies(id: number, movieIds: number[], deviceId?: string): ShelfResult<ShelfDetail> {
+  public addMovies(id: number, movieIds: number[], profileId?: number): ShelfResult<ShelfDetail> {
     if (!this.shelves.exists(id)) return { error: 'shelf-not-found' };
     if (!this.movies.hasAll(movieIds)) return { error: 'movie-not-found' };
     this.shelves.transaction(() => {
       this.shelfMovies.addMovies(id, unique(movieIds));
       this.shelves.touch(id);
     });
-    return { value: this.get(id, deviceId)! };
+    return { value: this.get(id, profileId)! };
   }
 
-  public removeMovie(id: number, movieId: number, deviceId?: string): ShelfResult<ShelfDetail> {
+  public removeMovie(id: number, movieId: number, profileId?: number): ShelfResult<ShelfDetail> {
     if (!this.shelves.exists(id)) return { error: 'shelf-not-found' };
     const movieIds = this.shelfMovies.listMovieIds(id);
     if (!movieIds.includes(movieId)) return { error: 'movie-not-found' };
@@ -63,10 +63,10 @@ export class ShelfService {
       this.shelfMovies.removeMovie(id, movieId);
       this.shelves.touch(id);
     });
-    return { value: this.get(id, deviceId)! };
+    return { value: this.get(id, profileId)! };
   }
 
-  public reorder(id: number, movieIds: number[], deviceId?: string): ShelfResult<ShelfDetail> {
+  public reorder(id: number, movieIds: number[], profileId?: number): ShelfResult<ShelfDetail> {
     if (!this.shelves.exists(id)) return { error: 'shelf-not-found' };
     const current = this.shelfMovies.listMovieIds(id);
     if (!sameIds(current, movieIds)) return { error: 'invalid-order' };
@@ -74,10 +74,10 @@ export class ShelfService {
       this.shelfMovies.replaceOrder(id, movieIds);
       this.shelves.touch(id);
     });
-    return { value: this.get(id, deviceId)! };
+    return { value: this.get(id, profileId)! };
   }
 
-  public updateMovieShelves(movieId: number, shelfIds: number[], newShelfName: string | undefined, deviceId?: string): ShelfResult<Movie> {
+  public updateMovieShelves(movieId: number, shelfIds: number[], newShelfName: string | undefined, profileId?: number): ShelfResult<Movie> {
     if (!this.movies.hasAll([movieId])) return { error: 'movie-not-found' };
     const uniqueShelfIds = unique(shelfIds);
     if (uniqueShelfIds.some((id) => !this.shelves.exists(id))) return { error: 'shelf-not-found' };
@@ -90,7 +90,7 @@ export class ShelfService {
 
       this.shelfMovies.ensureMovieShelves(movieId, finalShelfIds);
       for (const shelfId of new Set([...currentShelfIds, ...finalShelfIds])) this.shelves.touch(shelfId);
-      return { value: this.library.get(movieId, deviceId)! } as const;
+      return { value: this.library.get(movieId, profileId)! } as const;
     });
     return result;
   }
@@ -99,8 +99,8 @@ export class ShelfService {
     return { ...shelf, movieCount: this.shelfMovies.countForShelf(shelf.id), coverMovies: this.shelfMovies.listCoverMovies(shelf.id) };
   }
 
-  private detail(shelf: ShelfRecord, deviceId?: string): ShelfDetail {
-    const movies = this.library.listByIds(this.shelfMovies.listMovieIds(shelf.id), deviceId);
+  private detail(shelf: ShelfRecord, profileId?: number): ShelfDetail {
+    const movies = this.library.listByIds(this.shelfMovies.listMovieIds(shelf.id), profileId);
     return { ...this.summary(shelf), movies };
   }
 }
