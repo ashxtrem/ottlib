@@ -1,18 +1,18 @@
 import { useEffect, useRef } from 'react';
-import type { PlaybackSource } from '@ottlib/shared';
+import type { PlaybackSource, SubtitleSource } from '@ottlib/shared';
 import type { HlsEngine } from '../../utils/browserCaps';
 
 interface VideoSurfaceProps {
   source: PlaybackSource;
   /** How an `hls` source is played here: the browser itself, hls.js (loaded on demand) or not at all. */
   hlsEngine: HlsEngine;
-  /** Where playback starts (the resume position); applied once per source. */
+  /** Where playback starts (the resume position, or the position a track switch reopened at); applied once per source. */
   startMs?: number | null;
-  /** The `<video>` element, for progress reporting and (later) custom controls. */
+  /** The `<video>` element, for progress reporting and the custom controls. */
   onVideoElement?: (video: HTMLVideoElement | null) => void;
   onPlaybackError: (reason: 'media' | 'unsupported') => void;
-  /** Native browser controls; a placeholder until the custom controls take over. */
-  nativeControls?: boolean;
+  /** Text subtitles rendered as `<track>` (only those whose file is ready); the page picks which one shows. */
+  textTracks: SubtitleSource[];
 }
 
 type HlsInstance = { destroy(): void };
@@ -25,10 +25,11 @@ const HLS_RECOVERY_TRIES = 2;
  * hls.js isn't supported or the effect was cleaned up while the chunk loaded (then nothing touches the `<video>`).
  * A fatal network error (e.g. the server restarting ffmpeg after a seek) reloads and a media error recovers, a few times.
  */
-async function attachHlsJs(video: HTMLVideoElement, url: string, onFatal: () => void, isCancelled: () => boolean): Promise<HlsInstance | null> {
+async function attachHlsJs(video: HTMLVideoElement, url: string, startSec: number, onFatal: () => void, isCancelled: () => boolean): Promise<HlsInstance | null> {
   const { default: Hls } = await import('hls.js');
   if (isCancelled() || !Hls.isSupported()) return null;
-  const hls = new Hls({ enableWorker: true });
+  // The playlist covers the whole film, so loading starts straight at the start position (no detour via segment 0).
+  const hls = new Hls({ enableWorker: true, startPosition: startSec > 0 ? startSec : -1 });
   let networkTries = 0;
   let mediaTries = 0;
   hls.on(Hls.Events.FRAG_LOADED, () => { networkTries = 0; mediaTries = 0; });
@@ -43,7 +44,7 @@ async function attachHlsJs(video: HTMLVideoElement, url: string, onFatal: () => 
   return hls;
 }
 
-export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, nativeControls = true }: VideoSurfaceProps) {
+export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks }: VideoSurfaceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const errorRef = useRef(onPlaybackError); errorRef.current = onPlaybackError;
   const startRef = useRef(startMs); startRef.current = startMs;
@@ -64,7 +65,7 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
     if (source.kind === 'direct' || hlsEngine === 'native') {
       video.src = source.streamUrl;
     } else if (hlsEngine === 'hlsjs') {
-      attachHlsJs(video, source.streamUrl, () => errorRef.current('media'), () => cancelled)
+      attachHlsJs(video, source.streamUrl, start, () => errorRef.current('media'), () => cancelled)
         .then((instance) => {
           if (cancelled) instance?.destroy(); else if (instance) hls = instance; else errorRef.current('unsupported');
         })
@@ -85,11 +86,10 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
     ref={videoRef}
     playsInline
     autoPlay
-    controls={nativeControls}
     onError={(event) => { if (event.currentTarget.error && event.currentTarget.getAttribute('src')) onPlaybackError('media'); }}
     className="h-full w-full bg-black object-contain"
   >
-    {source.subtitles.map((subtitle, index) => <track
+    {textTracks.map((subtitle, index) => <track
       key={subtitle.url}
       kind="subtitles"
       src={subtitle.url}
