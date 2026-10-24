@@ -40,7 +40,7 @@ Optional integrations:
 
 ## Installing
 
-Download the latest [release](https://github.com/ashxtrem/ottlib/releases): a server bundle for Windows, Linux or macOS (extract and run `start.bat` / `start.sh`), plus the Android TV and phone APKs. See [docs/install.md](docs/install.md) for setup, upgrading and verifying downloads. To run from source instead, follow the steps below.
+Download the latest [release](https://github.com/ashxtrem/ottlib/releases): a server bundle for Windows, Linux or macOS (extract and run `start.bat` / `start.sh`), plus the Android TV and phone APKs. See [docs/install.md](docs/install.md) for setup, upgrading and verifying downloads. For profiles, PINs and resets, see [docs/profiles.md](docs/profiles.md). To run from source instead, follow the steps below.
 
 ## Getting started
 
