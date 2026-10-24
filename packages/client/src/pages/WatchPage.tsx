@@ -18,6 +18,7 @@ import { usePlayerTracks } from '../hooks/usePlayerTracks';
 import { useUpNext } from '../hooks/useUpNext';
 import { useVideoState } from '../hooks/useVideoState';
 import { chooseHlsEngine, probeBrowserCaps, type PlaybackSwitch } from '../utils/browserCaps';
+import type { EndGuard } from '../utils/playbackEnd';
 import { playbackProblem, type PlaybackFailure } from '../utils/playbackProblem';
 import { SEEK_STEP_SECONDS, VOLUME_STEP } from '../utils/playerShortcuts';
 import { audioItems, subtitleItems } from '../utils/trackMenuItems';
@@ -56,8 +57,12 @@ function WatchPlayer({ movieId, shelfId }: { movieId: number; shelfId?: number }
   const [switchStartMs, setSwitchStartMs] = useState<number | null>(null);
   const [resumeAtMs, setResumeAtMs] = useState<number | null | undefined>(undefined);
   const leave = useLeaveWatch(movieId);
-  usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId });
-  const state = useVideoState(video, source?.durationMs ?? null);
+  // Only hls sources can end falsely. The last false end's position lives as long as this player (a new movie mounts a fresh one).
+  const lastFalseEnd = useRef<number | null>(null);
+  const endGuardMs = source?.kind === 'hls' ? source.durationMs ?? null : null;
+  const endGuard = useMemo<EndGuard>(() => ({ durationMs: endGuardMs, lastFalseEnd }), [endGuardMs]);
+  usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard });
+  const state = useVideoState(video, source?.durationMs ?? null, endGuard);
   const commands = usePlayerCommands(video);
   const screen = useFullscreen(container, video);
   const controls = useAutoHide(state.paused || menu !== null);
@@ -111,7 +116,7 @@ function WatchPlayer({ movieId, shelfId }: { movieId: number; shelfId?: number }
   return <div ref={setContainer} onPointerMove={controls.show} className={`fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-black text-white ${controls.visible ? '' : 'cursor-none'}`}>
     {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} />
       : source ? <>
-        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={setVideo} onPlaybackError={onPlaybackError} />
+        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={setVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} />
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls
           state={state} visible={controls.visible} fullscreen={screen.fullscreen} onBack={leave}

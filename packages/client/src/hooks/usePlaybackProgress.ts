@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { api } from './apiClient';
+import { isRealVideoEnd, type EndGuard } from '../utils/playbackEnd';
 import { progressAction, progressBody, type ProgressTrigger } from '../utils/progressSchedule';
 
 interface ProgressOptions {
@@ -7,6 +8,8 @@ interface ProgressOptions {
   /** Used while the element doesn't know its duration yet (or reports Infinity for a growing HLS playlist). */
   fallbackDurationMs: number | null;
   shelfId?: number;
+  /** An `ended` that isn't a real end (mid-file on an HLS source) doesn't post complete. */
+  endGuard: EndGuard;
 }
 
 /**
@@ -14,7 +17,8 @@ interface ProgressOptions {
  * leaving the page; POST complete on `ended`. Requests go through `api` with `keepalive`, so the profile headers go along
  * and the last one survives the page closing.
  */
-export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, fallbackDurationMs, shelfId }: ProgressOptions): void {
+export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, fallbackDurationMs, shelfId, endGuard }: ProgressOptions): void {
+  const guardRef = useRef(endGuard); guardRef.current = endGuard;
   // Keeps the last known duration of this movie: a track switch renders the page without a source (null) while the
   // emptied element reports NaN, and the switch-time leave still needs a duration.
   const fallback = useRef<{ movieId: number; ms: number | null }>({ movieId, ms: fallbackDurationMs });
@@ -42,7 +46,7 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
     const onTick = () => { remember(); if (!video.paused) send('tick'); };
     const onPause = () => send('pause');
     const onSeeked = () => { remember(); send('seeked'); };
-    const onEnded = () => send('ended');
+    const onEnded = () => { if (isRealVideoEnd(video, guardRef.current)) send('ended'); };
     const onLeave = () => send('leave');
     video.addEventListener('timeupdate', onTick);
     video.addEventListener('pause', onPause);
