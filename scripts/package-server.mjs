@@ -1,11 +1,12 @@
 // Stages a self-contained OttLib server folder and archives it. Run after `npm run build`.
 //   node scripts/package-server.mjs --version 0.2.0 --variant full|lite --out release
-// "full" adds a Node runtime and ffprobe; "lite" expects both to be installed on the host.
+// "full" adds a Node runtime, ffprobe and (Windows, Linux) a pinned ffmpeg; "lite" expects them on the host.
 // Native modules (better-sqlite3) are installed for the platform this runs on, so run it once per OS/arch.
 import { execFileSync, execSync } from 'node:child_process';
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { FFMPEG_NOTICE, fetchBundledFfmpeg } from './bundle-ffmpeg.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, arg, i, all) => (arg.startsWith('--') ? [...pairs, [arg.slice(2), all[i + 1]]] : pairs), []));
 const version = args.version ?? '0.0.0-dev';
@@ -65,8 +66,13 @@ if (variant === 'full') {
   if (!existsSync(source)) throw new Error(`@ffprobe-installer has no binary for ${process.platform}/${process.arch}`);
   copyFileSync(source, join(stage, 'runtime', ffprobeName));
   chmodSync(join(stage, 'runtime', ffprobeName), 0o755);
-  writeFileSync(join(stage, 'runtime', 'NOTICE.txt'), 'ffprobe (FFmpeg) is a separate GPL-3.0 program, bundled unmodified via @ffprobe-installer. Source: https://ffmpeg.org\n');
   rmSync(scratch, { recursive: true, force: true });
+
+  // Transcoding for the web player; macOS has no pinned build and uses ffmpeg from the PATH.
+  const ffmpeg = await fetchBundledFfmpeg(join(stage, 'runtime'));
+  const notice = ['ffprobe (FFmpeg) is a separate GPL-3.0 program, bundled unmodified via @ffprobe-installer. Source: https://ffmpeg.org\n'];
+  if (ffmpeg) notice.push(FFMPEG_NOTICE);
+  writeFileSync(join(stage, 'runtime', 'NOTICE.txt'), notice.join(''));
 }
 
 const archive = isWindows ? `${name}.zip` : `${name}.tar.gz`;

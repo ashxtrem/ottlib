@@ -8,8 +8,8 @@ Get the downloads from the [latest release](https://github.com/ashxtrem/ottlib/r
 
 | You want | Download |
 | --- | --- |
-| The server, nothing else installed | `ottlib-<version>-<os>-<arch>.zip` (Windows) or `.tar.gz` (Linux, macOS). Includes Node.js and ffprobe. |
-| The server, smaller download | the same name ending in `-lite`. Needs Node.js 22 or later, plus FFmpeg's `ffprobe` on the PATH for media details. |
+| The server, nothing else installed | `ottlib-<version>-<os>-<arch>.zip` (Windows) or `.tar.gz` (Linux, macOS). Includes Node.js, ffprobe and, on Windows and Linux, ffmpeg (about 65 MB of the download). On macOS, install ffmpeg on the PATH for transcoding. |
+| The server, smaller download | the same name ending in `-lite`. Needs Node.js 22 or later, plus FFmpeg (`ffprobe` and `ffmpeg`) on the PATH for media details and transcoding. |
 | The Android TV app | `ottlib-tv-<version>.apk` |
 | The phone / foldable app | `ottlib-mobile-<version>.apk` |
 | To check your download | `SHA256SUMS` |
@@ -43,7 +43,7 @@ The downloads are not code-signed.
 
 ### Lite bundles
 
-Install [Node.js](https://nodejs.org) 22 or later. For media details (codecs, audio and subtitle tracks), install [FFmpeg](https://ffmpeg.org) so that `ffprobe` is on your PATH. The launcher tells you if either is missing.
+Install [Node.js](https://nodejs.org) 22 or later. For media details (codecs, audio and subtitle tracks), install [FFmpeg](https://ffmpeg.org) so that `ffprobe` is on your PATH. The browser player also needs FFmpeg's `ffmpeg` on the PATH to transcode files the browser can't play; without it, the server plays files directly only. The launcher tells you if any of them is missing.
 
 ## Installing the Android apps
 
@@ -92,4 +92,4 @@ Android checks this key on updates: an APK signed with a different key can't upd
 ## Notes
 
 - OttLib is meant for a home network. Set an access PIN (Settings → Access PIN) if others share your network, and don't expose it to the internet: it serves plain HTTP.
-- The bundled `ffprobe` is an unmodified build of FFmpeg, licensed GPL-3.0 (see `runtime/NOTICE.txt` in the full bundles).
+- The bundled `ffprobe` and `ffmpeg` are unmodified builds of FFmpeg, licensed GPL-3.0; `ffmpeg` is the [BtbN FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) GPL static build (see `runtime/NOTICE.txt` in the full bundles).
