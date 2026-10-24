@@ -33,7 +33,8 @@ playback_history(id INTEGER PK AUTOINCREMENT, profile_id INTEGER NOT NULL REFERE
                  completed INTEGER NOT NULL DEFAULT 0)
 ```
 - If `profiles` is empty, insert the owner profile `Home` (`is_owner=1`, first color, no PIN).
-- `playback_progress` and `movie_watch_state` are re-keyed from `(movie_id, device_id)` to `(movie_id, profile_id)`:
+- Re-key (separate step `020_profile_scope.ts`, built in T003 together with its callers so every merge stays green):
+  `playback_progress` and `movie_watch_state` are re-keyed from `(movie_id, device_id)` to `(movie_id, profile_id)`:
   create-new / copy / drop / rename inside one transaction, only when the table still lacks `profile_id`. Every old row goes
   to the owner. `device_id` stays as a plain nullable column ("last device"); `shelf_id` (016) is kept.
   Duplicates (one movie on several devices): progress keeps the row with the latest `updated_at`; watch state keeps
@@ -125,9 +126,9 @@ change it to the new behaviour (200 via the single-profile fallback).
 ## Tasks (plan-runner split)
 | Task | Covers | Spec | Deps |
 |---|---|---|---|
-| T001 | §1 migration, new repos, progress/watch-state repo re-key | full | — |
+| T001 | §1 migration 019 (new tables + owner row), the four new repos, tests | full | — |
 | T002 | §2 + §3 shared schemas, profile service, routes, resolution hook, reset-local, CLI | partial | T001 |
-| T003 | §4 scope switch across routes/services/movieRepository + §5 hides/plays routes and history update | partial | T002 |
+| T003 | §1 re-key migration 020 + progress/watch-state repos, §4 scope switch across routes/services/movieRepository, §5 hides/plays routes and history update | partial | T002 |
 | T004 | §6 VLC locator, local launch, m3u start-time, delete androidIntent.ts | full | T003 |
 | T005 | §7 profile gate, picker, PIN pad, apiClient header, header chip, settings section | partial | T002 |
 | T006 | §7 hides to server + import, PlayButton plays/resume/VLC hint + not-found dialog | full | T003, T004, T005 |
