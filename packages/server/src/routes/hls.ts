@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { SegmentNotFoundError } from '../services/hls/hlsSession.js';
 import { SessionNotFoundError, type TranscodeSessionService } from '../services/hls/transcodeSessionService.js';
@@ -21,9 +21,13 @@ function sendError(reply: FastifyReply, error: unknown) {
   return reply.code(500).send({ error: error instanceof Error ? error.message : 'Transcoding failed' });
 }
 
+/** Streams the file; it is opened first, so a file that is gone still answers 404 (sendError) before any byte is sent. */
 async function sendFile(reply: FastifyReply, path: Promise<string>) {
-  const body = await readFile(await path);
-  return reply.header('content-type', 'video/mp4').header('cache-control', 'no-store').send(body);
+  const file = await open(await path, 'r');
+  try {
+    const { size } = await file.stat();
+    return reply.header('content-type', 'video/mp4').header('content-length', size).header('cache-control', 'no-store').send(file.createReadStream());
+  } catch (error) { await file.close().catch(() => undefined); throw error; }
 }
 
 export function registerHlsRoutes(app: FastifyInstance, sessions: TranscodeSessionService, info: TranscodeInfoService): void {

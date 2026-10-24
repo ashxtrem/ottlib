@@ -37,7 +37,7 @@ function fixture(ffmpeg?: FfmpegLocator) {
     decision: { mode: 'remux', audioOrder: null, audioCopy: true, burnSubtitleOrder: null, toneMap: false, reasons: ['container'] },
     keyframesMs: [0, 4000, 8000],
   });
-  return { app, db, pins, open, runs: fake.runs };
+  return { app, db, pins, open, runs: fake.runs, root: join(directory, 'hls') };
 }
 
 describe('HLS routes', () => {
@@ -62,6 +62,20 @@ describe('HLS routes', () => {
       expect((await app.inject({ method: 'GET', url: '/api/hls/1/nope/main.m3u8' })).statusCode).toBe(404);
       expect((await app.inject({ method: 'DELETE', url: base })).statusCode).toBe(204);
       expect((await app.inject({ method: 'GET', url: `${base}/main.m3u8` })).statusCode).toBe(404);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('answers 404 for a segment whose file is gone from disk', async () => {
+    const { app, db, open, runs, root } = fixture();
+    try {
+      const base = (await open()).sessionUrl;
+      const segment = app.inject({ method: 'GET', url: `${base}/seg-0.m4s` });
+      runs[0].produce([0, 4000]);
+      expect((await segment).statusCode).toBe(200);
+      rmSync(join(root, base.split('/')[4], 'seg-0.m4s'));
+      const gone = await app.inject({ method: 'GET', url: `${base}/seg-0.m4s` });
+      expect(gone.statusCode).toBe(404);
+      expect(gone.json()).toEqual({ error: 'Segment is no longer available' });
     } finally { await app.close(); db.close(); }
   });
 

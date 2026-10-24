@@ -9,7 +9,7 @@ import { x264Encoder } from '../../providers/transcode/x264Encoder.js';
 import type { PlaybackDecision } from '../playbackDecider.js';
 import { fakeSpawner, fragment } from './fmp4Fixture.js';
 import { SessionBusyError, type HlsSessionInput } from './sessionOpener.js';
-import { SessionNotFoundError, TranscodeSessionService } from './transcodeSessionService.js';
+import { defaultTranscodeRoot, SessionNotFoundError, TranscodeSessionService } from './transcodeSessionService.js';
 
 const directories: string[] = [];
 afterEach(() => directories.splice(0).forEach((directory) => rmSync(directory, { recursive: true, force: true })));
@@ -208,6 +208,47 @@ describe('TranscodeSessionService', () => {
     runs[0].exit(1, 'Invalid data found when processing input\n');
     await expect(waiting).rejects.toThrow(/exited with code 1: Invalid data found/);
     await service.shutdown();
+  });
+
+  it('does not respawn ffmpeg where a run failed until a far request or the retry delay passes', async () => {
+    const { service, runs, clock } = fixture();
+    const id = sessionId((await service.open(input())).playlistUrl);
+    const first = service.segment(7, id, 0);
+    runs[0].produce([0, 2000, 4000, 6000]); // segments 0-2 complete
+    await first;
+    const pending = service.segment(7, id, 3);
+    runs[0].exit(1, 'Broken frame\n');
+    await expect(pending).rejects.toThrow(/Broken frame/);
+    await service.segment(7, id, 1); // produced: served, without resuming at the failed point
+    await service.segment(7, id, 2);
+    await expect(service.segment(7, id, 3)).rejects.toThrow(/Broken frame/);
+    await expect(service.init(7, id)).resolves.toContain('init.mp4');
+    expect(runs).toHaveLength(1);
+    clock.now += 30_000;
+    await service.segment(7, id, 2); // the retry delay passed: resumes after the newest segment
+    expect(runs).toHaveLength(2);
+    expect(runs[1].args[runs[1].args.indexOf('-ss') + 1]).toBe('6.200');
+    await service.shutdown();
+  });
+
+  it('starts a new run for a far request after a failure', async () => {
+    const { service, runs } = fixture();
+    const id = sessionId((await service.open(input())).playlistUrl);
+    const pending = service.segment(7, id, 0);
+    runs[0].exit(1, 'Broken frame\n');
+    await expect(pending).rejects.toThrow(/Broken frame/);
+    await expect(service.segment(7, id, 2)).rejects.toThrow(/Broken frame/);
+    expect(runs).toHaveLength(1);
+    const far = service.segment(7, id, 100);
+    expect(runs).toHaveLength(2);
+    runs[1].produce([200_000, 202_000]);
+    expect(readFileSync(await far).equals(fragment(200_000))).toBe(true);
+    await service.shutdown();
+  });
+
+  it('keeps its temp root in an ottlib-hls folder of its own under OTTLIB_TRANSCODE_DIR', () => {
+    expect(defaultTranscodeRoot({ OTTLIB_TRANSCODE_DIR: join('D:', 'shared') })).toBe(join('D:', 'shared', 'ottlib-hls'));
+    expect(defaultTranscodeRoot({})).toBe(join(tmpdir(), 'ottlib-hls'));
   });
 
   it('empties the temp root at start and removes it on shutdown', async () => {

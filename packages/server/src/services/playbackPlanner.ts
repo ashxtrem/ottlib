@@ -39,7 +39,8 @@ export class PlaybackPlanner {
   public constructor(private readonly options: PlaybackPlannerOptions) {}
 
   public async plan(file: PlaybackMovie, profileId: number | undefined, request: PlaybackRequest, deviceId?: string): Promise<PlaybackPlan> {
-    const info = await this.mediaInfoOf(file, profileId);
+    const known = await this.knownMovie(file, profileId);
+    const info = known?.mediaInfo ?? null;
     if (!info) return this.describe('direct', ['probe-failed'], []);
     const tracks = this.options.tracks.listByMovieIds([file.id]).get(file.id) ?? [];
     const ffmpegAvailable = Boolean(this.options.sessions) && await (this.options.ffmpegAvailable?.() ?? Promise.resolve(false));
@@ -53,8 +54,10 @@ export class PlaybackPlanner {
     const plan = this.describe(decision.mode, decision.reasons, tracks, decision);
     if (decision.mode === 'direct') return plan;
     const audioChannels = tracks.find((track) => track.type === 'audio' && track.order === decision.audioOrder)?.channels ?? null;
+    // The first open (no startMs yet) starts ffmpeg at the viewer's resume point, where the player will seek first.
+    const startMs = request.startMs ?? known?.resumePositionMs ?? undefined;
     const handle = await this.options.sessions!.open({
-      movie: file, mediaInfo: info, decision, deviceId, startMs: request.startMs, keyframesMs: decision.mode === 'remux' ? keyframes ?? [] : [], maxHeight: request.maxHeight, audioChannels
+      movie: file, mediaInfo: info, decision, deviceId, startMs, keyframesMs: decision.mode === 'remux' ? keyframes ?? [] : [], maxHeight: request.maxHeight, audioChannels
     });
     return { ...plan, hls: handle };
   }
@@ -70,11 +73,11 @@ export class PlaybackPlanner {
     };
   }
 
-  /** The file's probe result, running ffprobe once if it has none yet; null when the probe fails. */
-  private async mediaInfoOf(file: PlaybackMovie, profileId: number | undefined): Promise<ProbedMediaInfo | null> {
-    const known = this.options.movies.get(file.id, profileId)?.mediaInfo;
-    if (known) return known;
+  /** The movie as this viewer sees it (probe result, resume point), running ffprobe once if it has no probe yet. */
+  private async knownMovie(file: PlaybackMovie, profileId: number | undefined): Promise<{ mediaInfo: ProbedMediaInfo | null; resumePositionMs: number | null } | null> {
+    const known = this.options.movies.get(file.id, profileId);
+    if (known?.mediaInfo) return known;
     await this.options.mediaInfo.refresh(file.id, file.path);
-    return this.options.movies.get(file.id, profileId)?.mediaInfo ?? null;
+    return this.options.movies.get(file.id, profileId) ?? null;
   }
 }

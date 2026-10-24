@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
+import { PlaybackProgressRepository } from '../repositories/playbackProgressRepository.js';
+import { ProfileRepository } from '../repositories/profileRepository.js';
 import type { HlsSessionOpener } from './hls/sessionOpener.js';
 import type { MediaInfoService } from './mediaInfoService.js';
 import { PlaybackPlanner } from './playbackPlanner.js';
@@ -26,7 +28,7 @@ function setup(options: { probe?: boolean; sessions?: boolean; keyframes?: numbe
   const open = vi.fn<HlsSessionOpener['open']>().mockResolvedValue({ playlistUrl: '/api/hls/1/s/main.m3u8', sessionUrl: '/api/hls/1/s' });
   const keyframes = vi.fn(async () => options.keyframes === undefined ? [0, 2000, 4000] : options.keyframes);
   const planner = new PlaybackPlanner({ movies, tracks, mediaInfo: { refresh } as unknown as MediaInfoService, sessions: options.sessions === false ? undefined : { open }, ffmpegAvailable: async () => true, keyframes });
-  return { planner, movies, refresh, open, keyframes, file: movies.playbackMovie(1)!, close: () => db.close() };
+  return { planner, movies, refresh, open, keyframes, db, file: movies.playbackMovie(1)!, close: () => db.close() };
 }
 
 describe('PlaybackPlanner', () => {
@@ -42,6 +44,20 @@ describe('PlaybackPlanner', () => {
       expect(open).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 'device-1', keyframesMs: [0, 2000, 4000], decision: expect.objectContaining({ mode: 'remux', audioCopy: false }) }));
       await planner.plan(file, undefined, chrome);
       expect(refresh).toHaveBeenCalledTimes(1);
+    } finally { close(); }
+  });
+
+  it("opens the session at the viewer's resume point when the request sends no start", async () => {
+    const { planner, open, db, file, close } = setup();
+    try {
+      const owner = new ProfileRepository(db).getOwner()!.id;
+      new PlaybackProgressRepository(db).set(1, owner, 'device-1', 1_800_000, 6_000_000);
+      await planner.plan(file, owner, chrome);
+      expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ startMs: 1_800_000 }));
+      await planner.plan(file, owner, { ...chrome, startMs: 60_000 });
+      expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ startMs: 60_000 }));
+      await planner.plan(file, undefined, chrome);
+      expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ startMs: undefined }));
     } finally { close(); }
   });
 

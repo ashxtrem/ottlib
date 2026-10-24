@@ -23,7 +23,7 @@ export interface TranscodeSessionServiceOptions {
   /** '?key=…' for a movie when an access PIN is set, else ''. */
   streamQuery: (movieId: number) => string;
   spawn?: SpawnFn;
-  /** Temp root; default `OTTLIB_TRANSCODE_DIR`, else `os.tmpdir()/ottlib-hls`. */
+  /** Temp root, emptied at start; default `<OTTLIB_TRANSCODE_DIR>/ottlib-hls`, else `os.tmpdir()/ottlib-hls`. */
   root?: string;
   now?: () => number;
   log?: (message: string) => void;
@@ -32,8 +32,9 @@ export interface TranscodeSessionServiceOptions {
 /** A session that does not exist, or belongs to another movie. */
 export class SessionNotFoundError extends Error {}
 
-export function defaultTranscodeRoot(): string {
-  return process.env[transcodeDirEnvVar] || join(tmpdir(), transcodeDirName);
+/** Always an `ottlib-hls` folder of its own: start() empties the root, so an override pointing at a shared folder must not be the root itself. */
+export function defaultTranscodeRoot(env: NodeJS.ProcessEnv = process.env): string {
+  return join(env[transcodeDirEnvVar] || tmpdir(), transcodeDirName);
 }
 
 const hevcLabels = new Set(['hevc', 'h.265', 'h265']);

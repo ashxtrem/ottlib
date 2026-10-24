@@ -57,6 +57,8 @@ export const transcodeSessionLimits = {
   segmentWaitMs: 20_000,
   /** How far past the newest produced segment a request may be and still wait. */
   segmentWaitWindow: 4,
+  /** After a run fails, no new run starts where it failed (from its start to just past its newest segment) for this long. */
+  failedRunRetryMs: 30_000,
 };
 
 /** Temp root for session folders (`<root>/<sessionId>`); default `os.tmpdir()/ottlib-hls`. */
