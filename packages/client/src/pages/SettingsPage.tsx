@@ -20,6 +20,7 @@ import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection
 import { ProfilesSettingsSection } from '../components/ProfilesSettingsSection';
 import { useAuthStatus } from '../hooks/useAccessPin';
 import { SubtitleSettingsSection } from '../components/SubtitleSettingsSection';
+import { TranscodeSettingsSection } from '../components/settings/TranscodeSettingsSection';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -100,6 +101,7 @@ export function SettingsPage() {
     <AccessPinSettingsSection />
     <ProfilesSettingsSection />
     <SubtitleSettingsSection />
+    <TranscodeSettingsSection />
 
     <form
       onSubmit={(event) => {
