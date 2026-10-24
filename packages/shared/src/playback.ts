@@ -23,13 +23,79 @@ export const subtitleSourceSchema = z.object({
   isHearingImpaired: z.boolean()
 });
 
+/** One audio track a client can pick; `order` is the ffprobe stream index (what `audioOrder` takes). */
+export const audioTrackSourceSchema = z.object({
+  order: z.number().int().nonnegative(),
+  language: z.string().nullable(),
+  title: z.string().nullable(),
+  codec: z.string().nullable(),
+  channels: z.number().int().nullable(),
+  isDefault: z.boolean()
+});
+
+/** A picture-based subtitle that can only be shown by burning it into the video. */
+export const burnInSubtitleSchema = z.object({
+  order: z.number().int().nonnegative(),
+  language: z.string().nullable(),
+  title: z.string().nullable(),
+  codec: z.string().nullable(),
+  isForced: z.boolean()
+});
+
+export const playbackModeSchema = z.enum(['direct', 'remux', 'transcode']);
+
 export const playbackSourceSchema = z.object({
-  kind: z.enum(['direct']),
+  kind: z.enum(['direct', 'hls']),
+  /** For `hls` the playlist URL. */
   streamUrl: z.string(),
   mimeType: z.string(),
   durationMs: z.number().int().nullable(),
   resumePositionMs: z.number().int().nonnegative().nullable(),
-  subtitles: z.array(subtitleSourceSchema)
+  subtitles: z.array(subtitleSourceSchema),
+  mode: playbackModeSchema.optional(),
+  /** Why the file is not played directly (e.g. `video-codec`, `audio-codec`, `container`). */
+  reasons: z.array(z.string()).optional(),
+  /** DELETE this URL to stop the transcode session. */
+  sessionUrl: z.string().optional(),
+  audioTracks: z.array(audioTrackSourceSchema).optional(),
+  audioOrder: z.number().int().nonnegative().optional(),
+  burnInSubtitles: z.array(burnInSubtitleSchema).optional(),
+  burnSubtitleOrder: z.number().int().nonnegative().optional()
+});
+
+const commaList = z
+  .union([z.string(), z.array(z.string())])
+  .transform((value) =>
+    (Array.isArray(value) ? value.join(',') : value)
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter((item) => item.length > 0)
+  );
+
+const queryBool = z
+  .union([z.boolean(), z.string()])
+  .transform((value, ctx) => {
+    if (typeof value === 'boolean') return value;
+    const text = value.trim().toLowerCase();
+    if (text === 'true' || text === '1') return true;
+    if (text === 'false' || text === '0') return false;
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Expected true, false, 1 or 0' });
+    return z.NEVER;
+  });
+
+/**
+ * Query of GET /api/movies/:id/playback. Its presence (any field) turns the direct/remux/transcode decision on;
+ * without it the answer is the plain direct source. Lists are comma separated.
+ */
+export const playbackRequestSchema = z.object({
+  containers: commaList.optional(),
+  video: commaList.optional(),
+  audio: commaList.optional(),
+  hdr: queryBool.optional(),
+  maxHeight: z.coerce.number().int().nonnegative().optional(),
+  audioOrder: z.coerce.number().int().nonnegative().optional(),
+  burnSubtitleOrder: z.coerce.number().int().nonnegative().optional(),
+  startMs: z.coerce.number().int().nonnegative().optional()
 });
 
 export const serverInfoSchema = z.object({
@@ -54,9 +120,24 @@ export const playlistQuerySchema = z.object({
   start: z.coerce.number().int().nonnegative().catch(0).default(0)
 });
 
+/** GET /api/transcode/encoders: what the server's ffmpeg can transcode with. `available: false` when there is no ffmpeg. */
+export const transcodeEncodersSchema = z.object({
+  available: z.boolean(),
+  ffmpegVersion: z.string().nullable(),
+  /** Encoders whose test encode passed (`nvenc`, `qsv`, `amf`, `x264`), in the order `auto` tries them. */
+  encoders: z.array(z.string()),
+  /** The encoder the current setting resolves to, or null when none works. */
+  active: z.string().nullable()
+});
+
+export type TranscodeEncoders = z.infer<typeof transcodeEncodersSchema>;
 export type PlayLocalRequest = z.infer<typeof playLocalRequestSchema>;
-export type PlaybackProgressUpdate =z.infer<typeof playbackProgressUpdateSchema>;
+export type PlaybackProgressUpdate = z.infer<typeof playbackProgressUpdateSchema>;
 export type PlaybackProgressResult = z.infer<typeof playbackProgressResultSchema>;
 export type SubtitleSource = z.infer<typeof subtitleSourceSchema>;
 export type PlaybackSource = z.infer<typeof playbackSourceSchema>;
+export type PlaybackMode = z.infer<typeof playbackModeSchema>;
+export type AudioTrackSource = z.infer<typeof audioTrackSourceSchema>;
+export type BurnInSubtitle = z.infer<typeof burnInSubtitleSchema>;
+export type PlaybackRequest = z.infer<typeof playbackRequestSchema>;
 export type ServerInfo = z.infer<typeof serverInfoSchema>;

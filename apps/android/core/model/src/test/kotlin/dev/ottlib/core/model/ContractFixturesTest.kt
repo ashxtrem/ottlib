@@ -31,6 +31,7 @@ class ContractFixturesTest {
         "shelf-summaries" to ListSerializer(ShelfSummary.serializer()),
         "shelf-detail" to ShelfDetail.serializer(),
         "playback-source" to PlaybackSource.serializer(),
+        "playback-source-hls" to PlaybackSource.serializer(),
         "progress-result" to PlaybackProgressResult.serializer(),
         "scan-status-idle" to ScanStatus.serializer(),
         "scan-status-running" to ScanStatus.serializer(),
@@ -77,6 +78,21 @@ class ContractFixturesTest {
         val source = strict.decodeFromString(PlaybackSource.serializer(), File(fixtures, "playback-source.json").readText())
         assertEquals("direct", source.kind)
         assertTrue(source.subtitles.isNotEmpty())
+        assertEquals(null, source.mode)
         assertEquals(SUPPORTED_API_VERSION, strict.decodeFromString(ServerInfo.serializer(), File(fixtures, "server-info.json").readText()).apiVersion)
+    }
+
+    @Test
+    fun hlsPlaybackSourceCarriesTheDecision() {
+        val source = strict.decodeFromString(PlaybackSource.serializer(), File(fixtures, "playback-source-hls.json").readText())
+        assertEquals("hls", source.kind)
+        assertEquals("application/vnd.apple.mpegurl", source.mimeType)
+        assertEquals("transcode", source.mode)
+        assertTrue(source.reasons.contains("hdr"))
+        assertEquals("/api/hls/1/session-1", source.sessionUrl)
+        assertEquals(1, source.audioOrder)
+        assertEquals(1, source.audioTracks.size)
+        assertEquals(2, source.burnSubtitleOrder)
+        assertEquals("PGS", source.burnInSubtitles.single().codec)
     }
 }

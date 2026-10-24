@@ -21,8 +21,8 @@ The tag is the only version number: `v0.2.0` becomes Android `versionName` 0.2.0
 | --- | --- |
 | `ottlib-tv-<version>.apk` | Android TV / Google TV app |
 | `ottlib-mobile-<version>.apk` | Phone and foldable app |
-| `ottlib-<version>-<os>-<arch>.zip` / `.tar.gz` | Server with its own Node.js runtime and ffprobe. Nothing else to install. |
-| `ottlib-<version>-<os>-<arch>-lite.zip` / `.tar.gz` | Server only (about 30 MB). Needs Node.js 22+ and, for media details, `ffprobe` from FFmpeg on the PATH. |
+| `ottlib-<version>-<os>-<arch>.zip` / `.tar.gz` | Server with its own Node.js runtime, ffprobe and (Windows, Linux) ffmpeg, a pinned BtbN GPL build verified by checksum in `scripts/bundle-ffmpeg.mjs`. macOS uses ffmpeg from the PATH. |
+| `ottlib-<version>-<os>-<arch>-lite.zip` / `.tar.gz` | Server only (about 30 MB). Needs Node.js 22+ and, for media details and transcoding, `ffprobe` and `ffmpeg` from FFmpeg on the PATH. |
 | `SHA256SUMS` | Checksums of everything above |
 
 Bundles are built for `windows-x64`, `linux-x64`, `linux-arm64`, `macos-arm64` and `macos-x64`. Native modules (SQLite) are compiled for the platform each bundle is built on, so a bundle only runs on its own OS/arch.

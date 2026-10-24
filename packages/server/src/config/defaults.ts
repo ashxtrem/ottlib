@@ -27,7 +27,8 @@ export const defaultSettings = {
   ignoredPatterns: defaultIgnoredPatterns,
   excludedFolders: [],
   scheduleEnabled: false,
-  scheduleCron: '0 3 * * *'
+  scheduleCron: '0 3 * * *',
+  transcodeEncoder: 'auto' as const
 };
 
 export const mimeTypes: Record<string, string> = {

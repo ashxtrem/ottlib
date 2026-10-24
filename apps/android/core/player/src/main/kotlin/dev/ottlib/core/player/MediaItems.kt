@@ -11,17 +11,30 @@ import java.util.Locale
 
 /**
  * Converts the server's playback description into a Media3 item. [resolve] turns server-relative URLs
- * into absolute ones. The container is sniffed from the stream, so no MIME type is forced.
+ * into absolute ones. A direct stream's container is sniffed, so no MIME type is forced; an `hls` source is the
+ * server's playlist and is marked as one so Media3 picks its HLS source.
  */
 fun PlaybackSource.toMediaItem(movieId: Long, title: String, resolve: (String) -> String): MediaItem =
     MediaItem.Builder()
         .setMediaId(movieId.toString())
         .setUri(resolve(streamUrl))
+        .setMimeType(if (kind == "hls") MimeTypes.APPLICATION_M3U8 else null)
         .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
         .setSubtitleConfigurations(subtitles.mapNotNull { it.toConfiguration(resolve) })
         .build()
 
+/** [this] plus the side-loaded subtitles of [previous] it doesn't already carry (keeps found subtitles across a source swap). */
+fun MediaItem.withSubtitlesFrom(previous: MediaItem?): MediaItem {
+    val own = localConfiguration?.subtitleConfigurations.orEmpty()
+    val kept = previous?.localConfiguration?.subtitleConfigurations.orEmpty().filter { old -> own.none { it.id == old.id } }
+    return if (kept.isEmpty()) this else buildUpon().setSubtitleConfigurations(own + kept).build()
+}
+
+/** Embedded text subtitles answer 202 + JSON while the server extracts them, so they can't be side-loaded. */
+private const val EMBEDDED_SUBTITLE_PATH = "/subtitles/embedded/"
+
 internal fun SubtitleSource.toConfiguration(resolve: (String) -> String): MediaItem.SubtitleConfiguration? {
+    if (url.contains(EMBEDDED_SUBTITLE_PATH)) return null
     val mimeType = subtitleMimeType(codec) ?: return null
     return MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(url)))
         .setId(url.substringBefore('?'))

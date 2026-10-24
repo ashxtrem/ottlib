@@ -97,6 +97,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
             problem = shown,
             onContinue = { viewModel.dismissProblem(resume = true) },
             onRetry = viewModel::retry,
+            onPlayViaServer = viewModel::playViaServer,
             onExternal = openExternally,
             onExit = onExit,
         )

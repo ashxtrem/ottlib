@@ -150,9 +150,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Bundle with Node and ffprobe
+      # Full: Node, ffprobe and, on Windows and Linux, the pinned checksum-verified ffmpeg (scripts/bundle-ffmpeg.mjs).
+      - name: Bundle with Node, ffprobe and ffmpeg
         run: node scripts/package-server.mjs --version ${{ needs.version.outputs.name }} --variant full --out release
-      - name: Bundle without Node and ffprobe
+      - name: Bundle without Node, ffprobe and ffmpeg
         run: node scripts/package-server.mjs --version ${{ needs.version.outputs.name }} --variant lite --out release
       - uses: actions/upload-artifact@v4
         with:

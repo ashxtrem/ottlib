@@ -7,7 +7,8 @@ import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
 import { OpensubtitlesProvider } from '../providers/subtitles/opensubtitlesProvider.js';
-import { buildApp } from '../app.js';
+import { buildApp, type AppOverrides } from '../app.js';
+import { SessionBusyError, type HlsSessionOpener } from '../services/hls/sessionOpener.js';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
@@ -20,7 +21,7 @@ const device = '3f1c2a52-8a3b-4f0e-9a51-2d6f0f5d9c11';
 const headers = { 'x-device-id': device };
 const directories: string[] = [];
 
-function fixture() {
+function fixture(overrides: AppOverrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'ottlib-native-client-')); directories.push(directory);
   const media = join(directory, 'media'); const db = createDatabase(join(directory, 'data'));
   db.prepare('INSERT INTO folders (path) VALUES (?)').run(media);
@@ -39,7 +40,7 @@ function fixture() {
     { type: 'audio', source: 'embedded', order: 1, language: 'eng', title: 'Surround 5.1', codec: 'E-AC-3', channels: 6, channelLayout: '5.1(side)', isDefault: true, isForced: false, isHearingImpaired: false },
     { type: 'subtitle', source: 'embedded', order: 2, language: 'eng', title: null, codec: 'PGS', channels: null, channelLayout: null, isDefault: false, isForced: false, isHearingImpaired: false }
   ]);
-  return { app: buildApp(db, join(directory, 'data'), 8081), db, media };
+  return { app: buildApp(db, join(directory, 'data'), 8081, overrides), db, media };
 }
 
 /** Replace values that vary per run (timestamps, temp paths, host details) so fixtures are stable. */
@@ -206,6 +207,44 @@ describe('native client endpoints', () => {
       expect((await app.inject({ method: 'GET', url: '/api/movies/1/subtitles/99999' })).statusCode).toBe(404);
       expect((await app.inject({ method: 'GET', url: '/api/movies/999/playback' })).statusCode).toBe(404);
     } finally { await app.close(); db.close(); }
+  });
+
+  it('answers a capability request with an HLS session, and a bare request as before', async () => {
+    const open = vi.fn<HlsSessionOpener['open']>().mockResolvedValue({ playlistUrl: '/api/hls/1/session-1/main.m3u8', sessionUrl: '/api/hls/1/session-1' });
+    const { app, db, media } = fixture({ sessions: { open }, ffmpegAvailable: async () => true });
+    try {
+      // A client that plays only H.264/AAC in MP4: the HDR10 HEVC MKV (no readable Cues) must be transcoded with tone mapping.
+      const query = 'containers=mp4,webm&video=h264&audio=aac&hdr=false&audioOrder=1&burnSubtitleOrder=2&startMs=90000';
+      const response = await app.inject({ method: 'GET', url: `/api/movies/1/playback?${query}`, headers });
+      expect(response.statusCode).toBe(200);
+      const source = playbackSourceSchema.parse(response.json());
+      expect(source).toMatchObject({ kind: 'hls', streamUrl: '/api/hls/1/session-1/main.m3u8', mimeType: 'application/vnd.apple.mpegurl', mode: 'transcode', sessionUrl: '/api/hls/1/session-1', audioOrder: 1, burnSubtitleOrder: 2 });
+      expect(source.reasons).toEqual(['container', 'video-codec', 'audio-codec', 'burn-in', 'hdr']);
+      expect(open).toHaveBeenCalledWith(expect.objectContaining({ deviceId: device, startMs: 90_000, keyframesMs: [], decision: expect.objectContaining({ mode: 'transcode', toneMap: true, audioCopy: false }) }));
+      await snapshot('playback-source-hls', source, media);
+
+      const bare = playbackSourceSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/1/playback', headers })).json());
+      expect(bare).toMatchObject({ kind: 'direct', streamUrl: '/api/stream/1' });
+      expect(bare).not.toHaveProperty('mode');
+      expect(open).toHaveBeenCalledTimes(1);
+
+      expect((await app.inject({ method: 'GET', url: '/api/movies/1/playback?hdr=maybe', headers })).statusCode).toBe(400);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/999/playback?video=h264', headers })).statusCode).toBe(404);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('answers 503 TRANSCODE_BUSY when the session limit is hit, and plays directly without ffmpeg', async () => {
+    const busy: HlsSessionOpener = { open: vi.fn().mockRejectedValue(new SessionBusyError()) };
+    const { app, db } = fixture({ sessions: busy, ffmpegAvailable: async () => true });
+    const { app: bare, db: bareDb } = fixture({ ffmpegAvailable: async () => false });
+    try {
+      const response = await app.inject({ method: 'GET', url: '/api/movies/1/playback?video=h264', headers });
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toMatchObject({ error: 'TRANSCODE_BUSY' });
+      const noFfmpeg = playbackSourceSchema.parse((await bare.inject({ method: 'GET', url: '/api/movies/1/playback?video=h264', headers })).json());
+      expect(noFfmpeg).toMatchObject({ kind: 'direct', mode: 'direct', streamUrl: '/api/stream/1' });
+      expect(noFfmpeg.reasons).toContain('ffmpeg-missing');
+    } finally { await app.close(); db.close(); await bare.close(); bareDb.close(); }
   });
 
   it('records progress, lists continue watching, and clears it when marked watched', async () => {
