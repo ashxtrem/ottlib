@@ -45,10 +45,10 @@ export class PlaybackPlanner {
     const ffmpegAvailable = Boolean(this.options.sessions) && await (this.options.ffmpegAvailable?.() ?? Promise.resolve(false));
     // Assume a keyframe index exists first; it is only read (a file scan) when the answer could be remux.
     let keyframes: number[] | null = null;
-    let decision = decidePlayback({ info, tracks, hasKeyframes: true, ffmpegAvailable, request });
+    let decision = decidePlayback({ info, tracks, hasKeyframes: true, ffmpegAvailable, request, filename: file.filename });
     if (decision.mode === 'remux') {
       keyframes = await (this.options.keyframes ?? readKeyframes)(file.path, info.container).catch(() => null);
-      if (!keyframes?.length) decision = decidePlayback({ info, tracks, hasKeyframes: false, ffmpegAvailable, request });
+      if (!keyframes?.length) decision = decidePlayback({ info, tracks, hasKeyframes: false, ffmpegAvailable, request, filename: file.filename });
     }
     const plan = this.describe(decision.mode, decision.reasons, tracks, decision);
     if (decision.mode === 'direct') return plan;

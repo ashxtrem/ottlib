@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { playLocalRequestSchema, playbackRequestSchema } from '@ottlib/shared';
-import { PlaybackService } from '../services/playbackService.js';
+import { MovieUnavailableError, PlaybackService } from '../services/playbackService.js';
 import { SessionBusyError } from '../services/hls/sessionOpener.js';
 import { isLoopback } from './loopback.js';
 import { requireProfile } from './profileContext.js';
@@ -26,8 +26,9 @@ export function registerPlaybackRoutes(app: FastifyInstance, playback: PlaybackS
     if (parsed && !parsed.success) return reply.code(400).send({ error: 'Invalid playback request' });
     const device = request.headers['x-device-id'];
     try { return await playback.source(Number((request.params as any).id), profileId, parsed?.data, typeof device === 'string' ? device : undefined); } catch (error) {
-      if (error instanceof SessionBusyError) return reply.code(503).send({ code: error.code, message: error.message });
-      return reply.code(404).send({ error: error instanceof Error ? error.message : 'Movie file is unavailable' });
+      if (error instanceof SessionBusyError) return reply.code(503).send({ error: error.code, message: error.message });
+      if (error instanceof MovieUnavailableError) return reply.code(404).send({ error: error.message });
+      throw error;
     }
   });
 }

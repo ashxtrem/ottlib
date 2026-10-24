@@ -1,3 +1,4 @@
+import { extname } from 'node:path';
 import type { MediaTrack, PlaybackMode, PlaybackRequest } from '@ottlib/shared';
 import type { ProbedMediaInfo } from '../repositories/movieRepository.js';
 
@@ -31,6 +32,14 @@ export interface DecideInput {
   hasKeyframes: boolean;
   ffmpegAvailable: boolean;
   request: PlaybackRequest;
+  /** The file's name; the probe labels .webm as 'MKV' (same Matroska family), so the extension tells them apart. */
+  filename: string;
+}
+
+/** The probed container label, lower-cased, with a Matroska file named .webm told apart as 'webm'. */
+function containerKey(container: string | null | undefined, filename: string): string {
+  const label = container?.toLowerCase() ?? '';
+  return label === 'mkv' && extname(filename).toLowerCase() === '.webm' ? 'webm' : label;
 }
 
 export function isImageSubtitle(track: MediaTrack): boolean {
@@ -54,11 +63,11 @@ function inList(list: string[] | undefined, vocabulary: Record<string, string>, 
 }
 
 /** Decides how a file reaches a client with the given capabilities: as it is, repackaged without re-encoding the video, or transcoded. */
-export function decidePlayback({ info, tracks, hasKeyframes, ffmpegAvailable, request }: DecideInput): PlaybackDecision {
+export function decidePlayback({ info, tracks, hasKeyframes, ffmpegAvailable, request, filename }: DecideInput): PlaybackDecision {
   const audio = audioTracksOf(tracks); const chosen = chooseAudio(tracks, request.audioOrder);
   const burn = tracks.find((track) => track.source === 'embedded' && track.order === request.burnSubtitleOrder && isImageSubtitle(track));
   const isHdr = Boolean(info.hdrFormat); const hdrOk = !isHdr || request.hdr === true;
-  const containerOk = (directContainers[info.container?.toLowerCase() ?? ''] ?? []).some((name) => (request.containers ?? []).includes(name));
+  const containerOk = (directContainers[containerKey(info.container, filename)] ?? []).some((name) => (request.containers ?? []).includes(name));
   const videoOk = inList(request.video, videoVocabulary, info.videoCodec);
   const audioCopy = chosen ? inList(request.audio, audioVocabulary, chosen.codec) : true;
   const reasons: string[] = [];
