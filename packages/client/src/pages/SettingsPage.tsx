@@ -17,6 +17,7 @@ import { QbittorrentSettingsSection } from '../components/QbittorrentSettingsSec
 import { SkeletonSettings } from '../components/Skeleton';
 import { useSuccessPulse } from '../hooks/useSuccessPulse';
 import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection';
+import { ProfilesSettingsSection } from '../components/ProfilesSettingsSection';
 import { useAuthStatus } from '../hooks/useAccessPin';
 import { SubtitleSettingsSection } from '../components/SubtitleSettingsSection';
 
@@ -97,6 +98,7 @@ export function SettingsPage() {
     </section>
 
     <AccessPinSettingsSection />
+    <ProfilesSettingsSection />
     <SubtitleSettingsSection />
 
     <form
