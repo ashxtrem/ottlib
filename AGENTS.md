@@ -78,6 +78,14 @@ mobile          Phone/foldable app: Material 3 screens, touch player (gestures, 
 - **Adaptive, not device-specific (mobile).** Layouts branch on the window width class (`windowWidth()`) and posture (`rememberTabletopSplit`), never on device model or orientation, so the Fold's cover/inner screens, split screen and PiP all work. The activity handles size/fold changes itself (`configChanges`), so playback survives folding.
 - **Build/test:** `./gradlew test :tv:assembleDebug :mobile:assembleDebug` from `apps/android`.
 
+## Plans and agent runs (`.claude/`)
+
+- `/plan-writer <idea or issue>` discusses a feature and writes `plans/<topic>-plan.md`; on approval it opens or updates the
+  GitHub issue (label `planned`) and commits the plan on `claude/<topic>`.
+- `/plan-runner plans/<topic>-plan.md` builds an approved plan with helper agents (`.claude/agents/plan-*.md`) and opens the
+  PR into `master`. Repo hooks in `.claude/settings.json` guard the helpers (needs Python 3 on PATH; they fail open).
+- Their scripts are tested with `python -m unittest discover -s .claude/skills/plan-runner/tests`.
+
 ## When adding a new feature
 
 1. Does it need a new pluggable strategy (another metadata source, another playback mechanism)? → add one file implementing the existing interface, register it, done.
