@@ -131,3 +131,10 @@ start.
 
 ## 9. Progress log
 - 2026-10-24: plan written and approved.
+- 2026-10-24: built by /plan-runner (run 20261024-hls-false-end). T1 server keep-alive route (23 route/service tests),
+  T2 false-end guard (`playbackEnd.ts`, 5 tests; the false-end position is recorded in `setTimeout(0)` so all three
+  `ended` listeners judge against the previous one), T3 15 s keep-alive ping (4 tests). Full suite green: web 543 tests
+  in 100 files, Android unit tests pass. Gate note applied: `pause`/`leave` PUTs on a false end now go through the guard.
+  Left as known gaps: `lastFalseEnd` isn't cleared within one movie's player (a later false end within 5 s of an old one
+  counts as real); `usePlayerCommands.ts:12` still reads raw `video.ended` (harmless, the reopen replaces the source).
+  Still to check on the iPad with KAI 071 (§7).

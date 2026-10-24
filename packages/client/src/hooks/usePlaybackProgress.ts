@@ -33,7 +33,7 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
     const shelfQuery = shelfId === undefined ? '' : `?shelfId=${shelfId}`;
     const send = (trigger: ProgressTrigger, positionMs = video.currentTime * 1000) => {
       const duration = durationMs(); const now = Date.now();
-      const action = progressAction(trigger, { now, lastSentAt, positionMs, durationMs: duration, ended: video.ended });
+      const action = progressAction(trigger, { now, lastSentAt, positionMs, durationMs: duration, ended: video.ended && isRealVideoEnd(video, guardRef.current) });
       if (action === 'put') {
         lastSentAt = now;
         void api(`/api/movies/${movieId}/progress`, { method: 'PUT', body: JSON.stringify(progressBody(positionMs, duration, shelfId)), keepalive: true }).catch(() => undefined);
