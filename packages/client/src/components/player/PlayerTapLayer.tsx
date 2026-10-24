@@ -20,7 +20,7 @@ export function PlayerTapLayer({ onTogglePlay, onToggleControls, onSeekBy }: Pla
   const [hint, setHint] = useState<{ seconds: number; at: number } | null>(null);
 
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === 'mouse') { onTogglePlay(); return; }
+    if (event.pointerType === 'mouse') { if (event.button === 0) onTogglePlay(); return; }
     const now = event.timeStamp;
     const isDouble = now - lastTap.current < DOUBLE_TAP_MS;
     lastTap.current = isDouble ? 0 : now;

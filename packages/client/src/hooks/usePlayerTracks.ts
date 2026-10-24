@@ -52,7 +52,11 @@ export function usePlayerTracks({ video, source, reopen }: TracksOptions) {
         setOne(url, ready ? 'ready' : 'failed');
         if (!ready) setTextUrl((wanted) => (wanted === url ? null : wanted));
       })
-      .catch(() => { if (!controller.signal.aborted) setOne(url, 'failed'); })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setOne(url, 'failed');
+        setTextUrl((wanted) => (wanted === url ? null : wanted));
+      })
       .finally(() => checks.current.delete(url));
   }, [status, setOne]);
 
