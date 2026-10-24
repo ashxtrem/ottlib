@@ -1,5 +1,6 @@
 import { MAX_PROFILES, type ProfileCreate, type ProfilePatch, type ProfilePinUpdate, type ProfileSummary } from '@ottlib/shared';
 import type { ProfileRecord, ProfileRepository } from '../repositories/profileRepository.js';
+import { sessionTokenHash, type ProfileSessionRepository } from '../repositories/profileSessionRepository.js';
 import { hashPin } from './auth/pinHasher.js';
 import { ProfileError } from './profileError.js';
 import type { ProfilePinCheck } from './profilePinCheck.js';
@@ -16,7 +17,11 @@ const nameTaken = () => new ProfileError(409, 'Another profile already has that 
  * The owner manages everyone; any profile may rename, recolor and re-PIN itself.
  */
 export class ProfileService {
-  public constructor(private readonly profiles: ProfileRepository, private readonly pins: ProfilePinCheck) {}
+  public constructor(
+    private readonly profiles: ProfileRepository,
+    private readonly pins: ProfilePinCheck,
+    private readonly sessions: ProfileSessionRepository
+  ) {}
 
   public list(): ProfileSummary[] { return this.profiles.list().map(toProfileSummary); }
 
@@ -47,13 +52,15 @@ export class ProfileService {
 
   /**
    * Sets, changes or clears a PIN. A profile changing its own PIN must confirm the current one; the owner may set or
-   * clear another profile's PIN without it (that is how a forgotten PIN is reset).
+   * clear another profile's PIN without it (that is how a forgotten PIN is reset). Setting or changing a PIN signs the
+   * profile out on every other device; the caller's own session (`actorToken`) stays when it belongs to that profile.
    */
-  public setPin(actorId: number, targetId: number, input: ProfilePinUpdate, client: string): ProfileSummary {
+  public setPin(actorId: number, targetId: number, input: ProfilePinUpdate, client: string, actorToken?: string): ProfileSummary {
     const target = this.find(targetId);
     this.requireSelfOrOwner(actorId, target);
     if (actorId === target.id && target.pinHash !== null) this.pins.verify(target.id, target.pinHash, input.currentPin, client);
     this.profiles.setPinHash(target.id, input.pin === null ? null : hashPin(input.pin));
+    if (input.pin !== null) this.endOtherSessions(target.id, actorId === target.id ? actorToken : undefined);
     return this.get(target.id);
   }
 
@@ -63,6 +70,11 @@ export class ProfileService {
     const target = this.find(targetId);
     if (target.isOwner) throw new ProfileError(403, 'The owner profile cannot be deleted.');
     this.profiles.delete(target.id);
+  }
+
+  private endOtherSessions(profileId: number, keepToken: string | undefined): void {
+    if (keepToken) this.sessions.deleteForProfileExcept(profileId, sessionTokenHash(keepToken));
+    else this.sessions.deleteForProfile(profileId);
   }
 
   private find(id: number): ProfileRecord {

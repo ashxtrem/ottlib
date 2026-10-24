@@ -51,4 +51,18 @@ describe('ProfileSessionRepository', () => {
       expect(sessions.find('c')).toBeDefined();
     } finally { db.close(); }
   });
+
+  it('deletes a profile\'s sessions except one, and leaves other profiles alone', () => {
+    const { db, sessions, owner, kid } = fixture();
+    try {
+      sessions.create('a', kid, null); sessions.create('b', kid, device); sessions.create('c', owner, null);
+      sessions.deleteForProfileExcept(kid, 'b');
+      expect(sessions.find('a')).toBeUndefined();
+      expect(sessions.find('b')).toBeDefined();
+      expect(sessions.find('c')).toBeDefined();
+      sessions.deleteForProfileExcept(owner, 'b');
+      expect(sessions.find('b')).toBeDefined();
+      expect(sessions.find('c')).toBeUndefined();
+    } finally { db.close(); }
+  });
 });

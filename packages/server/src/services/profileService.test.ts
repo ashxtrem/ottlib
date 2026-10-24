@@ -18,8 +18,9 @@ function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'ottlib-profile-service-')); directories.push(directory);
   const db = createDatabase(directory);
   const records = new ProfileRepository(db); const pins = new ProfilePinCheck();
-  const profiles = new ProfileService(records, pins);
-  const sessions = new ProfileSessionService(records, new ProfileSessionRepository(db), pins);
+  const sessionRecords = new ProfileSessionRepository(db);
+  const profiles = new ProfileService(records, pins, sessionRecords);
+  const sessions = new ProfileSessionService(records, sessionRecords, pins);
   return { db, records, profiles, sessions, ownerId: records.getOwner()!.id };
 }
 
@@ -58,15 +59,49 @@ describe('ProfileService', () => {
     const { db, profiles, sessions, ownerId } = fixture();
     try {
       const kid = profiles.create(ownerId, { name: 'Kid', color: '#17c964', pin: '1234' });
-      expect(errorOf(() => profiles.setPin(kid.id, kid.id, { pin: '5678' }, 'ip'))).toMatchObject({ statusCode: 401 });
-      expect(errorOf(() => profiles.setPin(kid.id, kid.id, { currentPin: '0000', pin: '5678' }, 'ip'))).toMatchObject({ statusCode: 401 });
+      expect(errorOf(() => profiles.setPin(kid.id, kid.id, { pin: '5678' }, 'ip'))).toMatchObject({ statusCode: 403, code: 'PROFILE_PIN_INVALID' });
+      expect(errorOf(() => profiles.setPin(kid.id, kid.id, { currentPin: '0000', pin: '5678' }, 'ip'))).toMatchObject({ statusCode: 403, code: 'PROFILE_PIN_INVALID' });
       expect(profiles.setPin(kid.id, kid.id, { currentPin: '1234', pin: '5678' }, 'ip')).toMatchObject({ hasPin: true });
       expect(sessions.select(kid.id, '5678', 'ip', null).profile.id).toBe(kid.id);
 
       expect(profiles.setPin(ownerId, kid.id, { pin: null }, 'ip')).toMatchObject({ hasPin: false });
       expect(errorOf(() => profiles.setPin(kid.id, ownerId, { pin: '1111' }, 'ip'))).toMatchObject({ statusCode: 403 });
       expect(profiles.setPin(ownerId, ownerId, { pin: '1111' }, 'ip')).toMatchObject({ hasPin: true });
-      expect(errorOf(() => profiles.setPin(ownerId, ownerId, { pin: null }, 'ip'))).toMatchObject({ statusCode: 401 });
+      expect(errorOf(() => profiles.setPin(ownerId, ownerId, { pin: null }, 'ip'))).toMatchObject({ statusCode: 403 });
+    } finally { db.close(); }
+  });
+
+  it('signs the profile out elsewhere when its PIN is set or changed, but not when it is cleared', () => {
+    const { db, profiles, sessions, ownerId } = fixture();
+    try {
+      const kid = profiles.create(ownerId, { name: 'Kid', color: '#17c964' });
+      const signIn = (pin?: string) => sessions.select(kid.id, pin, 'ip', null).token;
+      const owner = sessions.select(ownerId, undefined, 'ip', null).token;
+      let [own, other] = [signIn(), signIn()];
+
+      // Setting its own PIN keeps the caller's session and ends the other one.
+      profiles.setPin(kid.id, kid.id, { pin: '1234' }, 'ip', own);
+      expect(sessions.sessionProfile(own)).toBe(kid.id);
+      expect(sessions.sessionProfile(other)).toBeUndefined();
+
+      // Changing it works the same way.
+      other = signIn('1234');
+      profiles.setPin(kid.id, kid.id, { currentPin: '1234', pin: '5678' }, 'ip', own);
+      expect(sessions.sessionProfile(own)).toBe(kid.id);
+      expect(sessions.sessionProfile(other)).toBeUndefined();
+
+      // The owner setting it ends every kid session and keeps the owner's own.
+      other = signIn('5678');
+      profiles.setPin(ownerId, kid.id, { pin: '2468' }, 'ip', owner);
+      expect(sessions.sessionProfile(own)).toBeUndefined();
+      expect(sessions.sessionProfile(other)).toBeUndefined();
+      expect(sessions.sessionProfile(owner)).toBe(ownerId);
+
+      // Clearing it signs nobody out.
+      [own, other] = [signIn('2468'), signIn('2468')];
+      profiles.setPin(ownerId, kid.id, { pin: null }, 'ip', owner);
+      expect(sessions.sessionProfile(own)).toBe(kid.id);
+      expect(sessions.sessionProfile(other)).toBe(kid.id);
     } finally { db.close(); }
   });
 
@@ -89,8 +124,8 @@ describe('ProfileSessionService', () => {
     const { db, profiles, sessions, ownerId } = fixture();
     try {
       const kid = profiles.create(ownerId, { name: 'Kid', color: '#17c964', pin: '1234' });
-      expect(errorOf(() => sessions.select(kid.id, undefined, 'ip', null))).toMatchObject({ statusCode: 401 });
-      for (let attempt = 1; attempt < 5; attempt++) expect(errorOf(() => sessions.select(kid.id, '0000', 'ip', null))).toMatchObject({ statusCode: 401 });
+      expect(errorOf(() => sessions.select(kid.id, undefined, 'ip', null))).toMatchObject({ statusCode: 403, code: 'PROFILE_PIN_INVALID' });
+      for (let attempt = 1; attempt < 5; attempt++) expect(errorOf(() => sessions.select(kid.id, '0000', 'ip', null))).toMatchObject({ statusCode: 403 });
       expect(errorOf(() => sessions.select(kid.id, '1234', 'ip', null))).toMatchObject({ statusCode: 429 });
       const fromElsewhere = sessions.select(kid.id, '1234', 'other-ip', null);
       expect(fromElsewhere.token).toMatch(/^[\w-]{43}$/);

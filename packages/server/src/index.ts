@@ -1,10 +1,10 @@
-import { loadBootstrapConfig } from './config/configStore.js';
+import { loadBootstrapConfig, resolveAppRoot } from './config/configStore.js';
 import { createDatabase } from './db/db.js';
 import { buildApp } from './app.js';
 import { DiscoveryService } from './services/discoveryService.js';
 import { ServerInfoService } from './services/serverInfoService.js';
 
-const config = await loadBootstrapConfig(); const db = createDatabase(config.absoluteAppDataPath); const app = buildApp(db, config.absoluteAppDataPath, config.port);
+const config = await loadBootstrapConfig(resolveAppRoot()); const db = createDatabase(config.absoluteAppDataPath); const app = buildApp(db, config.absoluteAppDataPath, config.port);
 await app.listen({ host: '0.0.0.0', port: config.port });
 if (config.advertise) {
   const info = new ServerInfoService(config.port); const discovery = new DiscoveryService(app.log);

@@ -10,6 +10,23 @@ import { profileToken, requireProfile } from './profileContext.js';
 const idParams = z.object({ id: z.coerce.number().int().positive() });
 const targetId = (request: FastifyRequest) => idParams.parse(request.params).id;
 
+/** Header the reset request must carry. A custom header forces a CORS preflight, which this server never grants. */
+export const LOCAL_RESET_HEADER = 'x-ottlib-reset';
+/** Headers a reverse proxy or tunnel adds; their presence means the loopback peer may be relaying a remote caller. */
+const proxyHeaders = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-real-ip'] as const;
+const loopbackHost = /^(localhost|127\.0\.0\.1|\[::1\])(:\d{1,5})?$/i;
+
+/**
+ * True only for a request typed on the server machine itself: loopback peer, the reset header (so a web page cannot fire
+ * it cross-site), no proxy headers, and a loopback Host (so DNS rebinding and local tunnels are refused).
+ */
+function isLocalResetRequest(request: FastifyRequest): boolean {
+  return isLoopback(request.socket.remoteAddress)
+    && request.headers[LOCAL_RESET_HEADER] === '1'
+    && proxyHeaders.every((name) => request.headers[name] === undefined)
+    && loopbackHost.test(request.headers.host ?? '');
+}
+
 function deviceId(request: FastifyRequest): string | null {
   const parsed = deviceIdSchema.safeParse(request.headers['x-device-id']);
   return parsed.success ? parsed.data : null;
@@ -38,15 +55,15 @@ export function registerProfileRoutes(app: FastifyInstance, profiles: ProfileSer
   });
   app.put('/api/profiles/:id/pin', async (request) => {
     const actor = requireProfile(request);
-    return profiles.setPin(actor, targetId(request), profilePinUpdateSchema.parse(request.body ?? {}), request.ip);
+    return profiles.setPin(actor, targetId(request), profilePinUpdateSchema.parse(request.body ?? {}), request.ip, profileToken(request));
   });
   app.delete('/api/profiles/:id', async (request, reply) => {
     profiles.remove(requireProfile(request), targetId(request));
     return reply.code(204).send();
   });
-  // Public in the auth guard so a forgotten access PIN can be cleared — hence loopback only.
+  // Public in the auth guard so a forgotten access PIN can be cleared — hence only from the server machine itself.
   app.post('/api/profiles/reset-local', async (request, reply) => {
-    if (!isLoopback(request.socket.remoteAddress)) return reply.code(403).send({ error: 'PIN reset is only available on the server machine.' });
+    if (!isLocalResetRequest(request)) return reply.code(403).send({ error: 'PIN reset is only available on the server machine.' });
     return reset.reset();
   });
 }
