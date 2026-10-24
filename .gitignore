@@ -34,3 +34,7 @@ Thumbs.db
 
 # Third-party qBittorrent search plugins (kept locally for development, never redistributed)
 /plugins/
+
+# Claude Code worktrees and plan-runner / plan-writer scratch output
+.claude/worktrees/
+/out/
