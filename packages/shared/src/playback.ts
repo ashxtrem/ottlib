@@ -42,7 +42,20 @@ export const serverInfoSchema = z.object({
   authRequired: z.boolean()
 });
 
-export type PlaybackProgressUpdate = z.infer<typeof playbackProgressUpdateSchema>;
+/** Optional body of POST /api/movies/:id/play-local. */
+export const playLocalRequestSchema = z.object({
+  startSec: z.number().int().nonnegative().optional(),
+  /** Fail with 409 VLC_NOT_FOUND instead of falling back to the OS default player. */
+  requireVlc: z.boolean().optional()
+});
+
+/** Query of GET /api/stream/:id/playlist.m3u. A bad `start` is ignored (0) rather than failing the download. */
+export const playlistQuerySchema = z.object({
+  start: z.coerce.number().int().nonnegative().catch(0).default(0)
+});
+
+export type PlayLocalRequest = z.infer<typeof playLocalRequestSchema>;
+export type PlaybackProgressUpdate =z.infer<typeof playbackProgressUpdateSchema>;
 export type PlaybackProgressResult = z.infer<typeof playbackProgressResultSchema>;
 export type SubtitleSource = z.infer<typeof subtitleSourceSchema>;
 export type PlaybackSource = z.infer<typeof playbackSourceSchema>;
