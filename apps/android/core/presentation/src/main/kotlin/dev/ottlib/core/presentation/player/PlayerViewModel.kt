@@ -257,9 +257,14 @@ class PlayerViewModel(
                 if (refusal != null) currentProblem.value = PlaybackProblem.ServerUnavailable(refusal, shown)
                 return@launch
             }
+            val item = runCatching { source.toMediaItem(movieId, title) { api.resolve(it)!! }.withSubtitlesFrom(active.currentMediaItem) }
+                .getOrElse { error ->
+                    source.sessionUrl?.let(::stopServerSession)
+                    currentProblem.value = PlaybackProblem.ServerUnavailable(error.userMessage(), shown)
+                    return@launch
+                }
             serverSession?.let(::stopServerSession)
             serverSession = source.sessionUrl
-            val item = source.toMediaItem(movieId, title) { api.resolve(it)!! }.withSubtitlesFrom(active.currentMediaItem)
             active.setMediaItem(item, request.startMs ?: 0)
             active.prepare()
             active.playWhenReady = true
