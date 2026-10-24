@@ -284,3 +284,22 @@ where the web left off, and "Play via server" on the TV for a TrueHD file.
 
 ## 12. Progress log
 - 2026-10-24: plan written and approved.
+- 2026-10-24: built by /plan-runner (12 tasks, each reviewed; full checks and a Fable gate, then a second gate on its fixes).
+  - **Muxer deviation (T5):** neither `-f hls` nor `-f segment`. The HLS muxer cut copy-mode segments on the planned
+    keyframes but zero-based `tfdt` on every restart (so `init.mp4` differed between runs), and the segment muxer dropped
+    `frag_discont`. ffmpeg now writes fragmented MP4 to stdout (`frag_keyframe+empty_moov+default_base_moof+frag_discont`,
+    `-use_editlist 0`, copy mode `-copyts`, +10 s `output_ts_offset`) and the server splits it into `init.mp4` and
+    `seg-n.m4s` by matching fragment times to the plan. Measured: cuts within 2 ms of the planned keyframes from any
+    restart, restarted video `tfdt` within 1 ms, `init.mp4` byte-identical. A segment is served only once the next one
+    opens (or ffmpeg exits cleanly).
+  - Time to first segment (30 s lavfi test clip, this PC): remux 315 ms, transcode 726 ms (NVENC, CPU decode: this ffmpeg
+    crashes with frames kept on the GPU, so a 3-frame check per encoder+codec falls back to CPU decode).
+  - Encoder probes on this PC (ffmpeg 2024-01-01 gyan): NVENC, QSV and x264 pass, AMF does not; auto picks NVENC; tone-map
+    picks libplacebo. The OpenCL tone-map chain is untested (tonemap_opencl segfaults here).
+  - Matroska Cues read on real library files: 28.2 GB in 40 ms (110 KB read), 26.6 GB in 58 ms, 23.1 GB in 34 ms, 19.5 GB in
+    44 ms. Some muxers write a Cue only about every 10 s (one UHD file averages 9.5 s), so its remux segments are ~10 s.
+  - Bundle: BtbN autobuild-2026-10-23 (ffmpeg n9.0.2 GPL) for win64, linux64 and linux-arm64, SHA-256 pinned; the full zip
+    grows by about 65 MB (not 100). The shipped build lists h264_nvenc/qsv/amf and libplacebo.
+  - hls.js chunk 595 kB (186 kB gzip), loaded only when the browser has no native HLS.
+  - Left for the manual checks: Safari native HLS with the +10 s `tfdt` offset; the Windows runner unzipping ffmpeg with
+    bsdtar (release CI); the qsv/amf hardware paths against real files.
