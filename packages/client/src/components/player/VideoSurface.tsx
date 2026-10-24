@@ -17,12 +17,27 @@ interface VideoSurfaceProps {
 
 type HlsInstance = { destroy(): void };
 
-/** Attaches an HLS playlist with hls.js, which sits in its own chunk and only loads when this runs. */
-async function attachHlsJs(video: HTMLVideoElement, url: string, onFatal: () => void): Promise<HlsInstance | null> {
+/** Recovery tries per fatal error kind before giving up; the count resets after a fragment loads. */
+const HLS_RECOVERY_TRIES = 2;
+
+/**
+ * Attaches an HLS playlist with hls.js, which sits in its own chunk and only loads when this runs. Returns null when
+ * hls.js isn't supported or the effect was cleaned up while the chunk loaded (then nothing touches the `<video>`).
+ * A fatal network error (e.g. the server restarting ffmpeg after a seek) reloads and a media error recovers, a few times.
+ */
+async function attachHlsJs(video: HTMLVideoElement, url: string, onFatal: () => void, isCancelled: () => boolean): Promise<HlsInstance | null> {
   const { default: Hls } = await import('hls.js');
-  if (!Hls.isSupported()) return null;
+  if (isCancelled() || !Hls.isSupported()) return null;
   const hls = new Hls({ enableWorker: true });
-  hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) onFatal(); });
+  let networkTries = 0;
+  let mediaTries = 0;
+  hls.on(Hls.Events.FRAG_LOADED, () => { networkTries = 0; mediaTries = 0; });
+  hls.on(Hls.Events.ERROR, (_event, data) => {
+    if (!data.fatal) return;
+    if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkTries < HLS_RECOVERY_TRIES) { networkTries += 1; hls.startLoad(); return; }
+    if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaTries < HLS_RECOVERY_TRIES) { mediaTries += 1; hls.recoverMediaError(); return; }
+    onFatal();
+  });
   hls.loadSource(url);
   hls.attachMedia(video);
   return hls;
@@ -49,7 +64,7 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
     if (source.kind === 'direct' || hlsEngine === 'native') {
       video.src = source.streamUrl;
     } else if (hlsEngine === 'hlsjs') {
-      attachHlsJs(video, source.streamUrl, () => errorRef.current('media'))
+      attachHlsJs(video, source.streamUrl, () => errorRef.current('media'), () => cancelled)
         .then((instance) => {
           if (cancelled) instance?.destroy(); else if (instance) hls = instance; else errorRef.current('unsupported');
         })

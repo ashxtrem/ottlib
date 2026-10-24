@@ -19,10 +19,12 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
   useEffect(() => {
     if (!video) return;
     let lastSentAt: number | null = null;
+    // The last position seen on timeupdate/seeked: VideoSurface may unmount first and reset currentTime to 0.
+    const lastPosition = { ms: video.currentTime * 1000 };
     const durationMs = () => (Number.isFinite(video.duration) && video.duration > 0 ? video.duration * 1000 : fallback.current ?? Number.NaN);
     const shelfQuery = shelfId === undefined ? '' : `?shelfId=${shelfId}`;
-    const send = (trigger: ProgressTrigger) => {
-      const positionMs = video.currentTime * 1000; const duration = durationMs(); const now = Date.now();
+    const send = (trigger: ProgressTrigger, positionMs = video.currentTime * 1000) => {
+      const duration = durationMs(); const now = Date.now();
       const action = progressAction(trigger, { now, lastSentAt, positionMs, durationMs: duration, ended: video.ended });
       if (action === 'put') {
         lastSentAt = now;
@@ -31,9 +33,11 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
         void api(`/api/movies/${movieId}/complete${shelfQuery}`, { method: 'POST', keepalive: true }).catch(() => undefined);
       }
     };
-    const onTick = () => { if (!video.paused) send('tick'); };
+    // An emptied element (after `load()` without a src) reports 0: keep the last real position.
+    const remember = () => { if (video.readyState > 0) lastPosition.ms = video.currentTime * 1000; };
+    const onTick = () => { remember(); if (!video.paused) send('tick'); };
     const onPause = () => send('pause');
-    const onSeeked = () => send('seeked');
+    const onSeeked = () => { remember(); send('seeked'); };
     const onEnded = () => send('ended');
     const onLeave = () => send('leave');
     video.addEventListener('timeupdate', onTick);
@@ -48,7 +52,8 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
       video.removeEventListener('ended', onEnded);
       window.removeEventListener('pagehide', onLeave);
       // Leaving the watch page inside the app is a leave too (only when something has played).
-      if (video.currentTime > 0) onLeave();
+      remember();
+      if (lastPosition.ms > 0) send('leave', lastPosition.ms);
     };
   }, [video, movieId, shelfId]);
 }
