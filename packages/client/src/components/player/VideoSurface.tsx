@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { PlaybackSource, SubtitleSource } from '@ottlib/shared';
 import type { HlsEngine } from '../../utils/browserCaps';
+import { isRealVideoEnd, type EndGuard } from '../../utils/playbackEnd';
 
 interface VideoSurfaceProps {
   source: PlaybackSource;
@@ -13,6 +14,8 @@ interface VideoSurfaceProps {
   onPlaybackError: (reason: 'media' | 'unsupported') => void;
   /** Text subtitles rendered as `<track>` (only those whose file is ready); the page picks which one shows. */
   textTracks: SubtitleSource[];
+  /** Tells a false `ended` (mid-file on an hls source, e.g. iPad Safari after the server session is gone) from a real one. */
+  endGuard: EndGuard;
 }
 
 type HlsInstance = { destroy(): void };
@@ -44,15 +47,32 @@ async function attachHlsJs(video: HTMLVideoElement, url: string, startSec: numbe
   return hls;
 }
 
-export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks }: VideoSurfaceProps) {
+export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks, endGuard }: VideoSurfaceProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const errorRef = useRef(onPlaybackError); errorRef.current = onPlaybackError;
   const startRef = useRef(startMs); startRef.current = startMs;
+  const guardRef = useRef(endGuard); guardRef.current = endGuard;
 
   useEffect(() => {
     onVideoElement?.(videoRef.current);
     return () => onVideoElement?.(null);
   }, [onVideoElement]);
+
+  // A false end reopens the stream at the position (the page's media-failure path, once per run of playback).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || source.kind !== 'hls') return;
+    const onEnded = () => {
+      const guard = guardRef.current;
+      if (isRealVideoEnd(video, guard)) return;
+      const positionMs = video.currentTime * 1000;
+      // Recorded after the other `ended` listeners have run, so they judge this event against the previous false end only.
+      setTimeout(() => { guard.lastFalseEnd.current = positionMs; }, 0);
+      errorRef.current('media');
+    };
+    video.addEventListener('ended', onEnded);
+    return () => video.removeEventListener('ended', onEnded);
+  }, [source.kind, source.streamUrl]);
 
   useEffect(() => {
     const video = videoRef.current;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isRealVideoEnd, type EndGuard } from '../utils/playbackEnd';
 
 export interface VideoState {
   paused: boolean;
@@ -24,20 +25,23 @@ function bufferedEnd(video: HTMLVideoElement): number {
   return currentTime * 1000;
 }
 
-function read(video: HTMLVideoElement, fallbackDurationMs: number | null): VideoState {
+function read(video: HTMLVideoElement, fallbackDurationMs: number | null, endGuard: EndGuard): VideoState {
   const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration * 1000 : fallbackDurationMs ?? Number.NaN;
-  return { paused: video.paused, ended: video.ended, positionMs: video.currentTime * 1000, durationMs: duration, bufferedMs: bufferedEnd(video), volume: video.volume, muted: video.muted };
+  return { paused: video.paused, ended: video.ended && isRealVideoEnd(video, endGuard), positionMs: video.currentTime * 1000, durationMs: duration, bufferedMs: bufferedEnd(video), volume: video.volume, muted: video.muted };
 }
 
-/** Live play/pause, position, duration, buffered end and volume of a `<video>` element (for the custom controls). */
-export function useVideoState(video: HTMLVideoElement | null, fallbackDurationMs: number | null): VideoState {
+/**
+ * Live play/pause, position, duration, buffered end and volume of a `<video>` element (for the custom controls).
+ * `ended` is only true for a real end, so up next doesn't start on a false `ended` mid-file.
+ */
+export function useVideoState(video: HTMLVideoElement | null, fallbackDurationMs: number | null, endGuard: EndGuard): VideoState {
   const [state, setState] = useState<VideoState>(idle);
   useEffect(() => {
     if (!video) return;
-    const update = () => setState(read(video, fallbackDurationMs));
+    const update = () => setState(read(video, fallbackDurationMs, endGuard));
     update();
     events.forEach((name) => video.addEventListener(name, update));
     return () => events.forEach((name) => video.removeEventListener(name, update));
-  }, [video, fallbackDurationMs]);
+  }, [video, fallbackDurationMs, endGuard]);
   return state;
 }
