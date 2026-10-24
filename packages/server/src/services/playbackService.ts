@@ -10,6 +10,7 @@ import { LocalLaunch } from '../providers/playback/localLaunch.js';
 import type { LocalPlaybackHandoff } from '../providers/playback/PlaybackHandoff.js';
 import { SubtitleLibraryService, downloadedSubtitleOrder } from './subtitles/subtitleLibraryService.js';
 import type { PlaybackPlanner } from './playbackPlanner.js';
+import type { EmbeddedSubtitleService } from './embeddedSubtitleService.js';
 
 export interface SubtitleFile { path: string; mimeType: string }
 
@@ -23,7 +24,7 @@ export class MovieUnavailableError extends Error {
 export class PlaybackService {
   private readonly playlist = new LanPlaylist();
   /** [streamQuery] adds the per-movie key external players need when an access PIN is set ('' otherwise). */
-  public constructor(private readonly movies: MovieRepository, private readonly streamQuery: (id: number) => string = () => '', private readonly subtitleLibrary?: SubtitleLibraryService, private readonly local: LocalPlaybackHandoff = new LocalLaunch(), private readonly planner?: PlaybackPlanner) {}
+  public constructor(private readonly movies: MovieRepository, private readonly streamQuery: (id: number) => string = () => '', private readonly subtitleLibrary?: SubtitleLibraryService, private readonly local: LocalPlaybackHandoff = new LocalLaunch(), private readonly planner?: PlaybackPlanner, private readonly embedded?: EmbeddedSubtitleService) {}
 
   public async movieFile(id: number): Promise<PlaybackMovie> {
     const movie = this.movies.playbackMovie(id);
@@ -46,9 +47,13 @@ export class PlaybackService {
     const subtitles = (await this.sideloadableSubtitles(file)).filter(subtitle => !downloaded.some(record => record.sidecar_path === subtitle.path)).map(({ track }) => ({
       url: `/api/movies/${id}/subtitles/${track.order}${query}`, language: track.language, codec: track.codec, title: track.title, isForced: track.isForced, isHearingImpaired: track.isHearingImpaired
     }));
+    // Only a capability request (the web player) lists the embedded text tracks; Android reads them from the file itself in direct play.
+    const extracted = !plan ? [] : (this.embedded?.textTracks(id) ?? []).map((track) => ({
+      url: `/api/movies/${id}/subtitles/embedded/${track.order}.vtt${query}`, language: track.language, codec: 'WEBVTT', title: track.title, isForced: track.isForced, isHearingImpaired: track.isHearingImpaired
+    }));
     const direct: PlaybackSource = {
       kind: 'direct', streamUrl: `/api/stream/${id}${query}`, mimeType: mimeTypes[extname(file.filename).slice(1).toLowerCase()] ?? 'application/octet-stream',
-      durationMs: movie?.mediaInfo?.durationMs ?? null, resumePositionMs: movie?.resumePositionMs ?? null, subtitles: [...subtitles, ...downloaded.map(record => this.subtitleLibrary!.source(record))]
+      durationMs: movie?.mediaInfo?.durationMs ?? null, resumePositionMs: movie?.resumePositionMs ?? null, subtitles: [...subtitles, ...extracted, ...downloaded.map(record => this.subtitleLibrary!.source(record))]
     };
     if (!plan) return direct;
     const { hls, ...details } = plan;
