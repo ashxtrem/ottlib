@@ -28,10 +28,12 @@ export function usePlaybackSource(movieId: number, capabilities: PlaybackCapabil
   useEffect(() => {
     if (!capabilities) return;
     let active = true;
-    setState((previous) => ({ ...previous, error: null, loading: true }));
+    // Drop the old source: its session is DELETEd below, so the old <video> must stop (the page shows its spinner meanwhile).
+    setState({ source: null, error: null, loading: true });
     api<PlaybackSource>(`/api/movies/${movieId}/playback?${playbackQuery(capabilities, change)}`)
       .then((source) => {
         // An answer that arrives after leaving (or after another switch) still opened a session: stop it right away.
+        // Safe: the server issues a distinct sessionUrl per request, so this never stops the current session.
         if (!active) { stopSession(source.sessionUrl); return; }
         session.current = source.sessionUrl;
         setState({ source, error: null, loading: false });
