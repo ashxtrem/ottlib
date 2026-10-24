@@ -1,15 +1,13 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { ProfileSelectResult } from '@ottlib/shared';
 import type { ProfileRepository } from '../repositories/profileRepository.js';
-import type { ProfileSessionRepository } from '../repositories/profileSessionRepository.js';
+import { sessionTokenHash as tokenHash, type ProfileSessionRepository } from '../repositories/profileSessionRepository.js';
 import { ProfileError, profileRequired } from './profileError.js';
 import type { ProfilePinCheck } from './profilePinCheck.js';
 import { toProfileSummary } from './profileService.js';
 
 /** `last_seen_at` is written at most this often per session. */
 const touchIntervalMs = 60_000;
-
-const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 
 /** Signing in to a profile (a session token per device) and working out which profile a request acts as. */
 export class ProfileSessionService {
