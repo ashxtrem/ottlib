@@ -9,6 +9,7 @@ import { ShelvesPage } from './pages/ShelvesPage';
 import { ShelfDetailPage } from './pages/ShelfDetailPage';
 import { TorrentSearchPage } from './pages/TorrentSearchPage';
 import { HiddenTitlesPage } from './pages/HiddenTitlesPage';
+import { WatchPage } from './pages/WatchPage';
 import { BackIcon, DownloadIcon, PlusIcon, SettingsIcon, ShelvesIcon } from './components/icons';
 import { useBackToLibrary, useBackToLibraryLabel } from './hooks/useBackToLibrary';
 import { focusRing, pressable } from './components/interactionStyles';
@@ -41,7 +42,12 @@ function SectionLinks() {
   return <nav aria-label="Sections" className="flex shrink-0 items-center gap-1"><NavLink to="/" end viewTransition className={sectionLinkClassName}>Home</NavLink><NavLink to="/library" viewTransition className={sectionLinkClassName}>Library</NavLink></nav>;
 }
 
+/** The full-screen player sits outside the header layout but inside the access-PIN and profile gates. */
 export function App() {
+  return <PinGate><ProfileGate><Routes><Route path="/watch/:id" element={<WatchPage />} /><Route path="*" element={<HeaderLayout />} /></Routes></ProfileGate></PinGate>;
+}
+
+function HeaderLayout() {
   const { pathname } = useLocation();
   const scrollSentinel = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -53,5 +59,5 @@ export function App() {
     return () => observer.disconnect();
   }, []);
   const hasMediaToolbar = pathname === '/library' || /^\/shelves\/\d+$/.test(pathname);
-  return <PinGate><ProfileGate><div className="min-h-screen"><div ref={scrollSentinel} className="h-px" aria-hidden="true" /><header className={`sticky top-0 z-30 bg-canvas/95 px-4 py-3 transition-[border-color,box-shadow] duration-fast ease-standard ${scrolled ? 'border-b border-border shadow-sm' : 'border-b border-transparent'}`}><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3"><Link to="/" viewTransition className={`shrink-0 rounded-full transition-transform duration-fast ease-emphasis hover:scale-105 ${focusRing}`}><img src="/icons/ottlib-192.png" alt="OttLib home" className="h-10 w-10" /></Link><SectionLinks />{hasMediaToolbar && <div id="library-toolbar" className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1" />}<ProfileMenu className="ml-auto" /></div></header><ScanStatusBanner /><main className="mx-auto max-w-7xl px-4 py-6 pb-24"><Routes><Route path="/" element={<HomePage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/movie/:id" element={<MovieDetailPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/torrents" element={<TorrentSearchPage />} /><Route path="/hidden" element={<HiddenTitlesPage />} /><Route path="/shelves" element={<ShelvesPage />} /><Route path="/shelves/:id" element={<ShelfDetailPage />} /></Routes></main><FloatingNavigationButtons /></div></ProfileGate></PinGate>;
+  return <div className="min-h-screen"><div ref={scrollSentinel} className="h-px" aria-hidden="true" /><header className={`sticky top-0 z-30 bg-canvas/95 px-4 py-3 transition-[border-color,box-shadow] duration-fast ease-standard ${scrolled ? 'border-b border-border shadow-sm' : 'border-b border-transparent'}`}><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3"><Link to="/" viewTransition className={`shrink-0 rounded-full transition-transform duration-fast ease-emphasis hover:scale-105 ${focusRing}`}><img src="/icons/ottlib-192.png" alt="OttLib home" className="h-10 w-10" /></Link><SectionLinks />{hasMediaToolbar && <div id="library-toolbar" className="order-last w-full min-w-0 sm:order-none sm:w-auto sm:flex-1" />}<ProfileMenu className="ml-auto" /></div></header><ScanStatusBanner /><main className="mx-auto max-w-7xl px-4 py-6 pb-24"><Routes><Route path="/" element={<HomePage />} /><Route path="/library" element={<LibraryPage />} /><Route path="/movie/:id" element={<MovieDetailPage />} /><Route path="/settings" element={<SettingsPage />} /><Route path="/torrents" element={<TorrentSearchPage />} /><Route path="/hidden" element={<HiddenTitlesPage />} /><Route path="/shelves" element={<ShelvesPage />} /><Route path="/shelves/:id" element={<ShelfDetailPage />} /></Routes></main><FloatingNavigationButtons /></div>;
 }
