@@ -236,7 +236,7 @@ describe('native client endpoints', () => {
   it('answers 503 TRANSCODE_BUSY when the session limit is hit, and plays directly without ffmpeg', async () => {
     const busy: HlsSessionOpener = { open: vi.fn().mockRejectedValue(new SessionBusyError()) };
     const { app, db } = fixture({ sessions: busy, ffmpegAvailable: async () => true });
-    const { app: bare, db: bareDb } = fixture();
+    const { app: bare, db: bareDb } = fixture({ ffmpegAvailable: async () => false });
     try {
       const response = await app.inject({ method: 'GET', url: '/api/movies/1/playback?video=h264', headers });
       expect(response.statusCode).toBe(503);

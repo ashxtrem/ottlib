@@ -9,9 +9,14 @@ describe('planSegments', () => {
     });
   });
 
-  it('starts the first remux segment at 0 when the first keyframe is later', () => {
+  it('folds the lead-in before a late first keyframe into segment 0 (ffmpeg starts its first segment there)', () => {
     const plan = planSegments({ mode: 'remux', durationMs: 6000, keyframesMs: [120, 3000] });
-    expect(plan.segments).toEqual([{ start: 0, duration: 120 }, { start: 120, duration: 2880 }, { start: 3000, duration: 3000 }]);
+    expect(plan.segments).toEqual([{ start: 0, duration: 3000 }, { start: 3000, duration: 3000 }]);
+  });
+
+  it('falls back to 4 s for a zero or NaN transcode segment length', () => {
+    expect(planSegments({ mode: 'transcode', durationMs: 8000, segmentMs: 0 }).segments).toHaveLength(2);
+    expect(planSegments({ mode: 'transcode', durationMs: 8000, segmentMs: Number.NaN }).segments).toHaveLength(2);
   });
 
   it('drops keyframes at or past the duration and duplicates', () => {

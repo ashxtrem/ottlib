@@ -32,6 +32,12 @@ export class EncoderRegistry {
     return null;
   }
 
+  /** Every registered encoder whose probe passes, in registry order. */
+  public async available(): Promise<VideoEncoder[]> {
+    const results = await Promise.all(this.encoders.map((encoder) => this.works(encoder)));
+    return this.encoders.filter((_encoder, index) => results[index]);
+  }
+
   private works(encoder: VideoEncoder): Promise<boolean> {
     let result = this.probes.get(encoder.name);
     if (!result) {

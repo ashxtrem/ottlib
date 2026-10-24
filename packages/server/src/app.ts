@@ -19,7 +19,11 @@ import { MetadataMatchService } from './services/metadataMatchService.js';
 import { PlaybackService } from './services/playbackService.js';
 import { PlaybackPlanner } from './services/playbackPlanner.js';
 import type { HlsSessionOpener } from './services/hls/sessionOpener.js';
-import { FfmpegLocator } from './providers/transcode/ffmpegLocator.js';
+import { FfmpegLocator, type FfmpegBinary } from './providers/transcode/ffmpegLocator.js';
+import { EncoderRegistry } from './providers/transcode/encoderRegistry.js';
+import { TranscodeSessionService } from './services/hls/transcodeSessionService.js';
+import { TranscodeInfoService } from './services/transcodeInfoService.js';
+import { registerHlsRoutes } from './routes/hls.js';
 import { PosterCacheService } from './services/posterCacheService.js';
 import { ScanService } from './services/scanService.js';
 import { SchedulerService } from './services/schedulerService.js';
@@ -77,8 +81,15 @@ import { PlaybackHistoryService } from './services/playbackHistoryService.js';
 import { registerHideRoutes } from './routes/hides.js';
 import { registerPlayRoutes } from './routes/plays.js';
 
-/** Collaborators a test (or the HLS wiring) can replace. */
-export interface AppOverrides { sessions?: HlsSessionOpener; ffmpegAvailable?: () => Promise<boolean> }
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** The HLS session service; index.ts calls its `start()` (empty the temp root, start the idle sweep) at server start. */
+    hlsSessions: TranscodeSessionService;
+  }
+}
+
+/** Collaborators a test can replace: the planner's session opener, the ffmpeg check, the HLS session service itself. */
+export interface AppOverrides { sessions?: HlsSessionOpener; ffmpegAvailable?: () => Promise<boolean>; hlsSessions?: TranscodeSessionService; ffmpeg?: FfmpegLocator }
 
 export function buildApp(db: Database.Database, appDataPath: string, port: number, overrides: AppOverrides = {}) {
   const app = Fastify({ logger: true, trustProxy: false });
@@ -91,8 +102,11 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
   const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
   const subtitleLibrary = new SubtitleLibraryService(new DownloadedSubtitleRepository(db), appDataPath, id => pins.streamQuery(id));
-  const ffmpeg = new FfmpegLocator();
-  const planner = new PlaybackPlanner({ movies, tracks: mediaTracks, mediaInfo, sessions: overrides.sessions, ffmpegAvailable: overrides.ffmpegAvailable ?? (async () => (await ffmpeg.locate()) !== null) });
+  const ffmpeg = overrides.ffmpeg ?? new FfmpegLocator(); const locate = () => ffmpeg.locate(); const encoderSetting = () => settings.get().transcodeEncoder;
+  const registries = new WeakMap<FfmpegBinary, EncoderRegistry>();
+  const encodersFor = (binary: FfmpegBinary) => { let registry = registries.get(binary); if (!registry) { registry = new EncoderRegistry(binary); registries.set(binary, registry); } return registry; };
+  const hlsSessions = overrides.hlsSessions ?? new TranscodeSessionService({ locate, encoders: encodersFor, encoderSetting, streamQuery: (id) => pins.streamQuery(id), log: (message) => app.log.info(message) });
+  const planner = new PlaybackPlanner({ movies, tracks: mediaTracks, mediaInfo, sessions: overrides.sessions ?? hlsSessions, ffmpegAvailable: overrides.ffmpegAvailable ?? (async () => (await locate()) !== null) });
   const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary, undefined, planner);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
@@ -101,6 +115,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
   registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerHideRoutes(app, new HideService(new HideRepository(db))); registerPlayRoutes(app, movies, playHistory); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback);
+  registerHlsRoutes(app, hlsSessions, new TranscodeInfoService(locate, encodersFor, encoderSetting));
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
   app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
@@ -111,6 +126,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
   scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
+  app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions);
   app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }

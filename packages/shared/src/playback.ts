@@ -120,7 +120,18 @@ export const playlistQuerySchema = z.object({
   start: z.coerce.number().int().nonnegative().catch(0).default(0)
 });
 
-export type PlayLocalRequest = z.infer<typeof playLocalRequestSchema>;
+/** GET /api/transcode/encoders: what the server's ffmpeg can transcode with. `available: false` when there is no ffmpeg. */
+export const transcodeEncodersSchema = z.object({
+  available: z.boolean(),
+  ffmpegVersion: z.string().nullable(),
+  /** Encoders whose test encode passed (`nvenc`, `qsv`, `amf`, `x264`), in the order `auto` tries them. */
+  encoders: z.array(z.string()),
+  /** The encoder the current setting resolves to, or null when none works. */
+  active: z.string().nullable()
+});
+
+export type TranscodeEncoders = z.infer<typeof transcodeEncodersSchema>;
+export type PlayLocalRequest =z.infer<typeof playLocalRequestSchema>;
 export type PlaybackProgressUpdate =z.infer<typeof playbackProgressUpdateSchema>;
 export type PlaybackProgressResult = z.infer<typeof playbackProgressResultSchema>;
 export type SubtitleSource = z.infer<typeof subtitleSourceSchema>;
