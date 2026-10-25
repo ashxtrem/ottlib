@@ -9,7 +9,14 @@ interface MovieRow {
   metadata_media_type: 'movie' | 'tv' | null; season: number | null; episode: number | null; size: number; provider_id: string | null;
   media_probe_status: string; container_format: string | null; duration_ms: number | null; video_width: number | null; video_height: number | null;
   video_codec: string | null; video_profile: string | null; video_bit_rate: number | null; hdr_format: string | null;
+  picture_x: number | null; picture_y: number | null; picture_width: number | null; picture_height: number | null; picture_status: PictureStatus;
 }
+
+/** Where the real picture sits inside the video frame, in source pixels. */
+export interface PictureArea { x: number; y: number; width: number; height: number }
+export type PictureStatus = 'pending' | 'done' | 'none' | 'failed';
+/** A file waiting for picture-area detection; the frame fields are null until media info has been probed. */
+export interface PicturePendingRow { id: number; path: string; durationMs: number | null; frameWidth: number | null; frameHeight: number | null }
 
 interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
@@ -218,7 +225,12 @@ export class MovieRepository {
         parsed_title = excluded.parsed_title, parsed_year = excluded.parsed_year,
         size = excluded.size, mtime_ms = excluded.mtime_ms,
         last_seen_at = excluded.last_seen_at, missing = 0,
-        media_probe_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.media_probe_status END`).run(movie);
+        media_probe_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.media_probe_status END,
+        picture_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.picture_status END,
+        picture_x = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_x END,
+        picture_y = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_y END,
+        picture_width = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_width END,
+        picture_height = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_height END`).run(movie);
       const row = this.db.prepare('SELECT id FROM movies WHERE canonical_path = ?').get(movie.path) as { id: number };
       if (existing && changed) this.resetForRematch(row.id);
       return { id: row.id, inserted: !existing, needsMatch: changed || existing?.metadata_status === 'error', needsProbe: changed || existing?.media_probe_status === 'pending' };
@@ -228,7 +240,33 @@ export class MovieRepository {
   public clearMediaInfo(id: number): void {
     this.db.prepare(`UPDATE movies SET media_probe_status = 'pending', media_probe_error = NULL, media_probed_at = NULL,
       container_format = NULL, duration_ms = NULL, video_width = NULL, video_height = NULL, video_codec = NULL,
-      video_profile = NULL, video_bit_rate = NULL, hdr_format = NULL WHERE id = ?`).run(id);
+      video_profile = NULL, video_bit_rate = NULL, hdr_format = NULL,
+      picture_status = 'pending', picture_x = NULL, picture_y = NULL, picture_width = NULL, picture_height = NULL WHERE id = ?`).run(id);
+  }
+
+  /** Available files whose picture area has not been measured yet, by id after `afterId` (a cursor, so skipped rows are not refetched). */
+  public listPicturePending(limit: number, afterId = 0): PicturePendingRow[] {
+    const rows = this.db.prepare(`SELECT id, canonical_path, media_probe_status, duration_ms, video_width, video_height FROM movies
+      WHERE picture_status = 'pending' AND missing = 0 AND canonical_path <> '' AND id > ? ORDER BY id LIMIT ?`).all(afterId, limit) as Array<Pick<MovieRow, 'id' | 'canonical_path' | 'media_probe_status' | 'duration_ms' | 'video_width' | 'video_height'>>;
+    return rows.map((row) => ({
+      id: row.id, path: row.canonical_path,
+      durationMs: row.media_probe_status === 'completed' ? row.duration_ms : null,
+      frameWidth: row.media_probe_status === 'completed' ? row.video_width : null,
+      frameHeight: row.media_probe_status === 'completed' ? row.video_height : null
+    }));
+  }
+
+  public applyPictureArea(id: number, area: PictureArea | null, status: PictureStatus): void {
+    this.db.prepare('UPDATE movies SET picture_x = ?, picture_y = ?, picture_width = ?, picture_height = ?, picture_status = ? WHERE id = ?')
+      .run(area?.x ?? null, area?.y ?? null, area?.width ?? null, area?.height ?? null, status, id);
+  }
+
+  /** The measured picture rectangle in source pixels, or null unless detection finished with bars found. */
+  public getPictureArea(id: number): PictureArea | null {
+    const row = this.db.prepare('SELECT picture_x, picture_y, picture_width, picture_height, picture_status FROM movies WHERE id = ?').get(id) as
+      Pick<MovieRow, 'picture_x' | 'picture_y' | 'picture_width' | 'picture_height' | 'picture_status'> | undefined;
+    if (row?.picture_status !== 'done' || row.picture_x === null || row.picture_y === null || row.picture_width === null || row.picture_height === null) return null;
+    return { x: row.picture_x, y: row.picture_y, width: row.picture_width, height: row.picture_height };
   }
 
   public applyMediaInfo(id: number, mediaInfo: ProbedMediaInfo): void {
