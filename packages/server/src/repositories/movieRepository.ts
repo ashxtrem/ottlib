@@ -16,7 +16,7 @@ interface MovieRow {
 export interface PictureArea { x: number; y: number; width: number; height: number }
 export type PictureStatus = 'pending' | 'done' | 'none' | 'failed';
 /** A file waiting for picture-area detection; the frame fields are null until media info has been probed. */
-export interface PicturePendingRow { id: number; path: string; durationMs: number | null; frameWidth: number | null; frameHeight: number | null }
+export interface PicturePendingRow { id: number; path: string; size: number; mtimeMs: number; durationMs: number | null; frameWidth: number | null; frameHeight: number | null }
 
 interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
@@ -246,19 +246,25 @@ export class MovieRepository {
 
   /** Available files whose picture area has not been measured yet, by id after `afterId` (a cursor, so skipped rows are not refetched). */
   public listPicturePending(limit: number, afterId = 0): PicturePendingRow[] {
-    const rows = this.db.prepare(`SELECT id, canonical_path, media_probe_status, duration_ms, video_width, video_height FROM movies
-      WHERE picture_status = 'pending' AND missing = 0 AND canonical_path <> '' AND id > ? ORDER BY id LIMIT ?`).all(afterId, limit) as Array<Pick<MovieRow, 'id' | 'canonical_path' | 'media_probe_status' | 'duration_ms' | 'video_width' | 'video_height'>>;
+    const rows = this.db.prepare(`SELECT id, canonical_path, size, mtime_ms, media_probe_status, duration_ms, video_width, video_height FROM movies
+      WHERE picture_status = 'pending' AND missing = 0 AND canonical_path <> '' AND id > ? ORDER BY id LIMIT ?`).all(afterId, limit) as Array<Pick<MovieRow, 'id' | 'canonical_path' | 'size' | 'media_probe_status' | 'duration_ms' | 'video_width' | 'video_height'> & { mtime_ms: number }>;
     return rows.map((row) => ({
-      id: row.id, path: row.canonical_path,
+      id: row.id, path: row.canonical_path, size: row.size, mtimeMs: row.mtime_ms,
       durationMs: row.media_probe_status === 'completed' ? row.duration_ms : null,
       frameWidth: row.media_probe_status === 'completed' ? row.video_width : null,
       frameHeight: row.media_probe_status === 'completed' ? row.video_height : null
     }));
   }
 
-  public applyPictureArea(id: number, area: PictureArea | null, status: PictureStatus): void {
-    this.db.prepare('UPDATE movies SET picture_x = ?, picture_y = ?, picture_width = ?, picture_height = ?, picture_status = ? WHERE id = ?')
-      .run(area?.x ?? null, area?.y ?? null, area?.width ?? null, area?.height ?? null, status, id);
+  /** With `expected` (the size and mtime the measurement was taken from) the result is dropped if the file changed or the row was reset meanwhile. */
+  public applyPictureArea(id: number, area: PictureArea | null, status: PictureStatus, expected?: { size: number; mtimeMs: number }): void {
+    const values = [area?.x ?? null, area?.y ?? null, area?.width ?? null, area?.height ?? null, status, id];
+    if (!expected) {
+      this.db.prepare('UPDATE movies SET picture_x = ?, picture_y = ?, picture_width = ?, picture_height = ?, picture_status = ? WHERE id = ?').run(...values);
+      return;
+    }
+    this.db.prepare(`UPDATE movies SET picture_x = ?, picture_y = ?, picture_width = ?, picture_height = ?, picture_status = ?
+      WHERE id = ? AND size = ? AND mtime_ms = ? AND picture_status = 'pending'`).run(...values, expected.size, expected.mtimeMs);
   }
 
   /** The measured picture rectangle in source pixels, or null unless detection finished with bars found. */

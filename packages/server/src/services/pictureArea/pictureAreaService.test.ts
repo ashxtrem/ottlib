@@ -84,9 +84,46 @@ describe('PictureAreaService', () => {
       release();
       await first;
       expect(detector.detect).toHaveBeenCalledTimes(1);
-      expect(locate).toHaveBeenCalledTimes(1);
+      expect(locate).toHaveBeenCalledTimes(2); // the call during the pass asked for one more pass
       await service.runPending();
+      expect(locate).toHaveBeenCalledTimes(3);
+    } finally { db.close(); }
+  });
+
+  it('does not apply a result measured on the old file after it changed mid-detection', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const { db, movies, detector, service, add } = setup(async () => { await gate; return same({ w: 3840, h: 1632, x: 0, y: 264 }); });
+    try {
+      const id = add('swapped');
+      const pass = service.runPending();
+      await vi.waitFor(() => expect(detector.detect).toHaveBeenCalledTimes(1));
+      movies.upsertScanned(scanned('swapped', 2));
+      release();
+      await pass;
+      expect(movies.getPictureArea(id)).toBeNull();
+      expect(db.prepare('SELECT picture_status, picture_x FROM movies WHERE id = ?').get(id)).toEqual({ picture_status: 'pending', picture_x: null });
+    } finally { db.close(); }
+  });
+
+  it('runs one more pass when called during a pass, so rows reset meanwhile are measured', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const { db, movies, detector, locate, service, add } = setup(async () => { await gate; return same({ w: 3840, h: 1632, x: 0, y: 264 }); });
+    try {
+      const id = add('first');
+      const pass = service.runPending();
+      await vi.waitFor(() => expect(detector.detect).toHaveBeenCalledTimes(1));
+      // The file changes and is probed again while the first pass is still measuring the old one.
+      movies.upsertScanned(scanned('first', 2));
+      movies.applyMediaInfo(id, { container: 'MKV', durationMs: 7_000_000, width: 3840, height: 2160, videoCodec: 'HEVC', videoProfile: null, videoBitRate: null, hdrFormat: null });
+      expect(service.runPending()).toBe(pass);
+      expect(service.runPending()).toBe(pass);
+      release();
+      await pass;
       expect(locate).toHaveBeenCalledTimes(2);
+      expect(detector.detect).toHaveBeenCalledTimes(2);
+      expect(movies.getPictureArea(id)).toEqual({ x: 0, y: 264, width: 3840, height: 1632 });
     } finally { db.close(); }
   });
 
