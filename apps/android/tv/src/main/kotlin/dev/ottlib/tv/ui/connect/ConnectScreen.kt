@@ -32,6 +32,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.ottlib.core.discovery.DiscoveredServer
 import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.connect.ConnectOutcome
 import dev.ottlib.core.presentation.connect.ConnectViewModel
 import dev.ottlib.core.presentation.connect.localSubnetPrefix
 import dev.ottlib.core.presentation.theme.OttlibColors
@@ -42,20 +43,29 @@ import dev.ottlib.tv.ui.components.UpdateBanner
 import dev.ottlib.tv.ui.components.tryRequestFocus
 
 @Composable
-fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
+fun ConnectScreen(autoConnect: Boolean, onConnected: (ConnectOutcome) -> Unit) {
     val container = appContainer()
     val viewModel = viewModel { ConnectViewModel(container.connection, container.profileSession, container.discovery, autoConnect) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val servers by viewModel.servers.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.connected) { if (state.connected) onConnected() }
+    LaunchedEffect(state.connected) { if (state.connected) onConnected(state.outcome ?: ConnectOutcome.Home) }
 
     if (state.restoring || state.connected) {
         LoadingMessage("Connecting to your Ottlib server…")
         return
     }
     state.pinFor?.let { server ->
-        PinEntry(server, checking = state.connecting != null, error = state.error, onSubmit = viewModel::submitPin, onCancel = viewModel::cancelPin)
+        PinEntry(
+            title = "Enter access PIN",
+            message = "The Ottlib server at $server is protected. Enter the PIN set in the web app under Settings → Access PIN.",
+            key = server,
+            cancelLabel = "Choose another server",
+            checking = state.connecting != null,
+            error = state.error,
+            onSubmit = viewModel::submitPin,
+            onCancel = viewModel::cancelPin,
+        )
         return
     }
 

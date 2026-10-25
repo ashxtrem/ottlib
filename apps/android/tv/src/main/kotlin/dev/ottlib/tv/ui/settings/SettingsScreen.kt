@@ -33,6 +33,7 @@ import dev.ottlib.tv.ui.components.ChoiceDialog
 import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TopDestination
 import dev.ottlib.tv.ui.components.TopNavigation
+import dev.ottlib.tv.ui.profiles.rememberSwitchProfileFocus
 
 private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Picture, AutoPlay }
 
@@ -46,6 +47,7 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onOpenHidden: () -> Uni
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
     val hiddenCount by remember { container.hiddenTitles.titles.map { it.size } }.collectAsStateWithLifecycle(initialValue = 0)
+    val switchFocus = rememberSwitchProfileFocus()
 
     Column(Modifier.fillMaxSize()) {
         TopNavigation(TopDestination.Settings, onNavigate)
@@ -53,6 +55,8 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onOpenHidden: () -> Uni
             Modifier.width(760.dp).padding(horizontal = ScreenPadding, vertical = 16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            ProfileSettingsSection(switchFocus)
+
             SectionTitle("Server")
             ListItem(
                 selected = false,
@@ -152,6 +156,6 @@ private fun secondsChoices(values: List<Int>) = values.map { Choice("$it seconds
 private fun autoPlayChoices() = PlaybackSettings.AUTO_PLAY_CHOICES.map { Choice(if (it == 0) "Off" else "After $it seconds", it) }
 
 @Composable
-private fun SectionTitle(text: String) {
+internal fun SectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, color = OttlibColors.Foreground, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
 }

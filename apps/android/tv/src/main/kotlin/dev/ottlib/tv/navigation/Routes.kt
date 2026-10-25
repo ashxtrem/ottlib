@@ -4,6 +4,7 @@ import dev.ottlib.tv.ui.components.TopDestination
 
 object Routes {
     const val CONNECT = "connect?auto={auto}"
+    const val PROFILES = "profiles"
     const val HOME = "home"
     const val LIBRARY = "library"
     const val SEARCH = "search"
