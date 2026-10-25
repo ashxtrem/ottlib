@@ -50,7 +50,7 @@ export const pictureAreaSchema = z.object({
   height: z.number().min(0).max(1)
 });
 
-export const playbackModeSchema =z.enum(['direct', 'remux', 'transcode']);
+export const playbackModeSchema = z.enum(['direct', 'remux', 'transcode']);
 
 export const playbackSourceSchema = z.object({
   kind: z.enum(['direct', 'hls']),
@@ -146,7 +146,7 @@ export type PlaybackProgressUpdate = z.infer<typeof playbackProgressUpdateSchema
 export type PlaybackProgressResult = z.infer<typeof playbackProgressResultSchema>;
 export type SubtitleSource = z.infer<typeof subtitleSourceSchema>;
 export type PictureArea = z.infer<typeof pictureAreaSchema>;
-export type PlaybackSource =z.infer<typeof playbackSourceSchema>;
+export type PlaybackSource = z.infer<typeof playbackSourceSchema>;
 export type PlaybackMode = z.infer<typeof playbackModeSchema>;
 export type AudioTrackSource = z.infer<typeof audioTrackSourceSchema>;
 export type BurnInSubtitle = z.infer<typeof burnInSubtitleSchema>;
