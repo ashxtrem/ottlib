@@ -111,5 +111,19 @@ class ContractFixturesTest {
         assertEquals(1, source.audioTracks.size)
         assertEquals(2, source.burnSubtitleOrder)
         assertEquals("PGS", source.burnInSubtitles.single().codec)
+        assertEquals(null, source.pictureArea)
+    }
+
+    @Test
+    fun directPlaybackSourceCarriesThePictureAsFractions() {
+        val source = strict.decodeFromString(PlaybackSource.serializer(), File(fixtures, "playback-source.json").readText())
+        assertEquals(PictureArea(x = 0f, y = 0.125f, width = 1f, height = 0.75f), source.pictureArea)
+    }
+
+    @Test
+    fun movieFixtureCarriesTheDetectedPictureSize() {
+        val movie = strict.decodeFromString(Movie.serializer(), File(fixtures, "movie.json").readText())
+        assertEquals(3840, movie.mediaInfo?.pictureWidth)
+        assertEquals(1620, movie.mediaInfo?.pictureHeight)
     }
 }

@@ -43,5 +43,6 @@
       "isForced": false
     }
   ],
-  "burnSubtitleOrder": 2
+  "burnSubtitleOrder": 2,
+  "pictureArea": null
 }

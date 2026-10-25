@@ -474,7 +474,8 @@ export class MovieRepository {
     imdbId: row.imdb_id, metadataStatus: row.metadata_status, metadataSource: row.metadata_source, mediaType: row.metadata_media_type, season: row.season, episode: row.episode, showKey: showKeyOf(row), fileSizeBytes: row.size,
     mediaInfo: row.media_probe_status === 'completed' ? {
       container: row.container_format, durationMs: row.duration_ms, width: row.video_width, height: row.video_height,
-      videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: []
+      videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: [],
+      pictureWidth: row.picture_status === 'done' ? row.picture_width : null, pictureHeight: row.picture_status === 'done' ? row.picture_height : null
     } : null,
     watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, missing: Boolean(row.missing), addedAt: row.added_at, shelves: []
   });

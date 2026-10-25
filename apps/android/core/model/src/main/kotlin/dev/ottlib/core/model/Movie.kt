@@ -46,6 +46,9 @@ data class MediaInfo(
     val videoBitRate: Long?,
     val hdrFormat: String?,
     val tracks: List<MediaTrack>,
+    // Detected picture size in source pixels (letterbox bars removed); null until detected.
+    val pictureWidth: Int? = null,
+    val pictureHeight: Int? = null,
 )
 
 @Serializable

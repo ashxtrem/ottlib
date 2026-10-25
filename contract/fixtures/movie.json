@@ -62,7 +62,9 @@
         "isForced": false,
         "isHearingImpaired": false
       }
-    ]
+    ],
+    "pictureWidth": 3840,
+    "pictureHeight": 1620
   },
   "watched": false,
   "resumePositionMs": null,

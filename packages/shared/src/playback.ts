@@ -42,7 +42,15 @@ export const burnInSubtitleSchema = z.object({
   isForced: z.boolean()
 });
 
-export const playbackModeSchema = z.enum(['direct', 'remux', 'transcode']);
+/** The real picture inside the frame (letterbox bars excluded), as fractions of the frame width and height. */
+export const pictureAreaSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  width: z.number().min(0).max(1),
+  height: z.number().min(0).max(1)
+});
+
+export const playbackModeSchema =z.enum(['direct', 'remux', 'transcode']);
 
 export const playbackSourceSchema = z.object({
   kind: z.enum(['direct', 'hls']),
@@ -60,7 +68,9 @@ export const playbackSourceSchema = z.object({
   audioTracks: z.array(audioTrackSourceSchema).optional(),
   audioOrder: z.number().int().nonnegative().optional(),
   burnInSubtitles: z.array(burnInSubtitleSchema).optional(),
-  burnSubtitleOrder: z.number().int().nonnegative().optional()
+  burnSubtitleOrder: z.number().int().nonnegative().optional(),
+  /** Detected picture area; null when unknown or when burned-in subtitles sit in the bars. */
+  pictureArea: pictureAreaSchema.nullable().optional()
 });
 
 const commaList = z
@@ -135,7 +145,8 @@ export type PlayLocalRequest = z.infer<typeof playLocalRequestSchema>;
 export type PlaybackProgressUpdate = z.infer<typeof playbackProgressUpdateSchema>;
 export type PlaybackProgressResult = z.infer<typeof playbackProgressResultSchema>;
 export type SubtitleSource = z.infer<typeof subtitleSourceSchema>;
-export type PlaybackSource = z.infer<typeof playbackSourceSchema>;
+export type PictureArea = z.infer<typeof pictureAreaSchema>;
+export type PlaybackSource =z.infer<typeof playbackSourceSchema>;
 export type PlaybackMode = z.infer<typeof playbackModeSchema>;
 export type AudioTrackSource = z.infer<typeof audioTrackSourceSchema>;
 export type BurnInSubtitle = z.infer<typeof burnInSubtitleSchema>;

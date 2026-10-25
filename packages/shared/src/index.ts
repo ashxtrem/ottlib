@@ -72,7 +72,10 @@ export const mediaInfoSchema = z.object({
   videoProfile: z.string().nullable(),
   videoBitRate: z.number().int().nullable(),
   hdrFormat: z.string().nullable(),
-  tracks: z.array(mediaTrackSchema)
+  tracks: z.array(mediaTrackSchema),
+  /** Detected picture size inside the frame, source pixels (letterbox bars removed); null until detected. */
+  pictureWidth: z.number().int().nullable().optional(),
+  pictureHeight: z.number().int().nullable().optional()
 });
 
 export const movieSchema = z.object({

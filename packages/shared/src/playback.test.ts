@@ -52,6 +52,15 @@ describe('playbackSourceSchema', () => {
     };
     expect(playbackSourceSchema.parse(hls)).toEqual(hls);
   });
+
+  it('carries a picture area as fractions, or null, or nothing', () => {
+    const base = { kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/mp4', durationMs: null, resumePositionMs: null, subtitles: [] };
+    const pictureArea = { x: 0, y: 0.125, width: 1, height: 0.75 };
+    expect(playbackSourceSchema.parse({ ...base, pictureArea }).pictureArea).toEqual(pictureArea);
+    expect(playbackSourceSchema.parse({ ...base, pictureArea: null }).pictureArea).toBeNull();
+    expect(playbackSourceSchema.parse(base).pictureArea).toBeUndefined();
+    expect(playbackSourceSchema.safeParse({ ...base, pictureArea: { ...pictureArea, height: 1.5 } }).success).toBe(false);
+  });
 });
 
 describe('transcodeEncoder setting', () => {
