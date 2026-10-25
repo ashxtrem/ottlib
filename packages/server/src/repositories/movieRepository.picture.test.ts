@@ -37,12 +37,27 @@ describe('MovieRepository picture area', () => {
     } finally { db.close(); }
   });
 
+  it('applies a measurement only to the size and mtime it was taken from, while pending', () => {
+    const { db, movies, id, scanned } = setup();
+    try {
+      movies.applyPictureArea(id, area, 'done', { size: 2, mtimeMs: 1 });
+      expect(movies.getPictureArea(id)).toBeNull();
+      movies.applyPictureArea(id, area, 'done', { size: 1, mtimeMs: 2 });
+      expect(movies.getPictureArea(id)).toBeNull();
+      movies.applyPictureArea(id, area, 'done', { size: 1, mtimeMs: 1 });
+      expect(movies.getPictureArea(id)).toEqual(area);
+      movies.applyPictureArea(id, null, 'none', { size: 1, mtimeMs: 1 });
+      expect(movies.getPictureArea(id)).toEqual(area);
+      expect(scanned.size).toBe(1);
+    } finally { db.close(); }
+  });
+
   it('lists pending available files after a cursor, with frame data only once probed', () => {
     const { db, movies, id, scanned } = setup();
     try {
-      expect(movies.listPicturePending(10)).toEqual([{ id, path: 'E:/Movies/example.mkv', durationMs: null, frameWidth: null, frameHeight: null }]);
+      expect(movies.listPicturePending(10)).toEqual([{ id, path: 'E:/Movies/example.mkv', size: 1, mtimeMs: 1, durationMs: null, frameWidth: null, frameHeight: null }]);
       movies.applyMediaInfo(id, probe);
-      expect(movies.listPicturePending(10)).toEqual([{ id, path: 'E:/Movies/example.mkv', durationMs: 7_000_000, frameWidth: 3840, frameHeight: 2160 }]);
+      expect(movies.listPicturePending(10)).toEqual([{ id, path: 'E:/Movies/example.mkv', size: 1, mtimeMs: 1, durationMs: 7_000_000, frameWidth: 3840, frameHeight: 2160 }]);
       expect(movies.listPicturePending(10, id)).toEqual([]);
       movies.applyPictureArea(id, null, 'none');
       expect(movies.listPicturePending(10)).toEqual([]);
