@@ -29,16 +29,22 @@ internal suspend fun Call.awaitBody(): String = suspendCancellableCoroutine { co
 
 private fun Response.bodyOrThrow(): String = use {
     val text = body?.string().orEmpty()
-    if (!isSuccessful) throw ApiException(code, errorMessage(text) ?: "Server returned HTTP $code")
+    if (!isSuccessful) {
+        val error = parseError(text)
+        throw ApiException(code, error?.message ?: "Server returned HTTP $code", error?.code)
+    }
     text
 }
 
-/** The `{ error }` text; when `error` is a code (`TRANSCODE_BUSY`) and a `message` comes with it, the message. */
-private fun errorMessage(body: String): String? = runCatching {
+private class ParsedError(val message: String, val code: String?)
+
+/** The `{ error }` text; when `error` is a code (`TRANSCODE_BUSY`) and a `message` comes with it, the message (and the code is kept). */
+private fun parseError(body: String): ParsedError? = runCatching {
     val json = OttlibJson.parseToJsonElement(body).jsonObject
-    val error = json["error"]?.jsonPrimitive?.content
+    val error = json["error"]?.jsonPrimitive?.content ?: return@runCatching null
     val message = json["message"]?.jsonPrimitive?.content
-    if (error != null && message != null && errorCode.matches(error)) message else error
+    val isCode = errorCode.matches(error)
+    ParsedError(if (message != null && isCode) message else error, error.takeIf { isCode })
 }.getOrNull()
 
 private val errorCode = Regex("^[A-Z][A-Z0-9_]+$")
