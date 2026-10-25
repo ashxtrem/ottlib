@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PROFILE_SESSION_HEADER, authStatusSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema,recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { PROFILE_SESSION_HEADER, authStatusSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
