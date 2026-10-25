@@ -2,8 +2,9 @@
 
 Up to 6 profiles per library, each with an optional PIN. Watch progress, watched state, hides and play history belong to a
 profile instead of a device, so playback started on one device resumes on another. Shelves and settings stay shared.
-Android support is the follow-up run (Phase 1b). Today's Android app keeps working while the library has one PIN-less
-profile (§3 fallback); once a second profile or a PIN exists it gets 409 `PROFILE_REQUIRED` until Phase 1b ships.
+Android support is the follow-up run (Phase 1b), now planned in `plans/android-profiles-plan.md` (issue #26). Today's Android app keeps working while the library has one PIN-less
+profile (§3 fallback); once a second profile or a PIN exists it gets 409 `PROFILE_REQUIRED`. The 409 message text changed
+in Phase 1b to "Pick a profile to continue. On Android TV or phone, update the OttLib app."
 
 ## Decisions (agreed with the user)
 - Profile PIN keeps family members out of each other's lists. It is **not** a security boundary: stream URLs stay per-movie
