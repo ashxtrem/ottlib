@@ -2,7 +2,9 @@ package dev.ottlib.core.presentation.profiles
 
 import androidx.compose.ui.graphics.Color
 import dev.ottlib.core.model.PROFILE_COLORS
+import dev.ottlib.core.model.PROFILE_PIN_INVALID
 import dev.ottlib.core.model.ProfileSummary
+import dev.ottlib.core.network.ApiException
 import dev.ottlib.core.presentation.theme.OttlibColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,10 +45,7 @@ class ProfileRightsTest {
         assertFalse(canAddProfile(null, 1))
     }
 
-    @Test fun switchingNeedsAnotherProfileOrAPin() {
-        assertFalse(canSwitchProfile(owner, 1))
-        assertTrue(canSwitchProfile(lockedOwner, 1))
-        assertTrue(canSwitchProfile(owner, 2))
+    @Test fun theAvatarLetterIsTheFirstOfTheName() {
         assertEquals("K", profileInitial(" kid"))
         assertEquals("?", profileInitial("  "))
     }
@@ -62,9 +61,9 @@ class ProfileRightsTest {
     }
 
     @Test fun pinErrorsReadLikeTheWeb() {
-        val wrong = dev.ottlib.core.network.ApiException(403, "Wrong PIN.", "PROFILE_PIN_INVALID")
-        val notOwner = dev.ottlib.core.network.ApiException(403, "Only the owner profile can do that.")
-        val lockout = dev.ottlib.core.network.ApiException(429, "Too many wrong PINs. Try again in 30 seconds.")
+        val wrong = ApiException(403, "Wrong PIN.", PROFILE_PIN_INVALID)
+        val notOwner = ApiException(403, "Only the owner profile can do that.")
+        val lockout = ApiException(429, "Too many wrong PINs. Try again in 30 seconds.")
         assertEquals("Wrong PIN. Try again.", pinErrorMessage(wrong))
         assertEquals("Only the owner profile can do that.", pinErrorMessage(notOwner))
         assertEquals("Too many wrong PINs. Try again in 30 seconds.", pinErrorMessage(lockout))

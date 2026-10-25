@@ -20,6 +20,8 @@ val locked = ProfileSummary(3, "Locked", "#17c964", hasPin = true, isOwner = fal
 class FakeProfileServer(var profiles: List<ProfileSummary> = listOf(owner, kid, locked), var me: ProfileSummary? = null) {
     val server: HttpUrl = "http://192.168.0.2:8081/".toHttpUrl()
     var listCalls = 0
+    /** When set, listing profiles throws it (the server is unreachable). */
+    var listError: Exception? = null
     val selected = mutableListOf<Pair<Int, String?>>()
 
     private val tokens = object : ProfileTokens {
@@ -35,7 +37,7 @@ class FakeProfileServer(var profiles: List<ProfileSummary> = listOf(owner, kid, 
     val session = ProfileSession(
         tokens,
         ProfileAccess(
-            profiles = { listCalls++; profiles },
+            profiles = { listCalls++; listError?.let { throw it }; profiles },
             select = { id, pin ->
                 val profile = profiles.first { it.id == id }
                 if (profile.hasPin && pin == "9999") throw ApiException(429, "Too many wrong PINs. Try again in 30 seconds.")

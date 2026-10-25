@@ -22,6 +22,8 @@ data class ProfileManageUiState(
     /** The profile in use; its rights decide what each row offers. */
     val me: ProfileSummary? = null,
     val profiles: List<ProfileSummary> = emptyList(),
+    /** The session isn't resolved yet ([ProfileState.Unknown]). */
+    val loading: Boolean = true,
     val canAdd: Boolean = false,
     val busy: Boolean = false,
     /** The server's message as is ("Wrong PIN. Try again." for a wrong current PIN). */
@@ -39,7 +41,7 @@ class ProfileManageViewModel(private val api: OttlibApi, private val session: Pr
         viewModelScope.launch { session.state.collect { profile -> state.update { fromSession(it, profile) } } }
         viewModelScope.launch {
             try { session.refreshProfiles() } catch (error: CancellationException) { throw error } catch (error: Exception) {
-                state.update { it.copy(error = errorMessage(error)) }
+                if (session.state.value !is ProfileState.Unknown) state.update { it.copy(error = errorMessage(error)) }
             }
         }
     }
@@ -116,7 +118,7 @@ class ProfileManageViewModel(private val api: OttlibApi, private val session: Pr
     private fun fromSession(ui: ProfileManageUiState, profile: ProfileState): ProfileManageUiState {
         val me = profile.current
         val profiles = profile.profiles
-        return ui.copy(me = me, profiles = profiles, canAdd = canAddProfile(me, profiles.size))
+        return ui.copy(me = me, profiles = profiles, loading = profile is ProfileState.Unknown, canAdd = canAddProfile(me, profiles.size))
     }
 
     private companion object {

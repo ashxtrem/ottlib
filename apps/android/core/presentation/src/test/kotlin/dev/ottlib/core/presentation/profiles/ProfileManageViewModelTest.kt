@@ -2,6 +2,7 @@ package dev.ottlib.core.presentation.profiles
 
 import androidx.lifecycle.ViewModelStore
 import dev.ottlib.core.model.ProfileSummary
+import dev.ottlib.core.network.ApiException
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.network.OttlibJson
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,6 +50,26 @@ class ProfileManageViewModelTest {
             advanceUntilIdle()
             body(Setup(fake, http, viewModel))
         } finally { store.clear(); http.shutdown(); Dispatchers.resetMain() }
+    }
+
+    @Test fun beforeResolveItLoadsWithoutAnError() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val store = ViewModelStore()
+        try {
+            val fake = FakeProfileServer().apply { listError = ApiException(503, "Server unavailable") }
+            // No HTTP call is made before resolve, so the API points nowhere.
+            val viewModel = ProfileManageViewModel(OttlibApi(OkHttpClient()) { fake.server }, fake.session)
+            store.put("manage", viewModel)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.loading)
+            assertTrue(viewModel.uiState.value.profiles.isEmpty())
+            assertNull(viewModel.uiState.value.error)
+
+            fake.listError = null
+            fake.session.resolve(); advanceUntilIdle()
+            assertFalse(viewModel.uiState.value.loading)
+            assertEquals(listOf(owner, kid, locked), viewModel.uiState.value.profiles)
+        } finally { store.clear(); Dispatchers.resetMain() }
     }
 
     @Test fun createUsesTheNextUnusedColourAndRelists() = withManager { s ->
