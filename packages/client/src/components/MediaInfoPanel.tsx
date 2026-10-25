@@ -19,6 +19,21 @@ function TrackList({ title, tracks }: { title: string; tracks: MediaTrack[] }) {
   </div>;
 }
 
+function formatFrameRatio(width: number, height: number): string {
+  const ratio = width / height;
+  if (Math.abs(ratio / (16 / 9) - 1) <= 0.01) return '16:9';
+  if (Math.abs(ratio / (4 / 3) - 1) <= 0.01) return '4:3';
+  return `${ratio.toFixed(2)}:1`;
+}
+
+/** "Picture 3840×1632 (2.35:1) in a 16:9 frame", or null when no letterbox picture size was detected. */
+export function formatPictureLine(mediaInfo: Pick<MediaInfo, 'width' | 'height' | 'pictureWidth' | 'pictureHeight'> | null): string | null {
+  const w = mediaInfo?.pictureWidth; const h = mediaInfo?.pictureHeight;
+  if (!w || !h) return null;
+  const picture = `Picture ${w}×${h} (${(w / h).toFixed(2)}:1)`;
+  return mediaInfo.width && mediaInfo.height ? `${picture} in a ${formatFrameRatio(mediaInfo.width, mediaInfo.height)} frame` : picture;
+}
+
 async function copyText(value: string): Promise<void> {
   if (navigator.clipboard?.writeText && window.isSecureContext) { await navigator.clipboard.writeText(value); return; }
   const input = document.createElement('textarea');
@@ -32,6 +47,7 @@ export function MediaInfoPanel({ mediaInfo, filePath }: { mediaInfo: MediaInfo |
   const { show } = useToast(); const [copied, setCopied] = useState(false); const [expanded, setExpanded] = useState(false); const [canExpand, setCanExpand] = useState(false); const detailsRef = useRef<HTMLDivElement>(null);
   const videoDetails = mediaInfo ? [formatResolution(mediaInfo.height), mediaInfo.videoCodec, mediaInfo.videoProfile, mediaInfo.hdrFormat].filter(Boolean) : [];
   const hasData = Boolean(filePath || mediaInfo?.container || videoDetails.length || mediaInfo?.tracks.length);
+  const pictureLine = formatPictureLine(mediaInfo);
   const audio = mediaInfo?.tracks.filter((track) => track.type === 'audio') ?? [];
   const subtitles = mediaInfo?.tracks.filter((track) => track.type === 'subtitle') ?? [];
   useEffect(() => setExpanded(false), [mediaInfo]);
@@ -50,6 +66,7 @@ export function MediaInfoPanel({ mediaInfo, filePath }: { mediaInfo: MediaInfo |
     <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-subtle">Media info</h2>
     {videoDetails.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{videoDetails.map((detail) => <span key={detail} className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs font-medium text-foreground">{detail}</span>)}</div>}
     {mediaInfo?.width && mediaInfo.height && <p className="mt-2 text-xs text-muted">{mediaInfo.width.toLocaleString()} × {mediaInfo.height.toLocaleString()}{mediaInfo.container ? ` · ${mediaInfo.container}` : ''}</p>}
+    {pictureLine && <p className="mt-1 text-xs text-muted">{pictureLine}</p>}
     {!mediaInfo?.width && mediaInfo?.container && <p className="mt-2 text-xs text-muted">{mediaInfo.container}</p>}
     <div className="relative mt-4">
       <div ref={detailsRef} className={`space-y-4 overflow-hidden ${expanded ? '' : 'max-h-64'}`}>
