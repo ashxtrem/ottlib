@@ -1,5 +1,7 @@
 package dev.ottlib.core.player
 
+import dev.ottlib.core.model.PictureArea
+import dev.ottlib.core.model.PictureMode
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -22,4 +24,45 @@ object PictureGeometry {
     /** How much the video's shape is distorted when drawn into a frame of [frameAspect] (0 = undistorted). */
     fun distortion(videoAspect: Float, frameAspect: Float): Float =
         max(videoAspect, frameAspect) / minOf(videoAspect, frameAspect) - 1f
+
+    /**
+     * Where to draw the whole video frame so that the real picture [area] (bars burned into the frame excluded) is
+     * fitted to the screen by [scaling], or by [forcedAspect] when set. The rectangle may be larger than the screen
+     * and start off it (negative [FrameRect.left]/[FrameRect.top]); the player view clips it.
+     */
+    fun frameRect(
+        scaling: PictureMode.Scaling,
+        forcedAspect: Float?,
+        videoAspect: Float,
+        area: PictureArea,
+        screenW: Float,
+        screenH: Float,
+    ): FrameRect {
+        val screenAspect = screenW / screenH
+        val active = videoAspect * area.width / area.height
+        val (activeW, activeH) = when {
+            forcedAspect != null -> fit(forcedAspect, screenW, screenH)
+            scaling == PictureMode.Scaling.Fit -> fit(active, screenW, screenH)
+            scaling == PictureMode.Scaling.Crop -> cover(active, screenW, screenH)
+            scaling == PictureMode.Scaling.Stretch -> screenW to screenH
+            else -> cover(smartFillAspectRatio(active, screenAspect), screenW, screenH)
+        }
+        val frameW = activeW / area.width
+        val frameH = activeH / area.height
+        return FrameRect(
+            width = frameW,
+            height = frameH,
+            left = screenW / 2f - (area.x + area.width / 2f) * frameW,
+            top = screenH / 2f - (area.y + area.height / 2f) * frameH,
+        )
+    }
+
+    private fun fit(aspect: Float, w: Float, h: Float): Pair<Float, Float> =
+        if (aspect > w / h) w to w / aspect else h * aspect to h
+
+    private fun cover(aspect: Float, w: Float, h: Float): Pair<Float, Float> =
+        if (aspect > w / h) h * aspect to h else w to w / aspect
 }
+
+/** A rectangle in px, relative to the player view's top-left corner. */
+data class FrameRect(val width: Float, val height: Float, val left: Float, val top: Float)

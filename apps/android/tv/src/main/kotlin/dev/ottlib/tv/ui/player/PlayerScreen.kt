@@ -34,6 +34,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
     val completionError by viewModel.completionError.collectAsStateWithLifecycle()
     val nextWarning by viewModel.nextWarning.collectAsStateWithLifecycle()
     val pictureMode by viewModel.pictureMode.collectAsStateWithLifecycle()
+    val pictureArea by viewModel.pictureArea.collectAsStateWithLifecycle()
     val autoPlay by viewModel.autoPlay.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val openExternally = {
@@ -66,6 +67,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                 title = current.title,
                 controls = current.controls,
                 pictureMode = pictureMode,
+                pictureArea = pictureArea,
                 keysEnabled = problem == null,
                 onPictureModeChosen = viewModel::choosePictureMode,
                 onPictureHintSeen = viewModel::pictureHintSeen,

@@ -33,6 +33,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.SeekDirection
 import dev.ottlib.core.presentation.player.PlayerControls
@@ -54,6 +55,7 @@ fun PlayerSurface(
     title: String,
     controls: PlayerControls,
     pictureMode: PictureMode,
+    pictureArea: PictureArea?,
     inPictureInPicture: Boolean,
     onExit: () -> Unit,
     onPictureModeChosen: (PictureMode, Boolean) -> Unit,
@@ -156,14 +158,16 @@ fun PlayerSurface(
 
     val split = if (inPictureInPicture) null else rememberTabletopSplit(area.top, area.height.toInt())
     PictureInPictureEffect(player, area)
-    val video = remember(player) { movableContentOf { mode: PictureMode, modifier: Modifier -> VideoView(player, mode, modifier) } }
+    val video = remember(player) {
+        movableContentOf { mode: PictureMode, picture: PictureArea?, modifier: Modifier -> VideoView(player, mode, picture, modifier) }
+    }
     val touch = Modifier.fillMaxSize().playerGestures { gestures }
 
     Box(
         Modifier.fillMaxSize().background(Color.Black).onGloballyPositioned { area = it.boundsInWindow() },
     ) {
         if (split == null) {
-            video(pictureMode, Modifier.fillMaxSize())
+            video(pictureMode, pictureArea, Modifier.fillMaxSize())
             if (!inPictureInPicture) {
                 Box(touch)
                 AnimatedVisibility(controlsVisible, enter = fadeIn(), exit = fadeOut()) { OverlayControls(title, snapshot, controls, actions) }
@@ -172,7 +176,7 @@ fun PlayerSurface(
         } else {
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxWidth().height(split.top)) {
-                    video(pictureMode, Modifier.fillMaxSize())
+                    video(pictureMode, pictureArea, Modifier.fillMaxSize())
                     Box(touch)
                     PlayerHintOverlay(hint)
                 }

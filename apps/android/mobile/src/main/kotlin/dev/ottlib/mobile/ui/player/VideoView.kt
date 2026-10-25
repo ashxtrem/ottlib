@@ -12,6 +12,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.PictureModeController
 
@@ -21,9 +22,12 @@ import dev.ottlib.core.player.PictureModeController
  */
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoView(player: Player, pictureMode: PictureMode, modifier: Modifier = Modifier) {
+fun VideoView(player: Player, pictureMode: PictureMode, pictureArea: PictureArea?, modifier: Modifier = Modifier) {
     var picture by remember { mutableStateOf<PictureModeController?>(null) }
-    LaunchedEffect(picture, pictureMode) { picture?.apply(pictureMode) }
+    LaunchedEffect(picture, pictureMode, pictureArea) {
+        picture?.setPictureArea(pictureArea)
+        picture?.apply(pictureMode)
+    }
 
     AndroidView(
         modifier = modifier,

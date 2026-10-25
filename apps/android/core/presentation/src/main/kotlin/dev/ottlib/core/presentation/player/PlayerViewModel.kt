@@ -10,6 +10,7 @@ import dev.ottlib.core.data.PictureModeStore
 import dev.ottlib.core.data.PlaybackPreferences
 import dev.ottlib.core.data.TrackChoiceStore
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.model.TrackChoice
@@ -77,6 +78,9 @@ class PlayerViewModel(
     private val picture = MutableStateFlow(PictureMode.Fit)
     /** The confirmed picture mode (panel previews are applied to the view without changing this). */
     val pictureMode: StateFlow<PictureMode> = picture.asStateFlow()
+    private val area = MutableStateFlow<PictureArea?>(null)
+    /** The real picture inside the current source's frame (burned-in bars excluded), or null for the whole frame. */
+    val pictureArea: StateFlow<PictureArea?> = area.asStateFlow()
 
     private val next = MutableStateFlow<Movie?>(null)
     val nextMovie = next.asStateFlow()
@@ -162,6 +166,7 @@ class PlayerViewModel(
                 val settings = preferences.current()
                 autoPlaySeconds = settings.autoPlayNextSeconds
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
+                area.value = source.pictureArea
                 val skipBackMs = settings.skipBackSeconds * 1_000L
                 val skipForwardMs = settings.skipForwardSeconds * 1_000L
                 // Read preferences before creating a decoder: cancellation during a suspended read must not leak a player.
@@ -265,6 +270,7 @@ class PlayerViewModel(
                 }
             serverSession?.let(::stopServerSession)
             serverSession = source.sessionUrl
+            area.value = source.pictureArea
             active.setMediaItem(item, request.startMs ?: 0)
             active.prepare()
             active.playWhenReady = true
