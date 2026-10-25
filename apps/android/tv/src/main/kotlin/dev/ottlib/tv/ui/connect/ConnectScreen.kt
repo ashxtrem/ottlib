@@ -44,7 +44,7 @@ import dev.ottlib.tv.ui.components.tryRequestFocus
 @Composable
 fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { ConnectViewModel(container.connection, container.discovery, autoConnect) }
+    val viewModel = viewModel { ConnectViewModel(container.connection, container.profileSession, container.discovery, autoConnect) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val servers by viewModel.servers.collectAsStateWithLifecycle()
 

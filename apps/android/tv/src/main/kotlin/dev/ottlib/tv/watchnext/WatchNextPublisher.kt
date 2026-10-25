@@ -37,6 +37,15 @@ class WatchNextPublisher(context: Context) : ContinueWatchingPublisher {
         programId(movieId)?.let { resolver.delete(TvContractCompat.buildWatchNextProgramUri(it), null, null) }
     }
 
+    /** The provider only returns this app's own Watch Next programs, so this removes all of ours. */
+    @SuppressLint("RestrictedApi")
+    override fun clear() = safely {
+        val ids = resolver.query(TvContractCompat.WatchNextPrograms.CONTENT_URI, WatchNextProgram.PROJECTION, null, null, null)?.use { cursor ->
+            buildList { while (cursor.moveToNext()) add(WatchNextProgram.fromCursor(cursor).id) }
+        }.orEmpty()
+        ids.forEach { resolver.delete(TvContractCompat.buildWatchNextProgramUri(it), null, null) }
+    }
+
     @SuppressLint("RestrictedApi")
     private fun programId(movieId: Long): Long? =
         resolver.query(TvContractCompat.WatchNextPrograms.CONTENT_URI, WatchNextProgram.PROJECTION, null, null, null)?.use { cursor ->
