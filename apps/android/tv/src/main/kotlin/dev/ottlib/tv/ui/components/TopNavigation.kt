@@ -24,6 +24,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.ottlib.core.presentation.theme.OttlibColors
+import dev.ottlib.tv.ui.profiles.ProfileChip
+import dev.ottlib.tv.ui.profiles.rememberSwitchProfileFocus
 
 enum class TopDestination(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Filled.Home),
@@ -34,6 +36,7 @@ enum class TopDestination(val label: String, val icon: ImageVector) {
 
 @Composable
 fun TopNavigation(current: TopDestination, onNavigate: (TopDestination) -> Unit, modifier: Modifier = Modifier) {
+    val switchFocus = rememberSwitchProfileFocus()
     Row(
         modifier.fillMaxWidth().padding(start = ScreenPadding, end = ScreenPadding, top = 24.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -63,5 +66,6 @@ fun TopNavigation(current: TopDestination, onNavigate: (TopDestination) -> Unit,
         // Pushed to the far end: the tabs above are places to go, this is an action.
         Spacer(Modifier.weight(1f))
         LibrarySyncButton()
+        ProfileChip(switchFocus)
     }
 }

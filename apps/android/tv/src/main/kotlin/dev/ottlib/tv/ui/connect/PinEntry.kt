@@ -29,21 +29,29 @@ import dev.ottlib.tv.ui.components.ScreenPadding
 import dev.ottlib.tv.ui.components.TvTextField
 import dev.ottlib.tv.ui.components.tryRequestFocus
 
-/** Shown instead of the server picker when the chosen server has an access PIN. Back returns to the picker. */
+/**
+ * A 4 to 8 digit PIN step: the server's access PIN (instead of the server picker) or a profile's PIN (instead of the
+ * profile picker). [key] names what the PIN is for, so a new target starts with an empty field. Back calls [onCancel].
+ */
 @Composable
-fun PinEntry(server: String, checking: Boolean, error: String?, onSubmit: (String) -> Unit, onCancel: () -> Unit) {
-    var pin by rememberSaveable(server) { mutableStateOf("") }
+fun PinEntry(
+    title: String,
+    message: String,
+    key: String,
+    cancelLabel: String,
+    checking: Boolean,
+    error: String?,
+    onSubmit: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var pin by rememberSaveable(key) { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     BackHandler(onBack = onCancel)
     LaunchedEffect(error) { if (error != null) pin = "" }
 
     Column(Modifier.fillMaxSize().padding(ScreenPadding), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        Text("Enter access PIN", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = OttlibColors.Foreground)
-        Text(
-            "The Ottlib server at $server is protected. Enter the PIN set in the web app under Settings → Access PIN.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = OttlibColors.Muted,
-        )
+        Text(title, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = OttlibColors.Foreground)
+        Text(message, style = MaterialTheme.typography.bodyLarge, color = OttlibColors.Muted)
         TvTextField(
             value = pin,
             onValueChange = { pin = it.filter(Char::isDigit).take(8) },
@@ -56,7 +64,7 @@ fun PinEntry(server: String, checking: Boolean, error: String?, onSubmit: (Strin
         )
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(onClick = { onSubmit(pin) }, enabled = !checking && pin.length >= 4) { Text("Unlock") }
-            Button(onClick = onCancel) { Text("Choose another server") }
+            Button(onClick = onCancel) { Text(cancelLabel) }
         }
         if (checking) Text("Checking…", style = MaterialTheme.typography.bodyLarge, color = OttlibColors.Accent)
         error?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = OttlibColors.Error) }
