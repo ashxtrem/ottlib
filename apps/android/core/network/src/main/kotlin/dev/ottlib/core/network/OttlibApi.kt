@@ -18,6 +18,13 @@ import dev.ottlib.core.model.PlaybackProgressResult
 import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.model.PlaybackRequest
 import dev.ottlib.core.model.PlaybackSource
+import dev.ottlib.core.model.ProfileCreateRequest
+import dev.ottlib.core.model.ProfileMe
+import dev.ottlib.core.model.ProfilePatch
+import dev.ottlib.core.model.ProfilePinUpdate
+import dev.ottlib.core.model.ProfileSelectRequest
+import dev.ottlib.core.model.ProfileSelectResult
+import dev.ottlib.core.model.ProfileSummary
 import dev.ottlib.core.model.Recommendation
 import dev.ottlib.core.model.ScanStatus
 import dev.ottlib.core.model.ServerInfo
@@ -67,6 +74,24 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     /** Signs in to [server] with its access PIN and returns the session token. Wrong PINs throw [ApiException] (401, or 429 when locked out). */
     suspend fun login(server: HttpUrl, pin: String): String =
         send<PinLoginResult>("POST", server.resolve("/api/auth/login")!!, OttlibJson.encodeToString(PinLoginRequest.serializer(), PinLoginRequest(pin))).token
+
+    suspend fun profiles(): List<ProfileSummary> = get(url("/api/profiles"))
+    /** Starts a profile session; a wrong PIN throws [ApiException] 403 with errorCode `PROFILE_PIN_INVALID`. */
+    suspend fun selectProfile(id: Int, pin: String? = null): ProfileSelectResult =
+        send("POST", url("/api/profiles/$id/select"), OttlibJson.encodeToString(ProfileSelectRequest.serializer(), ProfileSelectRequest(pin)))
+    suspend fun deselectProfile() {
+        client.newCall(Request.Builder().url(url("/api/profiles/deselect")).post(ByteArray(0).toRequestBody()).build()).awaitBody()
+    }
+    suspend fun profileMe(): ProfileMe = get(url("/api/profiles/me"))
+    suspend fun createProfile(request: ProfileCreateRequest): ProfileSummary =
+        send("POST", url("/api/profiles"), OttlibJson.encodeToString(ProfileCreateRequest.serializer(), request))
+    suspend fun updateProfile(id: Int, patch: ProfilePatch): ProfileSummary =
+        send("PATCH", url("/api/profiles/$id"), OttlibJson.encodeToString(ProfilePatch.serializer(), patch))
+    suspend fun setProfilePin(id: Int, update: ProfilePinUpdate): ProfileSummary =
+        send("PUT", url("/api/profiles/$id/pin"), OttlibJson.encodeToString(ProfilePinUpdate.serializer(), update))
+    suspend fun deleteProfile(id: Int) {
+        client.newCall(Request.Builder().url(url("/api/profiles/$id")).delete().build()).awaitBody()
+    }
 
     suspend fun movies(query: MovieQuery): MovieListPage = get(query.applyTo(url("/api/movies").newBuilder()).build())
     suspend fun continueWatching(limit: Int = 20): List<MovieListItem> =

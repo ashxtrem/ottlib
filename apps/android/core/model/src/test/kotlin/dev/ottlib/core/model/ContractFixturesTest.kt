@@ -45,6 +45,12 @@ class ContractFixturesTest {
         "subtitle-options" to SubtitleOptions.serializer(),
         "subtitle-search" to SubtitleSearchResponse.serializer(),
         "subtitle-download" to SubtitleDownloadResponse.serializer(),
+        "profiles" to ListSerializer(ProfileSummary.serializer()),
+        "profile-select-result" to ProfileSelectResult.serializer(),
+        "profile-me" to ProfileMe.serializer(),
+        "profile-summary" to ProfileSummary.serializer(),
+        "profile-required" to ApiError.serializer(),
+        "profile-pin-invalid" to ApiError.serializer(),
     )
 
     @Test
@@ -80,6 +86,17 @@ class ContractFixturesTest {
         assertTrue(source.subtitles.isNotEmpty())
         assertEquals(null, source.mode)
         assertEquals(SUPPORTED_API_VERSION, strict.decodeFromString(ServerInfo.serializer(), File(fixtures, "server-info.json").readText()).apiVersion)
+    }
+
+    @Test
+    fun profileFixturesCarryTheErrorCodesAndOwner() {
+        fun text(name: String) = File(fixtures, "$name.json").readText()
+        assertEquals(PROFILE_REQUIRED, strict.decodeFromString(ApiError.serializer(), text("profile-required")).error)
+        assertEquals(PROFILE_PIN_INVALID, strict.decodeFromString(ApiError.serializer(), text("profile-pin-invalid")).error)
+        val list = strict.decodeFromString(ListSerializer(ProfileSummary.serializer()), text("profiles"))
+        assertTrue(list.any { it.isOwner })
+        assertTrue(list.all { it.color in PROFILE_COLORS })
+        assertTrue(list.size <= MAX_PROFILES)
     }
 
     @Test
