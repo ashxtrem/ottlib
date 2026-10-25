@@ -23,7 +23,10 @@ interface ProfileTokens {
 class ProfileSessionStore(private val context: Context) : ProfileTokens {
     @Volatile private var cached: Map<String, String>? = null
 
-    /** Only blocks on the very first request. */
+    /**
+     * Only blocks on the very first call, which is the interceptor's on an OkHttp thread (every [ProfileSession] call
+     * that reads a token first makes a request), so `runBlocking` never runs on the main thread.
+     */
     override fun tokenBlocking(server: HttpUrl): String? = (cached ?: runBlocking { load() })[origin(server)]
 
     override suspend fun save(server: HttpUrl, token: String) {

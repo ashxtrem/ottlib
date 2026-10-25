@@ -138,9 +138,47 @@ class ProfileSessionTest {
     fun onRequiredForTheActiveServerClearsItsTokenAndShowsThePicker() = runTest {
         tokens.save(server, "token-1")
         session.resolve()
-        session.onRequired(server.resolve("/api/movies")!!)
+        session.onRequired(server.resolve("/api/movies")!!, "token-1")
         assertNull(tokens.tokenBlocking(server))
         assertEquals(ProfileState.NeedsPick(listOf(owner, kid)), session.state.value)
+    }
+
+    @Test
+    fun aStale409ForTheOldTokenAfterSelectKeepsTheNewSession() = runTest {
+        tokens.save(server, "token-1")
+        session.resolve()
+        val selectedKid = session.select(kid.id, null)
+        session.onRequired(server.resolve("/api/movies")!!, "token-1")
+        assertEquals("token-2", tokens.tokenBlocking(server))
+        assertEquals(selectedKid, session.state.value)
+    }
+
+    @Test
+    fun onRequiredBeforeResolveClearsTheTokenButShowsNoEmptyPicker() = runTest {
+        tokens.save(server, "token-1")
+        session.onRequired(server, "token-1")
+        assertNull(tokens.tokenBlocking(server))
+        assertEquals(ProfileState.Unknown, session.state.value)
+    }
+
+    @Test
+    fun onRequiredOnAServerWithoutProfilesStaysUnsupported() = runTest {
+        listed = { notFound() }
+        session.resolve()
+        session.onRequired(server, null)
+        assertEquals(ProfileState.Unsupported, session.state.value)
+    }
+
+    @Test
+    fun aFailedResolveLeavesUnknownAndARetryWorks() = runTest {
+        tokens.save(server, "token-1")
+        val before = session.resolve()
+        listed = { throw ApiException(500, "Boom") }
+        try { session.resolve(); fail("expected ApiException") } catch (error: ApiException) { assertEquals(500, error.statusCode) }
+        assertEquals(ProfileState.Unknown, session.state.value)
+        listed = { listOf(owner, kid) }
+        assertEquals(before, session.resolve())
+        assertEquals(before, session.state.value)
     }
 
     @Test
@@ -148,7 +186,7 @@ class ProfileSessionTest {
         tokens.save(server, "token-1")
         tokens.save(other, "token-x")
         val before = session.resolve()
-        session.onRequired(other)
+        session.onRequired(other, "token-x")
         assertNull(tokens.tokenBlocking(other))
         assertEquals("token-1", tokens.tokenBlocking(server))
         assertEquals(before, session.state.value)
