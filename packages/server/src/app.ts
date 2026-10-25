@@ -127,7 +127,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');
   if (existsSync(clientDist)) {
     app.register(fastifyStatic, { root: clientDist, prefix: '/' });
-    app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/media/') ?reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
+    app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/media/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
   scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
   app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions);
