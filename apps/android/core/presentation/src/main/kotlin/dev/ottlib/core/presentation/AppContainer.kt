@@ -54,7 +54,7 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
         .readTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(DeviceIdInterceptor { deviceIdentity.deviceIdBlocking() })
         .addInterceptor(AuthTokenInterceptor { authTokens.tokenBlocking(it) })
-        .addInterceptor(ProfileSessionInterceptor({ profileTokens.tokenBlocking(it) }, { profileSession.onRequired(it) }))
+        .addInterceptor(ProfileSessionInterceptor({ profileTokens.tokenBlocking(it) }, { url, sent -> profileSession.onRequired(url, sent) }))
         .build()
 
     val api: OttlibApi = OttlibApi(httpClient) { connection.activeServer.value }

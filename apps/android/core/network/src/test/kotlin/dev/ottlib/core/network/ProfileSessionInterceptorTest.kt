@@ -17,8 +17,12 @@ class ProfileSessionInterceptorTest {
     private val server = MockWebServer().apply { start() }
     private val other = MockWebServer().apply { start() }
     private val reported = mutableListOf<HttpUrl>()
+    private val reportedTokens = mutableListOf<String?>()
     private val client = OkHttpClient.Builder()
-        .addInterceptor(ProfileSessionInterceptor({ url -> if (url.port == server.port) "tok-1" else null }) { reported += it })
+        .addInterceptor(ProfileSessionInterceptor({ url -> if (url.port == server.port) "tok-1" else null }) { url, sent ->
+            reported += url
+            reportedTokens += sent
+        })
         .build()
 
     @After fun tearDown() {
@@ -48,6 +52,14 @@ class ProfileSessionInterceptorTest {
         repeat(5) { get(server).close() }
         assertEquals(1, reported.size)
         assertEquals(server.url("/api/x"), reported.single())
+        assertEquals(listOf<String?>("tok-1"), reportedTokens)
+    }
+
+    @Test
+    fun reportsNoTokenWhenTheRequestCarriedNone() {
+        other.enqueue(MockResponse().setResponseCode(409).setBody("""{"error":"PROFILE_REQUIRED"}"""))
+        get(other).close()
+        assertEquals(listOf<String?>(null), reportedTokens)
     }
 
     @Test

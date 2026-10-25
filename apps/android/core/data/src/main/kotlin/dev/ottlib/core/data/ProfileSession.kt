@@ -39,6 +39,8 @@ class ProfileSession(
     /** Works out the profile for the active server. Throws when the server can't be asked (other than 404). */
     suspend fun resolve(): ProfileState {
         beforeSwitch = null
+        // So a failure below doesn't leave the previous server's profile in place.
+        mutableState.value = ProfileState.Unknown
         val server = activeServer() ?: return set(ProfileState.Unknown)
         val profiles = try { access.profiles() } catch (error: ApiException) {
             if (error.statusCode == 404) return set(ProfileState.Unsupported) else throw error
@@ -85,13 +87,20 @@ class ProfileSession(
         beforeSwitch = null
     }
 
-    /** From the interceptor (an OkHttp thread): [server] no longer accepts its token. */
-    fun onRequired(server: HttpUrl) {
+    /**
+     * From the interceptor (an OkHttp thread): [server] refused [sentToken]. A request still carrying an older token
+     * (one [select] has since replaced) is ignored, so its late 409 doesn't wipe the new session.
+     */
+    fun onRequired(server: HttpUrl, sentToken: String?) {
+        if (tokens.tokenBlocking(server) != sentToken) return
         runBlocking { tokens.clear(server) }
         val active = activeServer() ?: return
         if (ProfileSessionStore.origin(active) != ProfileSessionStore.origin(server)) return
+        val now = state.value
+        // Before resolve (Unknown) or on a server without profiles there is nothing to pick from.
+        if (now.current == null && now.profiles.isEmpty()) return
         beforeSwitch = null
-        mutableState.value = ProfileState.NeedsPick(state.value.profiles)
+        mutableState.value = ProfileState.NeedsPick(now.profiles)
     }
 
     /** Re-lists the profiles (after one was added, renamed or deleted); the current one leaving sends to the picker. */

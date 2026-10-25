@@ -9,18 +9,19 @@ import okhttp3.Response
 
 /**
  * Sends the profile session token for the server a request goes to, and reports a `409 PROFILE_REQUIRED` answer
- * (the session is missing or no longer valid) through [onProfileRequired]. The body is only peeked, so the caller
- * still reads it and gets the normal [ApiException].
+ * (the session is missing or no longer valid) through [onProfileRequired], with the token the request carried (null
+ * when none) so a stale answer to an older token can be told apart. The body is only peeked, so the caller still
+ * reads it and gets the normal [ApiException].
  */
 class ProfileSessionInterceptor(
     private val tokenFor: (HttpUrl) -> String?,
-    private val onProfileRequired: (HttpUrl) -> Unit,
+    private val onProfileRequired: (url: HttpUrl, sentToken: String?) -> Unit,
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val token = tokenFor(request.url)
         val response = chain.proceed(if (token == null) request else request.newBuilder().header(PROFILE_SESSION_HEADER, token).build())
-        if (response.code == 409 && isProfileRequired(response)) onProfileRequired(request.url)
+        if (response.code == 409 && isProfileRequired(response)) onProfileRequired(request.url, token)
         return response
     }
 
