@@ -161,3 +161,13 @@ T5 and T6 run alongside each other (separate modules); T7 runs any time. T1 → 
 
 ## 10. Progress log
 - 2026-10-25: plan written and approved.
+- 2026-10-25: built by /plan-runner (run 20261025-android-profiles). T1 new 409 message + six profile fixtures (server
+  suite 64 files). T2 Profile.kt DTOs, `ProfileSessionInterceptor`, `ApiException.errorCode`, profile calls in `OttlibApi`.
+  T3 `ProfileSession`/`ProfileSessionStore`; review added a sent-token check so a late 409 can't wipe a fresh pick, and
+  `resolve()` starts at `Unknown`. T4 picker/manage ViewModels with a `loading` flag, `ProfileRights`, `ProfileColors`
+  (`:core:presentation:test` 118 tests). T5 TV picker, chip, Settings section. T6 mobile picker grid, chip, Settings and
+  Manage screen (PIN dialog also asks for a confirm, as the web does). T7 docs. Switch/chip rule follows the web: 2+
+  profiles or the current profile has a PIN. Final checks: build clean, web tests 102 files pass, Android unit tests and
+  both app builds pass. Left: `ProfileSession.reset()` is not called on change server (harmless: `resolve()` resets);
+  TV picker's remembered focus id is not cleared on server change; no Retry on an empty picker after an error; device
+  check pending.
