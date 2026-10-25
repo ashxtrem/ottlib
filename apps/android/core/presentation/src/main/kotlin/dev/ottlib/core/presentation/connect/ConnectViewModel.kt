@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.ottlib.core.data.ConnectResult
 import dev.ottlib.core.data.ConnectionManager
+import dev.ottlib.core.data.ProfileSession
 import dev.ottlib.core.discovery.DiscoveredServer
 import dev.ottlib.core.discovery.ServerDiscovery
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,9 +27,16 @@ data class ConnectUiState(
     val restoring: Boolean = false,
     /** `host:port` of a server waiting for its access PIN; the screen shows PIN entry instead of the picker. */
     val pinFor: String? = null,
+    /** Set with [connected]: Home, or the profile picker when the server needs a profile picked first. */
+    val outcome: ConnectOutcome? = null,
 )
 
-class ConnectViewModel(private val connection: ConnectionManager, discovery: ServerDiscovery, autoConnect: Boolean) : ViewModel() {
+class ConnectViewModel(
+    private val connection: ConnectionManager,
+    private val profiles: ProfileSession,
+    discovery: ServerDiscovery,
+    autoConnect: Boolean,
+) : ViewModel() {
     private val state = MutableStateFlow(ConnectUiState(restoring = autoConnect))
     val uiState: StateFlow<ConnectUiState> = state.asStateFlow()
     private var attempt: Job? = null
@@ -73,7 +82,13 @@ class ConnectViewModel(private val connection: ConnectionManager, discovery: Ser
         attempt = viewModelScope.launch {
             state.update { it.copy(connecting = "${url.host}:${url.port}", error = null) }
             when (val result = action()) {
-                is ConnectResult.Connected -> state.update { it.copy(connecting = null, connected = true, pinFor = null) }
+                is ConnectResult.Connected -> {
+                    val profile = try { profiles.resolve() } catch (error: CancellationException) { throw error } catch (error: Exception) {
+                        state.update { it.copy(connecting = null, restoring = false, error = error.message ?: "Couldn't load the server's profiles.") }
+                        return@launch
+                    }
+                    state.update { it.copy(connecting = null, connected = true, pinFor = null, outcome = connectOutcome(profile)) }
+                }
                 is ConnectResult.PinRequired -> {
                     pinServer = result.url
                     state.update { it.copy(connecting = null, restoring = false, pinFor = "${url.host}:${url.port}", error = result.message) }

@@ -7,6 +7,9 @@ import dev.ottlib.core.data.DeviceIdentity
 import dev.ottlib.core.data.HiddenTitleStore
 import dev.ottlib.core.data.PictureModeStore
 import dev.ottlib.core.data.PlaybackPreferences
+import dev.ottlib.core.data.ProfileAccess
+import dev.ottlib.core.data.ProfileSession
+import dev.ottlib.core.data.ProfileSessionStore
 import dev.ottlib.core.data.ServerAccess
 import dev.ottlib.core.data.ServerStore
 import dev.ottlib.core.data.TrackChoiceStore
@@ -15,6 +18,7 @@ import dev.ottlib.core.discovery.ServerDiscovery
 import dev.ottlib.core.network.AuthTokenInterceptor
 import dev.ottlib.core.network.DeviceIdInterceptor
 import dev.ottlib.core.network.OttlibApi
+import dev.ottlib.core.network.ProfileSessionInterceptor
 import dev.ottlib.core.player.OttlibPlayerFactory
 import dev.ottlib.core.presentation.sync.LibrarySync
 import dev.ottlib.core.presentation.metadata.MetadataRefresh
@@ -25,6 +29,7 @@ import dev.ottlib.core.presentation.update.InstalledApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -42,16 +47,29 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
     val trackChoices = TrackChoiceStore(context)
     val hiddenTitles = HiddenTitleStore(context)
     val authTokens = AuthTokenStore(context)
+    val profileTokens = ProfileSessionStore(context)
 
     val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(DeviceIdInterceptor { deviceIdentity.deviceIdBlocking() })
         .addInterceptor(AuthTokenInterceptor { authTokens.tokenBlocking(it) })
+        .addInterceptor(ProfileSessionInterceptor({ profileTokens.tokenBlocking(it) }, { profileSession.onRequired(it) }))
         .build()
 
     val api: OttlibApi = OttlibApi(httpClient) { connection.activeServer.value }
     val connection = ConnectionManager(ServerStore(context), authTokens, ServerAccess(api::serverInfo, api::authStatus, api::login))
+
+    /**
+     * Which profile the active server is used as. Hosts call [ProfileSession.resolve] after connecting (ConnectViewModel
+     * does) and route to the picker on [dev.ottlib.core.data.ProfileState.NeedsPick]. A profile change clears Watch Next.
+     */
+    val profileSession = ProfileSession(
+        profileTokens,
+        ProfileAccess(api::profiles, api::selectProfile, api::deselectProfile, api::profileMe),
+        { connection.activeServer.value },
+        { appScope.launch { continueWatching.clear() } },
+    )
     val playbackSequence = PlaybackSequence(api)
     val autoPlayStreak = AutoPlayStreak()
     val discovery = ServerDiscovery(context)
