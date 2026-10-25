@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
+import { registerMediaStatic } from './routes/mediaStatic.js';
 import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { FolderRepository } from './repositories/folderRepository.js';
@@ -122,11 +123,11 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
   app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
-  app.register(fastifyStatic, { root: appDataPath, prefix: '/media/', decorateReply: false });
+  registerMediaStatic(app, appDataPath);
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');
   if (existsSync(clientDist)) {
     app.register(fastifyStatic, { root: clientDist, prefix: '/' });
-    app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
+    app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/media/') ?reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
   scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
   app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions);
