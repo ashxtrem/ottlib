@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.ottlib.core.data.PlaybackSettings
+import dev.ottlib.core.data.ProfileState
+import dev.ottlib.core.data.canSwitchProfile
+import dev.ottlib.core.data.current
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.languageName
 import dev.ottlib.core.presentation.Choice
@@ -43,8 +46,9 @@ private enum class SettingsDialog { Audio, Subtitles, SkipBack, SkipForward, Pic
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onOpenHidden: () -> Unit, onChangeServer: () -> Unit) {
+fun SettingsScreen(onOpenHidden: () -> Unit, onChangeServer: () -> Unit, onSwitchProfile: () -> Unit, onManageProfiles: () -> Unit) {
     val container = appContainer()
+    val profile by container.profileSession.state.collectAsStateWithLifecycle()
     val viewModel = viewModel { SettingsViewModel(container.connection, container.playbackPreferences, container.api, container.deviceIdentity) }
     val server by viewModel.server.collectAsStateWithLifecycle()
     val playback by viewModel.playback.collectAsStateWithLifecycle()
@@ -60,6 +64,15 @@ fun SettingsScreen(onOpenHidden: () -> Unit, onChangeServer: () -> Unit) {
                 SectionTitle("Server")
                 Setting(server?.name ?: "Not connected", listOfNotNull(viewModel.serverUrl, server?.version?.let { "server $it" }).joinToString("  ·  "), trailing = "Change") {
                     viewModel.changeServer(onChangeServer)
+                }
+
+                val current = profile.current
+                if (current != null) {
+                    SectionTitle("Profiles")
+                    if (profile is ProfileState.Selected && profile.canSwitchProfile) {
+                        Setting("Switch profile", "Watching as ${current.name}", trailing = "Switch", onClick = onSwitchProfile)
+                    }
+                    Setting("Manage profiles", "Names, colours and PINs", trailing = "Manage", onClick = onManageProfiles)
                 }
 
                 SectionTitle("Playback")

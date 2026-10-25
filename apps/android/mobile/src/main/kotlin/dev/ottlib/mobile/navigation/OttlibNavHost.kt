@@ -15,7 +15,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.connect.ConnectOutcome
 import dev.ottlib.core.presentation.sync.SyncOutcomeToasts
+import dev.ottlib.mobile.ui.profiles.ProfileManageScreen
+import dev.ottlib.mobile.ui.profiles.ProfilesScreen
 import dev.ottlib.mobile.ui.connect.ConnectScreen
 import dev.ottlib.mobile.ui.details.DetailsScreen
 import dev.ottlib.mobile.ui.hidden.HiddenTitlesScreen
@@ -34,6 +38,13 @@ fun OttlibNavHost() {
     // Follows the window, not the device: a bottom bar on the Fold's cover screen, a rail when unfolded.
     val layoutType = if (current == null) NavigationSuiteType.None else NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
     val openMovie: (Long) -> Unit = { nav.navigate(Routes.details(it)) }
+    val profileSession = appContainer().profileSession
+    // Keeps the profile in use until a new pick; Back on the picker cancels and returns here.
+    val switchProfile: () -> Unit = {
+        profileSession.switch()
+        nav.navigate(Routes.PROFILES)
+    }
+    ProfileRequiredEffect(nav)
 
     NavigationSuiteScaffold(
         layoutType = layoutType,
@@ -52,16 +63,28 @@ fun OttlibNavHost() {
             composable(Routes.CONNECT, arguments = listOf(navArgument("auto") { type = NavType.BoolType; defaultValue = true })) { backStackEntry ->
                 ConnectScreen(
                     autoConnect = backStackEntry.arguments?.getBoolean("auto") ?: true,
-                    onConnected = { nav.navigate(Routes.HOME) { popUpTo(nav.graph.id) { inclusive = true } } },
+                    onConnected = { outcome ->
+                        val next = if (outcome == ConnectOutcome.PickProfile) Routes.PROFILES else Routes.HOME
+                        nav.navigate(next) { popUpTo(nav.graph.id) { inclusive = true } }
+                    },
                 )
             }
-            composable(Routes.HOME) { HomeScreen(onOpenMovie = openMovie) }
+            composable(Routes.PROFILES) {
+                ProfilesScreen(
+                    onPicked = { nav.navigate(Routes.HOME) { popUpTo(nav.graph.id) { inclusive = true } } },
+                    onCancelled = { nav.popBackStack() },
+                )
+            }
+            composable(Routes.PROFILES_MANAGE) { ProfileManageScreen(onBack = { nav.popBackStack() }) }
+            composable(Routes.HOME) { HomeScreen(onOpenMovie = openMovie, onSwitchProfile = switchProfile) }
             composable(Routes.LIBRARY) { LibraryScreen(onOpenMovie = openMovie) }
             composable(Routes.SEARCH) { SearchScreen(onOpenMovie = openMovie) }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     onOpenHidden = { nav.navigate(Routes.HIDDEN) },
                     onChangeServer = { nav.navigate(Routes.connect(autoConnect = false)) { popUpTo(nav.graph.id) { inclusive = true } } },
+                    onSwitchProfile = switchProfile,
+                    onManageProfiles = { nav.navigate(Routes.PROFILES_MANAGE) },
                 )
             }
             composable(Routes.HIDDEN) { HiddenTitlesScreen(onOpenMovie = openMovie, onBack = { nav.popBackStack() }) }
