@@ -58,3 +58,7 @@ T1 and T2 touch different files and run alongside each other.
 
 ## 7. Progress log
 - 2026-10-25: plan written from issue #25 (small-job lane).
+- 2026-10-25: built. T001 `routes/mediaStatic.ts` + `config/mediaStatic.ts` (extension list shared with
+  `PosterCacheService`), 10 DB aliases 404 with and without a session; T002 `021_stream_secret_rotation.ts`. Full web
+  suite 549 tests pass, Android unchanged. Gate notes left open: `/media` (no slash) and `/MEDIA/...` still fall back to
+  `index.html` when the client build is present (no file exposed); `mkdirSync` for the artwork roots sits in the routes layer.
