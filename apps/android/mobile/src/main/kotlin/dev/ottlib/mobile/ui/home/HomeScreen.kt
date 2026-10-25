@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.ottlib.core.data.ProfileState
+import dev.ottlib.core.data.canSwitchProfile
 import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.home.HomeRow
@@ -37,20 +39,25 @@ import dev.ottlib.mobile.ui.components.WindowWidth
 import dev.ottlib.mobile.ui.components.gutter
 import dev.ottlib.mobile.ui.components.posterWidth
 import dev.ottlib.mobile.ui.components.windowWidth
+import dev.ottlib.mobile.ui.profiles.ProfileChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onOpenMovie: (Long) -> Unit) {
+fun HomeScreen(onOpenMovie: (Long) -> Unit, onSwitchProfile: () -> Unit) {
     val container = appContainer()
     val viewModel = viewModel { HomeViewModel(container.api, container.librarySync, container.hiddenTitles.keys) }
     val state by viewModel.rows.collectAsStateWithLifecycle()
+    val profile by container.profileSession.state.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
         onPauseOrDispose { }
     }
     val width = windowWidth()
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Ottlib", fontWeight = FontWeight.Bold, color = OttlibColors.Accent) }, actions = { LibrarySyncAction() }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Ottlib", fontWeight = FontWeight.Bold, color = OttlibColors.Accent) }, actions = {
+        LibrarySyncAction()
+        (profile as? ProfileState.Selected)?.takeIf { it.canSwitchProfile }?.let { ProfileChip(it.profile, onClick = onSwitchProfile) }
+    }) }) { padding ->
         Column(Modifier.padding(padding)) {
             UpdateBanner(Modifier.padding(horizontal = width.gutter, vertical = 8.dp))
             when (val current = state) {
