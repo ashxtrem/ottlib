@@ -3,6 +3,7 @@ package dev.ottlib.core.presentation.profiles
 import androidx.lifecycle.ViewModelStore
 import dev.ottlib.core.data.ProfileState
 import dev.ottlib.core.data.current
+import dev.ottlib.core.network.ApiException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -67,6 +68,25 @@ class ProfilesViewModelTest {
         viewModel.closePin()
         assertNull(viewModel.uiState.value.pinFor)
         assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test fun beforeResolveItLoadsWithoutAnError() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val store = ViewModelStore()
+        try {
+            val fake = FakeProfileServer().apply { listError = ApiException(503, "Server unavailable") }
+            val viewModel = ProfilesViewModel(fake.session)
+            store.put("profiles", viewModel)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.loading)
+            assertTrue(viewModel.uiState.value.profiles.isEmpty())
+            assertNull(viewModel.uiState.value.error)
+
+            fake.listError = null
+            fake.session.resolve(); advanceUntilIdle()
+            assertFalse(viewModel.uiState.value.loading)
+            assertEquals(listOf(owner, kid, locked), viewModel.uiState.value.profiles)
+        } finally { store.clear(); Dispatchers.resetMain() }
     }
 
     @Test fun backFromASwitchKeepsTheProfileInUse() = withPicker { fake, _ ->

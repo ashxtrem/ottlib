@@ -43,8 +43,5 @@ fun profileRights(me: ProfileSummary?, target: ProfileSummary): ProfileRights {
 /** Only the owner adds profiles, up to [MAX_PROFILES]. */
 fun canAddProfile(me: ProfileSummary?, count: Int): Boolean = me?.isOwner == true && count < MAX_PROFILES
 
-/** Switching only leads somewhere when another profile exists or this one is locked behind a PIN. */
-fun canSwitchProfile(current: ProfileSummary, count: Int): Boolean = count > 1 || current.hasPin
-
 /** The avatar letter for a profile name. */
 fun profileInitial(name: String): String = name.trim().firstOrNull()?.uppercase() ?: "?"

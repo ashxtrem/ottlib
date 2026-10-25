@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 
 data class ProfilesUiState(
     val profiles: List<ProfileSummary> = emptyList(),
+    /** The session isn't resolved yet ([ProfileState.Unknown]): show a spinner, not an empty list or an error. */
+    val loading: Boolean = true,
     /** The profile whose PIN is being asked for; null shows the list. */
     val pinFor: ProfileSummary? = null,
     val busy: Boolean = false,
@@ -36,7 +38,8 @@ class ProfilesViewModel(private val session: ProfileSession) : ViewModel() {
         // The list may be one kept from before a 409, so ask again.
         viewModelScope.launch {
             try { session.refreshProfiles() } catch (error: CancellationException) { throw error } catch (error: Exception) {
-                state.update { it.copy(error = errorMessage(error)) }
+                // Before resolve, resolve itself reports the failure; this one would only flash an error.
+                if (session.state.value !is ProfileState.Unknown) state.update { it.copy(error = errorMessage(error)) }
             }
         }
     }
@@ -81,6 +84,7 @@ class ProfilesViewModel(private val session: ProfileSession) : ViewModel() {
         val pinFor = ui.pinFor?.let { open -> profile.profiles.firstOrNull { it.id == open.id } ?: open }
         return ui.copy(
             profiles = profile.profiles,
+            loading = profile is ProfileState.Unknown,
             pinFor = pinFor,
             canCancel = if (profile is ProfileState.NeedsPick) profile.canCancel else ui.canCancel,
         )
