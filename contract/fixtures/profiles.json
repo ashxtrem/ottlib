@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "name": "Home",
+    "color": "#e50914",
+    "hasPin": false,
+    "isOwner": true
+  },
+  {
+    "id": 2,
+    "name": "Kids",
+    "color": "#17c964",
+    "hasPin": true,
+    "isOwner": false
+  }
+]

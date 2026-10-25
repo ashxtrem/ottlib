@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authStatusSchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { PROFILE_SESSION_HEADER, authStatusSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema,recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
@@ -353,6 +353,40 @@ describe('native client endpoints', () => {
       expect((await app.inject({ method: 'GET', url: source.subtitles[0].url })).statusCode).toBe(200);
       expect((await app.inject({ method: 'HEAD', url: '/api/stream/1' })).statusCode).toBe(401);
       expect((await app.inject({ method: 'HEAD', url: source.streamUrl.replace('/stream/1', '/stream/2') })).statusCode).toBe(401);
+    } finally { await app.close(); db.close(); }
+  });
+});
+
+// A second fixture DB with two profiles — the owner "Home" (no PIN) and "Kids" (PIN 1234) — for the profile endpoints.
+describe('native client profile endpoints', () => {
+  it('lists, selects, reads and edits profiles, and refuses requests without a session', async () => {
+    const { app, db, media } = fixture();
+    try {
+      const kids = profileSummarySchema.parse((await app.inject({ method: 'POST', url: '/api/profiles', payload: { name: 'Kids', color: '#17c964', pin: '1234' } })).json());
+      const profiles = profileSummarySchema.array().parse((await app.inject({ method: 'GET', url: '/api/profiles' })).json());
+      expect(profiles.map((profile) => [profile.name, profile.hasPin, profile.isOwner])).toEqual([['Home', false, true], ['Kids', true, false]]);
+      await snapshot('profiles', profiles, media);
+
+      const required = await app.inject({ method: 'GET', url: '/api/movies', headers });
+      expect(required.statusCode).toBe(409);
+      await snapshot('profile-required', required.json(), media);
+
+      const wrongPin = await app.inject({ method: 'POST', url: `/api/profiles/${kids.id}/select`, headers, payload: { pin: '0000' } });
+      expect(wrongPin.statusCode).toBe(403);
+      await snapshot('profile-pin-invalid', wrongPin.json(), media);
+
+      const home = profiles.find((profile) => profile.isOwner)!;
+      const selected = profileSelectResultSchema.parse((await app.inject({ method: 'POST', url: `/api/profiles/${home.id}/select`, headers, payload: {} })).json());
+      await snapshot('profile-select-result', selected, media);
+      const authorized = { ...headers, [PROFILE_SESSION_HEADER]: selected.token };
+
+      const me = profileMeSchema.parse((await app.inject({ method: 'GET', url: '/api/profiles/me', headers: authorized })).json());
+      expect(me.profile).toEqual(home);
+      await snapshot('profile-me', me, media);
+
+      const patched = await app.inject({ method: 'PATCH', url: `/api/profiles/${kids.id}`, headers: authorized, payload: { color: '#006fee' } });
+      expect(patched.statusCode).toBe(200);
+      await snapshot('profile-summary', profileSummarySchema.parse(patched.json()), media);
     } finally { await app.close(); db.close(); }
   });
 });

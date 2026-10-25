@@ -7,4 +7,4 @@ export class ProfileError extends Error {
   }
 }
 
-export const profileRequired = () => new ProfileError(409, 'Pick a profile to continue.', 'PROFILE_REQUIRED');
+export const profileRequired = () => new ProfileError(409, 'Pick a profile to continue. On Android TV or phone, update the OttLib app.', 'PROFILE_REQUIRED');

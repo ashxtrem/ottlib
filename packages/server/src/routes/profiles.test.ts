@@ -40,6 +40,7 @@ describe('profile routes', () => {
       const required = await app.inject({ method: 'GET', url: '/api/profiles/me' });
       expect(required.statusCode).toBe(409);
       expect(required.json().error).toBe('PROFILE_REQUIRED');
+      expect(required.json().message).toBe('Pick a profile to continue. On Android TV or phone, update the OttLib app.');
       expect((await app.inject({ method: 'GET', url: '/api/profiles/me', headers: session('unknown') })).statusCode).toBe(409);
     } finally { await app.close(); db.close(); }
   });
