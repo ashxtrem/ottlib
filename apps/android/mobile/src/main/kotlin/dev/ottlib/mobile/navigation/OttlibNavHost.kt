@@ -42,7 +42,7 @@ fun OttlibNavHost() {
     // Keeps the profile in use until a new pick; Back on the picker cancels and returns here.
     val switchProfile: () -> Unit = {
         profileSession.switch()
-        nav.navigate(Routes.PROFILES)
+        nav.navigate(Routes.PROFILES) { launchSingleTop = true }
     }
     ProfileRequiredEffect(nav)
 

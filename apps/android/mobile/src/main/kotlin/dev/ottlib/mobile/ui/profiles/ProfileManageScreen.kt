@@ -90,7 +90,7 @@ fun ProfileManageScreen(onBack: () -> Unit) {
         }
     }
 
-    ManageDialogs(dialog, state, viewModel) { dialog = null }
+    ManageDialogs(dialog, state, viewModel) { dialog = null; viewModel.clearError() }
 }
 
 @Composable
