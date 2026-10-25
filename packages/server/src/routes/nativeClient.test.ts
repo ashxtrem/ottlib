@@ -36,6 +36,7 @@ function fixture(overrides: AppOverrides = {}) {
   movies.applyMetadata(1, { source: 'tmdb', providerId: '329865', mediaType: 'movie', title: 'Arrival', year: 2016, overview: 'A linguist is recruited to talk to visitors.', posterFile: 'arrival.jpg', backdropFile: 'arrival-backdrop.jpg', genres: ['Drama', 'Science Fiction'], cast: ['Amy Adams', 'Jeremy Renner'], rating: 7.6, runtime: 116, imdbId: 'tt2543164' });
   movies.markUnmatched(2);
   movies.applyMediaInfo(1, { container: 'MKV', durationMs: 6_960_000, width: 3840, height: 2160, videoCodec: 'HEVC', videoProfile: 'Main 10', videoBitRate: 40_000_000, hdrFormat: 'HDR10' });
+  movies.applyPictureArea(1, { x: 0, y: 270, width: 3840, height: 1620 }, 'done');
   new MediaTrackRepository(db).replaceForMovie(1, [
     { type: 'audio', source: 'embedded', order: 1, language: 'eng', title: 'Surround 5.1', codec: 'E-AC-3', channels: 6, channelLayout: '5.1(side)', isDefault: true, isForced: false, isHearingImpaired: false },
     { type: 'subtitle', source: 'embedded', order: 2, language: 'eng', title: null, codec: 'PGS', channels: null, channelLayout: null, isDefault: false, isForced: false, isHearingImpaired: false }

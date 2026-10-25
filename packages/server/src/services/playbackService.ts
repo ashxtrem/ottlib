@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { extname } from 'node:path';
-import type { PlaybackRequest, PlaybackSource } from '@ottlib/shared';
+import type { PictureArea, PlaybackRequest, PlaybackSource } from '@ottlib/shared';
 import { mimeTypes, subtitleMimeTypes } from '../config/defaults.js';
 import { MovieRepository, type PlaybackMovie } from '../repositories/movieRepository.js';
 import { isWithinRoot } from './scanner/walker.js';
@@ -53,11 +53,20 @@ export class PlaybackService {
     }));
     const direct: PlaybackSource = {
       kind: 'direct', streamUrl: `/api/stream/${id}${query}`, mimeType: mimeTypes[extname(file.filename).slice(1).toLowerCase()] ?? 'application/octet-stream',
-      durationMs: movie?.mediaInfo?.durationMs ?? null, resumePositionMs: movie?.resumePositionMs ?? null, subtitles: [...subtitles, ...extracted, ...downloaded.map(record => this.subtitleLibrary!.source(record))]
+      durationMs: movie?.mediaInfo?.durationMs ?? null, resumePositionMs: movie?.resumePositionMs ?? null, subtitles: [...subtitles, ...extracted, ...downloaded.map(record => this.subtitleLibrary!.source(record))],
+      pictureArea: plan?.burnSubtitleOrder != null ? null : this.pictureFractions(id, movie?.mediaInfo?.width, movie?.mediaInfo?.height)
     };
     if (!plan) return direct;
     const { hls, ...details } = plan;
     return { ...direct, ...(hls ? { kind: 'hls' as const, streamUrl: hls.playlistUrl, mimeType: 'application/vnd.apple.mpegurl', sessionUrl: hls.sessionUrl } : {}), ...details };
+  }
+
+  /** The detected picture as fractions of the frame; null when not detected or the frame size is unknown. */
+  private pictureFractions(id: number, frameWidth: number | null | undefined, frameHeight: number | null | undefined): PictureArea | null {
+    const area = this.movies.getPictureArea(id);
+    if (!area || !frameWidth || !frameHeight) return null;
+    const clamp = (value: number): number => Math.min(1, Math.max(0, value));
+    return { x: clamp(area.x / frameWidth), y: clamp(area.y / frameHeight), width: clamp(area.width / frameWidth), height: clamp(area.height / frameHeight) };
   }
 
   public async subtitleFile(id: number, order: number): Promise<SubtitleFile> {
