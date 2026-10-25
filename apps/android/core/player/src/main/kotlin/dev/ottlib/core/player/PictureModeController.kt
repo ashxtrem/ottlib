@@ -111,7 +111,7 @@ class PictureModeController(private val view: PlayerView, private val player: Pl
     private fun placeFrame(rect: FrameRect) {
         val frame = frame ?: return
         view.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FILL)
-        val params = FrameLayout.LayoutParams(rect.width.roundToInt(), rect.height.roundToInt(), Gravity.TOP or Gravity.START).apply {
+        val params = FrameLayout.LayoutParams(rect.width.roundToInt(), rect.height.roundToInt(), Gravity.TOP or Gravity.LEFT).apply {
             leftMargin = rect.left.roundToInt()
             topMargin = rect.top.roundToInt()
         }

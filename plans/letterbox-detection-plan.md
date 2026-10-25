@@ -230,3 +230,13 @@ T3 and T4 can run alongside each other once T2 is merged.
 
 ## 10. Progress log
 - 2026-10-25: plan written and approved.
+- 2026-10-25: built by /plan-runner (run 20261025-letterbox-detection), 4 tasks, all reviewed; checks and gate passed.
+  - Change from §3: the server-only area is read with `movieRepository.getPictureArea(id)`, not a field on `Movie`
+    (`Movie` is the zod type and is serialized to clients).
+  - T1 review fixes: `applyPictureArea` only writes when size/mtime still match, so a file changed mid-detection keeps
+    `pending`; a `runPending()` during a pass queues one more pass.
+  - Contract fixture: `playback-source.json` `pictureArea` = {x 0, y 0.125, width 1, height 0.75}; the HLS fixture is `null`
+    (subtitles burned in); `movie.json` has `pictureWidth` 3840, `pictureHeight` 1620.
+  - Geometry, Mummy area on 1920×1080: Fit frame 1920×1080 (picture 1920×816 at top 132); Zoom ≈2541×1429 at −311,−175;
+    Stretch 1920×1429 at 0,−175; forced 4:3 picture 1440×1080 at 240,0. Fit on 2400×1080 (20:9): picture 2400 wide.
+  - Open: a real-TV check of sizing `exo_content_frame` (§9); no PlayerViewModel test (no VM test setup exists yet).
