@@ -13,5 +13,11 @@
       "isForced": false,
       "isHearingImpaired": false
     }
-  ]
+  ],
+  "pictureArea": {
+    "x": 0,
+    "y": 0.125,
+    "width": 1,
+    "height": 0.75
+  }
 }

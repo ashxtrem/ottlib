@@ -19,6 +19,17 @@ data class PlaybackSource(
     val audioOrder: Int? = null,
     val burnInSubtitles: List<BurnInSubtitle> = emptyList(),
     val burnSubtitleOrder: Int? = null,
+    // Null when not detected yet, the frame size is unknown, or burned-in subtitles sit in the bars.
+    val pictureArea: PictureArea? = null,
+)
+
+/** Mirrors `pictureAreaSchema`: the real picture inside the frame as fractions (0..1) of frame width and height. */
+@Serializable
+data class PictureArea(
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float,
 )
 
 /**
