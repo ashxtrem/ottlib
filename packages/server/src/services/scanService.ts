@@ -6,11 +6,12 @@ import { SettingRepository } from '../repositories/settingRepository.js';
 import type { ScanRun } from '@ottlib/shared';
 import { MetadataMatchService } from './metadataMatchService.js';
 import { MediaInfoService } from './mediaInfoService.js';
+import type { PictureAreaService } from './pictureArea/pictureAreaService.js';
 import { parseTitle } from './scanner/titleParser.js';
 import { walkMovies } from './scanner/walker.js';
 
 export class ScanService {
-  public constructor(private readonly folders: FolderRepository, private readonly movies: MovieRepository, private readonly runs: ScanRunRepository, private readonly settings: SettingRepository, private readonly matcher: MetadataMatchService, private readonly mediaInfo: MediaInfoService) {}
+  public constructor(private readonly folders: FolderRepository, private readonly movies: MovieRepository, private readonly runs: ScanRunRepository, private readonly settings: SettingRepository, private readonly matcher: MetadataMatchService, private readonly mediaInfo: MediaInfoService, private readonly pictureArea: Pick<PictureAreaService, 'runPending'>) {}
 
   public start(): ScanRun {
     const active = this.runs.active('scan'); if (active) return active;
@@ -35,5 +36,12 @@ export class ScanService {
       if (completed) this.movies.markMissingNotSeen(folder.id, seenAt);
     }
     this.runs.finish(runId, errors.length ? 'failed' : 'completed', errors.length ? errors.join('\n') : null);
+    this.startPictureDetection();
+  }
+
+  /** Picture-area detection runs in its own pass after the scan; the scan never waits for it and never sees its errors. */
+  private startPictureDetection(): void {
+    try { void this.pictureArea.runPending().catch((error) => console.error('Picture area detection failed', error)); }
+    catch (error) { console.error('Picture area detection failed', error); }
   }
 }
