@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ottlib.core.presentation.player.SubtitleSearchController
 import dev.ottlib.tv.ui.components.tryRequestFocus
+import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.PictureModeController
 import dev.ottlib.core.player.SeekAccumulator
@@ -52,6 +53,7 @@ fun PlayerSurface(
     title: String,
     controls: PlayerControls,
     pictureMode: PictureMode,
+    pictureArea: PictureArea?,
     keysEnabled: Boolean,
     onPictureModeChosen: (PictureMode, Boolean) -> Unit,
     onPictureHintSeen: () -> Unit,
@@ -82,7 +84,10 @@ fun PlayerSurface(
 
     InterceptKeys { event -> playerView?.let { remoteKeys.handle(event, it, enabled = keysEnabled && !panelOpen && !subtitlesOpen) } ?: false }
     BackHandler(enabled = controlsVisible && !panelOpen && !subtitlesOpen) { playerView?.hideController() }
-    LaunchedEffect(picture, pictureMode) { picture?.apply(pictureMode) }
+    LaunchedEffect(picture, pictureMode, pictureArea) {
+        picture?.setPictureArea(pictureArea)
+        picture?.apply(pictureMode)
+    }
 
     Box(Modifier.fillMaxSize()) {
         AndroidView(

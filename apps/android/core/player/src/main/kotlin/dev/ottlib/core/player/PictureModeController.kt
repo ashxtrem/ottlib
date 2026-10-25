@@ -1,5 +1,6 @@
 package dev.ottlib.core.player
 
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -9,7 +10,9 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
+import kotlin.math.roundToInt
 
 
 /**
@@ -23,19 +26,29 @@ import dev.ottlib.core.model.PictureMode
 @OptIn(UnstableApi::class)
 class PictureModeController(private val view: PlayerView, private val player: Player) {
     private val frame: AspectRatioFrameLayout? = view.findViewById(androidx.media3.ui.R.id.exo_content_frame)
+    private val stockLayoutParams: ViewGroup.LayoutParams? = frame?.layoutParams
     private var mode = PictureMode.Fit
+    private var area: PictureArea? = null
+    private var areaPlaced = false
 
     // PlayerView resets the frame's ratio on every video-size change; re-apply a forced one after it does.
     private val listener = object : Player.Listener {
         override fun onVideoSizeChanged(videoSize: VideoSize) {
-            applyAspectRatio()
-            view.post { applyAspectRatio() }
+            onVideoSize()
+            view.post { onVideoSize() }
         }
     }
 
-    // Smart fill depends on the screen's shape, which is only known once the view is laid out.
+    private fun onVideoSize() {
+        if (area != null) refresh() else applyAspectRatio()
+    }
+
+    // Smart fill and the picture area depend on the screen's shape, which is only known once the view is laid out.
     private val layoutListener = View.OnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-        if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) applyAspectRatio()
+        if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+            applyAspectRatio()
+            if (area != null) view.post { refresh() }
+        }
     }
 
     init {
@@ -46,6 +59,34 @@ class PictureModeController(private val view: PlayerView, private val player: Pl
 
     fun apply(mode: PictureMode) {
         this.mode = mode
+        refresh()
+    }
+
+    /**
+     * The real picture inside the video frame (scope bars burned into a 16:9 frame excluded), or null for the whole
+     * frame. With an area every mode, Fit included, fits the real picture instead of the frame.
+     */
+    fun setPictureArea(area: PictureArea?) {
+        this.area = area
+        refresh()
+    }
+
+    fun release() {
+        player.removeListener(listener)
+        view.removeOnLayoutChangeListener(layoutListener)
+    }
+
+    private fun refresh() {
+        val rect = areaRect()
+        if (rect != null) {
+            placeFrame(rect)
+        } else {
+            restoreFrame()
+            applyMode()
+        }
+    }
+
+    private fun applyMode() {
         view.setResizeMode(
             when (mode.scaling) {
                 PictureMode.Scaling.Fit -> AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -56,12 +97,41 @@ class PictureModeController(private val view: PlayerView, private val player: Pl
         applyAspectRatio()
     }
 
-    fun release() {
-        player.removeListener(listener)
-        view.removeOnLayoutChangeListener(layoutListener)
+    /** The frame's on-screen rectangle for the current area, or null when there is no area or nothing to size by. */
+    private fun areaRect(): FrameRect? {
+        val area = area ?: return null
+        if (frame == null || stockLayoutParams == null) return null
+        if (area.width <= 0f || area.height <= 0f) return null
+        val video = naturalAspectRatio() ?: return null
+        if (view.width <= 0 || view.height <= 0) return null
+        return PictureGeometry.frameRect(mode.scaling, mode.aspectRatio, video, area, view.width.toFloat(), view.height.toFloat())
+    }
+
+    /** Sizes and positions the content frame explicitly; PlayerView clips the parts that fall off screen. */
+    private fun placeFrame(rect: FrameRect) {
+        val frame = frame ?: return
+        view.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FILL)
+        val params = FrameLayout.LayoutParams(rect.width.roundToInt(), rect.height.roundToInt(), Gravity.TOP or Gravity.START).apply {
+            leftMargin = rect.left.roundToInt()
+            topMargin = rect.top.roundToInt()
+        }
+        val current = frame.layoutParams as? FrameLayout.LayoutParams
+        val same = areaPlaced && current != null && current.width == params.width && current.height == params.height &&
+            current.leftMargin == params.leftMargin && current.topMargin == params.topMargin
+        if (!same) frame.layoutParams = params
+        areaPlaced = true
+    }
+
+    /** Puts back the stock MATCH_PARENT layout params after an area was applied. */
+    private fun restoreFrame() {
+        if (!areaPlaced) return
+        areaPlaced = false
+        val frame = frame ?: return
+        stockLayoutParams?.let { frame.layoutParams = it }
     }
 
     private fun applyAspectRatio() {
+        if (areaPlaced) return
         val ratio = when {
             mode.aspectRatio != null -> mode.aspectRatio
             mode.scaling == PictureMode.Scaling.Balanced -> smartFillAspectRatio()
