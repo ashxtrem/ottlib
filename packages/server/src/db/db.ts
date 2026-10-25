@@ -21,6 +21,7 @@ import { downloadedSubtitlesMigration } from './migrations/017_downloaded_subtit
 import { recommendationSignalsMigration } from './migrations/018_recommendation_signals.js';
 import { ensureProfiles } from './migrations/019_profiles.js';
 import { ensureProfileScope } from './migrations/020_profile_scope.js';
+import { ensureStreamSecretRotated } from './migrations/021_stream_secret_rotation.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -48,5 +49,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   db.exec(recommendationSignalsMigration);
   ensureProfiles(db);
   ensureProfileScope(db);
+  ensureStreamSecretRotated(db);
   return db;
 }
