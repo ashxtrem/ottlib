@@ -64,7 +64,7 @@ fun ProfilesScreen(currentId: Int?, onPicked: () -> Unit, onCancelled: () -> Uni
     BackHandler { if (viewModel.cancel()) onCancelled() else onExit() }
 
     // Until the list arrives: a spinner, never an empty-state message.
-    if (state.done || (state.profiles.isEmpty() && state.error == null)) {
+    if (state.done || state.loading) {
         LoadingMessage()
         return
     }
@@ -97,5 +97,5 @@ private fun ProfileRow(profiles: List<ProfileSummary>, focusId: Int?, enabled: B
             )
         }
     }
-    LaunchedEffect(target.id) { initial.tryRequestFocus() }
+    LaunchedEffect(target.id, enabled) { if (enabled) initial.tryRequestFocus() }
 }
