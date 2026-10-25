@@ -1,0 +1,9 @@
+{
+  "profile": {
+    "id": 1,
+    "name": "Home",
+    "color": "#e50914",
+    "hasPin": false,
+    "isOwner": true
+  }
+}

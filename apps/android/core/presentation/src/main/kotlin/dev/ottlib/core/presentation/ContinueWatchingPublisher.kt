@@ -10,9 +10,12 @@ data class ContinueWatchingEntry(val movieId: Long, val title: String, val poste
 interface ContinueWatchingPublisher {
     fun upsert(entry: ContinueWatchingEntry)
     fun remove(movieId: Long)
+    /** Removes every entry, e.g. when another profile (or server) becomes current. */
+    fun clear()
 
     object None : ContinueWatchingPublisher {
         override fun upsert(entry: ContinueWatchingEntry) = Unit
         override fun remove(movieId: Long) = Unit
+        override fun clear() = Unit
     }
 }

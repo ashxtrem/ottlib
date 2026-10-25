@@ -7,6 +7,8 @@ object Routes {
     const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val HIDDEN = "hidden"
+    const val PROFILES = "profiles"
+    const val PROFILES_MANAGE = "profiles/manage"
     const val DETAILS = "details/{id}"
     const val PLAYER = "player/{id}?fromStart={fromStart}"
 

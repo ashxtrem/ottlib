@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.ottlib.core.discovery.DiscoveredServer
 import dev.ottlib.core.presentation.appContainer
+import dev.ottlib.core.presentation.connect.ConnectOutcome
 import dev.ottlib.core.presentation.connect.ConnectUiState
 import dev.ottlib.core.presentation.connect.ConnectViewModel
 import dev.ottlib.core.presentation.connect.localSubnetPrefix
@@ -50,13 +51,13 @@ import dev.ottlib.mobile.ui.components.WindowWidth
 import dev.ottlib.mobile.ui.components.windowWidth
 
 @Composable
-fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
+fun ConnectScreen(autoConnect: Boolean, onConnected: (ConnectOutcome) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { ConnectViewModel(container.connection, container.discovery, autoConnect) }
+    val viewModel = viewModel { ConnectViewModel(container.connection, container.profileSession, container.discovery, autoConnect) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val servers by viewModel.servers.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.connected) { if (state.connected) onConnected() }
+    LaunchedEffect(state.connected) { if (state.connected) onConnected(state.outcome ?: ConnectOutcome.Home) }
 
     Scaffold { padding ->
         if (state.restoring || state.connected) {
@@ -65,11 +66,14 @@ fun ConnectScreen(autoConnect: Boolean, onConnected: () -> Unit) {
         }
         state.pinFor?.let { server ->
             PinEntry(
-                server,
+                title = "Enter access PIN",
+                message = "The Ottlib server at $server is protected. Enter the PIN set in the web app under Settings → Access PIN.",
+                key = server,
                 checking = state.connecting != null,
                 error = state.error,
                 onSubmit = viewModel::submitPin,
                 onCancel = viewModel::cancelPin,
+                cancelLabel = "Choose another server",
                 modifier = Modifier.padding(padding).padding(24.dp),
             )
             return@Scaffold

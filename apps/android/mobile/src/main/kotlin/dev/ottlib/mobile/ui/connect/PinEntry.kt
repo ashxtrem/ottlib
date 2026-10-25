@@ -27,17 +27,30 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.ottlib.core.presentation.theme.OttlibColors
 
-/** Shown instead of the server picker when the chosen server has an access PIN. Back returns to the picker. */
+/**
+ * A PIN step: the server's access PIN (instead of the server picker) or a profile's PIN (instead of the profile
+ * tiles). [key] names what the PIN is for, so a new target starts with an empty field. Back calls [onCancel].
+ */
 @Composable
-fun PinEntry(server: String, checking: Boolean, error: String?, onSubmit: (String) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
-    var pin by rememberSaveable(server) { mutableStateOf("") }
+fun PinEntry(
+    title: String,
+    message: String,
+    key: String,
+    checking: Boolean,
+    error: String?,
+    onSubmit: (String) -> Unit,
+    onCancel: () -> Unit,
+    cancelLabel: String,
+    modifier: Modifier = Modifier,
+) {
+    var pin by rememberSaveable(key) { mutableStateOf("") }
     BackHandler(onBack = onCancel)
     LaunchedEffect(error) { if (error != null) pin = "" }
 
     Column(modifier.widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Enter access PIN", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(
-            "The Ottlib server at $server is protected. Enter the PIN set in the web app under Settings → Access PIN.",
+            message,
             style = MaterialTheme.typography.bodyLarge,
             color = OttlibColors.Muted,
         )
@@ -53,7 +66,7 @@ fun PinEntry(server: String, checking: Boolean, error: String?, onSubmit: (Strin
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { onSubmit(pin) }, enabled = !checking && pin.length >= 4) { Text(if (checking) "Checking…" else "Unlock") }
-            TextButton(onClick = onCancel) { Text("Choose another server") }
+            TextButton(onClick = onCancel) { Text(cancelLabel) }
         }
         error?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = OttlibColors.Error) }
     }

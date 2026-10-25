@@ -68,9 +68,13 @@ Progress from VLC on another computer is not reported back to the library yet, s
 
 ## Android apps
 
-Profile support for the Android TV and phone apps arrives in a later app update. Until then:
+The Android TV and phone apps support profiles the same way the web app does.
 
-- The apps work as long as the library has a single profile with no PIN.
-- Once a second profile is added, or a profile PIN is set, the apps can't open the library until they are updated. Use the web app in the meantime.
+- **Picking:** on first connect the app asks **Who's watching?** when the library has two or more profiles, or when its only profile has a PIN. With one profile and no PIN there is no picker, and the app selects that profile on its own.
+- **Remembered per server:** the app keeps your pick for each library. It asks again only when that profile session stops working, for example when the profile is deleted or its PIN is set from another device.
+- **Switching:** tap the profile chip on Home (phone: the top app bar; TV: the top navigation bar), or choose **Switch profile** in Settings. Both show when the library has two or more profiles or the current profile has a PIN.
+- **Managing profiles:** the phone app only, under **Settings → Profiles → Manage profiles**. It has the same rights as the web app: create, rename, colour, set, change or clear a PIN, and delete. The TV app only picks profiles and enters PINs. It says: "Add or edit profiles in the web app or the phone app."
+- **Watch Next (TV):** switching profile clears the TV's Watch Next row, and the next playback fills it again.
+- **Hidden titles:** on Android these are still kept per device, not per profile.
 
-See [install.md](install.md) for how to update the apps.
+An app older than this update can't open a library with profiles. It shows "Pick a profile to continue. On Android TV or phone, update the OttLib app." To fix it, update the app (**Settings → update**). See [install.md](install.md) for how to update the apps.
