@@ -89,6 +89,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     /** The HLS session service; index.ts calls its `start()` (empty the temp root, start the idle sweep) at server start. */
     hlsSessions: TranscodeSessionService;
+    /** The picture-area pass; index.ts starts it at server start so files still pending (an upgrade, an interrupted pass) are measured without waiting for a scan. */
+    pictureArea: PictureAreaService;
   }
 }
 
@@ -133,7 +135,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/media/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
   scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
-  app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions);
+  app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions); app.decorate('pictureArea', pictureArea);
   app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }

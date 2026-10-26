@@ -7,6 +7,7 @@ import { ServerInfoService } from './services/serverInfoService.js';
 const config = await loadBootstrapConfig(resolveAppRoot()); const db = createDatabase(config.absoluteAppDataPath); const app = buildApp(db, config.absoluteAppDataPath, config.port);
 await app.hlsSessions.start();
 await app.listen({ host: '0.0.0.0', port: config.port });
+void app.pictureArea.runPending(); // background and never rejects; a scan started meanwhile joins this pass
 if (config.advertise) {
   const info = new ServerInfoService(config.port); const discovery = new DiscoveryService(app.log);
   discovery.start(info.name(), config.port, info.get().addresses);
