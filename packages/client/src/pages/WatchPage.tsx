@@ -17,6 +17,7 @@ import { usePlaybackProgress } from '../hooks/usePlaybackProgress';
 import { usePlaybackSource } from '../hooks/usePlaybackSource';
 import { usePlayerCommands } from '../hooks/usePlayerCommands';
 import { usePlayerShortcuts } from '../hooks/usePlayerShortcuts';
+import { usePictureMode } from '../hooks/usePictureMode';
 import { usePlayerTracks } from '../hooks/usePlayerTracks';
 import { useVideoState } from '../hooks/useVideoState';
 import { chooseHlsEngine, probeBrowserCaps, type PlaybackSwitch } from '../utils/browserCaps';
@@ -97,6 +98,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
     switchTo({ ...change, startMs: positionMs });
   }, [video, switchStartMs, source?.resumePositionMs, switchTo]);
   const tracks = usePlayerTracks({ video, source, reopen });
+  const picture = usePictureMode(movieId);
 
   // A session the server ended (e.g. reaped while paused) fails the hls stream: reopen once at the position before
   // showing the error. The once-flag resets as soon as playback runs again.
@@ -141,7 +143,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   return <div onPointerMove={controls.show} className={`relative h-full w-full ${controls.visible ? '' : 'cursor-none'}`}>
     {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} />
       : source ? <>
-        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} />
+        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} pictureMode={picture.mode} />
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls
           state={state} visible={controls.visible} fullscreen={screen.fullscreen} onBack={leave}
@@ -150,6 +152,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
           audioItems={audioItems(tracks.audioTracks, source.audioOrder)} onSelectAudio={tracks.selectAudio}
           subtitleItems={subtitleItems({ text: tracks.text, burnIn: tracks.burnIn, status: tracks.status, current: tracks.current })} onSelectSubtitle={tracks.selectSubtitle}
           menu={menu} onMenu={setMenu}
+          picture={{ mode: picture.mode, onSelect: picture.setMode }}
           more={{ positionMs: state.positionMs, credits: source.credits, autoSkip: source.autoSkipCredits, choice: creditsActions.choice, onCommand: (command) => void creditsActions.run(command, state.positionMs) }}
         />
         {resumeAtMs && switchStartMs === null ? <ResumeChip positionMs={resumeAtMs} onStartOver={() => commands.seekTo(0)} /> : null}
