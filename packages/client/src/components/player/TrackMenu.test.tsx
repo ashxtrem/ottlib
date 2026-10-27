@@ -57,6 +57,16 @@ describe('TrackMenu', () => {
     expect(markup).toContain('Forced · burned in');
   });
 
+  it('renders a footer below the items, only while open', () => {
+    const items = subtitleItems({ text: [], burnIn: [], status: {}, current: { kind: 'off' } });
+    const footer = <button type="button" role="menuitem">Find subtitles…</button>;
+    const open = renderToStaticMarkup(<TrackMenu label="Subtitles" icon="CC" items={items} open onOpenChange={() => undefined} onSelect={() => undefined} buttonClassName="" footer={footer} />);
+    expect(open.indexOf('Find subtitles…')).toBeGreaterThan(open.indexOf('Off'));
+    expect(open.match(/role="menuitemradio"/g)).toHaveLength(1);
+    const closed = renderToStaticMarkup(<TrackMenu label="Subtitles" icon="CC" items={items} open={false} onOpenChange={() => undefined} onSelect={() => undefined} buttonClassName="" footer={footer} />);
+    expect(closed).not.toContain('Find subtitles…');
+  });
+
   it('renders only the button while closed', () => {
     const markup = renderToStaticMarkup(<TrackMenu label="Audio" icon="A" items={[]} open={false} onOpenChange={() => undefined} onSelect={() => undefined} buttonClassName="" />);
     expect(markup).toContain('aria-expanded="false"');

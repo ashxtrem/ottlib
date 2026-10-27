@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BackIcon } from '../components/icons';
 import { focusRing } from '../components/interactionStyles';
+import { SubtitleDialog } from '../components/SubtitleDialog';
 import { PlaybackProblem } from '../components/player/PlaybackProblem';
 import { PlayerControls, type PlayerMenu } from '../components/player/PlayerControls';
 import { PlayerTapLayer } from '../components/player/PlayerTapLayer';
 import { ResumeChip } from '../components/player/ResumeChip';
-import { SkipCreditsButton } from '../components/player/SkipCreditsButton';
+import { SkipCreditsButton, isSkipCreditsRaised } from '../components/player/SkipCreditsButton';
 import { UpNextOverlay } from '../components/player/UpNextOverlay';
 import { VideoSurface } from '../components/player/VideoSurface';
 import { useAutoHide } from '../hooks/useAutoHide';
@@ -19,6 +20,8 @@ import { usePlayerCommands } from '../hooks/usePlayerCommands';
 import { usePlayerShortcuts } from '../hooks/usePlayerShortcuts';
 import { usePictureMode } from '../hooks/usePictureMode';
 import { usePlayerTracks } from '../hooks/usePlayerTracks';
+import { useSubtitleFinder } from '../hooks/useSubtitleFinder';
+import { useTrackMemory } from '../hooks/useTrackMemory';
 import { useVideoState } from '../hooks/useVideoState';
 import { chooseHlsEngine, probeBrowserCaps, type PlaybackSwitch } from '../utils/browserCaps';
 import type { EndGuard } from '../utils/playbackEnd';
@@ -84,7 +87,8 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   const { complete } = usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard });
   const state = useVideoState(video, source?.durationMs ?? null, endGuard);
   const commands = usePlayerCommands(video);
-  const controls = useAutoHide(state.paused || menu !== null);
+  const finder = useSubtitleFinder(movieId);
+  const controls = useAutoHide(state.paused || menu !== null || finder.open);
 
   useEffect(() => setFailure(null), [source?.streamUrl]);
   useEffect(() => { if (source && resumeAtMs === undefined) setResumeAtMs(source.resumePositionMs ?? null); }, [source, resumeAtMs]);
@@ -97,7 +101,8 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
     setSwitchStartMs(positionMs);
     switchTo({ ...change, startMs: positionMs });
   }, [video, switchStartMs, source?.resumePositionMs, switchTo]);
-  const tracks = usePlayerTracks({ video, source, reopen });
+  const memory = useTrackMemory(movieId);
+  const tracks = usePlayerTracks({ video, source, reopen, restart: switchTo, remembered: memory.wanted, onPick: memory.record });
   const picture = usePictureMode(movieId);
 
   // A session the server ended (e.g. reaped while paused) fails the hls stream: reopen once at the position before
@@ -136,30 +141,33 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
     subtitles: tracks.toggleSubtitles,
     'exit-fullscreen': screen.exit,
     back: leave
-  }, screen.fullscreen, menu === null && !problem);
+  }, screen.fullscreen, menu === null && !finder.open && !problem);
 
   const phase = upNext.phase;
   const upNextShown = upNext.next !== null && (phase.kind === 'preview' || phase.kind === 'countdown');
+  const creditsKind = credits.showSkip ? 'skip' : credits.showWatch ? 'watch' : null;
+  const cueClearance = { upNext: upNextShown, creditsButton: creditsKind ? (isSkipCreditsRaised(creditsKind, upNextShown) ? 'raised' as const : 'low' as const) : null };
   return <div onPointerMove={controls.show} className={`relative h-full w-full ${controls.visible ? '' : 'cursor-none'}`}>
     {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} />
       : source ? <>
-        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} pictureMode={picture.mode} />
+        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} pictureMode={picture.mode} cueClearance={cueClearance} />
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls
           state={state} visible={controls.visible} fullscreen={screen.fullscreen} onBack={leave}
           onTogglePlay={commands.togglePlay} onSeekBy={commands.seekBy} onSeekTo={commands.seekTo}
           onVolume={commands.setVolume} onToggleMute={commands.toggleMute} onToggleFullscreen={screen.toggle}
           audioItems={audioItems(tracks.audioTracks, source.audioOrder)} onSelectAudio={tracks.selectAudio}
-          subtitleItems={subtitleItems({ text: tracks.text, burnIn: tracks.burnIn, status: tracks.status, current: tracks.current })} onSelectSubtitle={tracks.selectSubtitle}
+          subtitleItems={subtitleItems({ text: tracks.text, burnIn: tracks.burnIn, status: tracks.status, current: tracks.current })} onSelectSubtitle={tracks.selectSubtitle} onFindSubtitles={finder.show}
           menu={menu} onMenu={setMenu}
           picture={{ mode: picture.mode, onSelect: picture.setMode }}
           more={{ positionMs: state.positionMs, credits: source.credits, autoSkip: source.autoSkipCredits, choice: creditsActions.choice, onCommand: (command) => void creditsActions.run(command, state.positionMs) }}
         />
         {resumeAtMs && switchStartMs === null ? <ResumeChip positionMs={resumeAtMs} onStartOver={() => commands.seekTo(0)} /> : null}
         {upNext.next && (phase.kind === 'preview' || phase.kind === 'countdown') && <UpNextOverlay next={upNext.next} phase={phase} onPlayNow={upNext.playNow} onCancel={upNext.cancel} />}
-        {(credits.showSkip || credits.showWatch) && <SkipCreditsButton kind={credits.showSkip ? 'skip' : 'watch'} aboveUpNext={upNextShown} onPress={credits.showSkip ? credits.skipCredits : credits.watchCredits} />}
+        {creditsKind && <SkipCreditsButton kind={creditsKind} aboveUpNext={upNextShown} onPress={creditsKind === 'skip' ? credits.skipCredits : credits.watchCredits} />}
       </>
         : <div className="flex h-full items-center justify-center" aria-live="polite"><svg aria-hidden="true" className="h-8 w-8 animate-spin text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12a8 8 0 1 1-2.34-5.66" /></svg><span className="sr-only">Loading…</span></div>}
+    {finder.movie && <SubtitleDialog key={movieId} movie={finder.movie} onClose={finder.close} onDownloaded={tracks.showDownloaded} listFiles={false} />}
     {!problem && !source && <button type="button" onClick={leave} aria-label="Back" title="Back" className={`absolute left-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 md:left-5 md:top-5 ${focusRing}`}><BackIcon /></button>}
   </div>;
 }

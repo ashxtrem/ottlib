@@ -3,7 +3,7 @@ import { focusRing } from '../interactionStyles';
 import { SeekBar } from './SeekBar';
 import { MoreMenu, type MoreMenuProps } from './MoreMenu';
 import { PictureMenu, type PictureMenuProps } from './PictureMenu';
-import { TrackMenu } from './TrackMenu';
+import { TrackMenu, menuItemClass } from './TrackMenu';
 import { AudioGlyph, BackTenGlyph, ExitFullscreenGlyph, ForwardTenGlyph, FullscreenGlyph, MutedGlyph, PauseGlyph, PlayGlyph, SubtitlesGlyph, VolumeGlyph } from './playerIcons';
 import type { VideoState } from '../../hooks/useVideoState';
 import { formatClock } from '../../utils/playerTime';
@@ -27,6 +27,8 @@ interface PlayerControlsProps {
   onSelectAudio: (order: number) => void;
   subtitleItems: Array<TrackMenuItem & { choice: SubtitleChoice }>;
   onSelectSubtitle: (choice: SubtitleChoice) => void;
+  /** Opens the subtitle finder ("Find subtitles…" under the subtitle menu); absent: no such item. */
+  onFindSubtitles?: () => void;
   menu: PlayerMenu;
   onMenu: (menu: PlayerMenu) => void;
   /** The More menu (credits mark, auto-skip); absent: no More button. */
@@ -46,6 +48,10 @@ export function PlayerControls(props: PlayerControlsProps) {
   const { state, visible, fullscreen, menu, onMenu } = props;
   const fade = `transition-opacity duration-base ${visible ? 'opacity-100' : 'pointer-events-none opacity-0'}`;
   const volumeLevel = state.muted ? 0 : state.volume;
+  const { onFindSubtitles } = props;
+  const findSubtitles = onFindSubtitles
+    ? <button type="button" role="menuitem" onClick={() => { onMenu(null); onFindSubtitles(); }} className={`${menuItemClass} ${focusRing}`}><span aria-hidden="true" className="w-4 shrink-0" /><span className="flex-1">Find subtitles…</span></button>
+    : undefined;
   return <>
     <div className={`absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/70 to-transparent p-3 md:p-5 ${fade}`}>
       <button type="button" onClick={props.onBack} aria-label="Back" title="Back" className={`${iconButton} bg-black/40 ${focusRing}`}><BackIcon /></button>
@@ -60,7 +66,7 @@ export function PlayerControls(props: PlayerControlsProps) {
         <input type="range" aria-label="Volume" min={0} max={1} step={0.05} value={volumeLevel} onChange={(event) => props.onVolume(Number(event.currentTarget.value))} className={`hidden h-1 w-24 cursor-pointer accent-white md:block ${focusRing}`} />
         <span className="ml-1 whitespace-nowrap text-xs tabular-nums text-white/80 md:text-sm">{formatClock(state.positionMs)}<span className="hidden sm:inline"> / {formatClock(state.durationMs)}</span></span>
         <span className="flex-1" />
-        {props.subtitleItems.length > 1 && <TrackMenu label="Subtitles" icon={<SubtitlesGlyph />} items={props.subtitleItems} open={menu === 'subtitles'} onOpenChange={(open) => onMenu(open ? 'subtitles' : null)} onSelect={(item) => props.onSelectSubtitle(item.choice)} buttonClassName={iconButton} />}
+        {(props.subtitleItems.length > 1 || props.onFindSubtitles) && <TrackMenu label="Subtitles" icon={<SubtitlesGlyph />} items={props.subtitleItems} open={menu === 'subtitles'} onOpenChange={(open) => onMenu(open ? 'subtitles' : null)} onSelect={(item) => props.onSelectSubtitle(item.choice)} buttonClassName={iconButton} footer={findSubtitles} />}
         {props.audioItems.length > 1 && <TrackMenu label="Audio" icon={<AudioGlyph />} items={props.audioItems} open={menu === 'audio'} onOpenChange={(open) => onMenu(open ? 'audio' : null)} onSelect={(item) => props.onSelectAudio(item.order)} buttonClassName={iconButton} />}
         {props.picture && <PictureMenu {...props.picture} open={menu === 'picture'} onOpenChange={(open) => onMenu(open ? 'picture' : null)} buttonClassName={iconButton} />}
         {props.more && <MoreMenu {...props.more} open={menu === 'more'} onOpenChange={(open) => onMenu(open ? 'more' : null)} buttonClassName={iconButton} />}
