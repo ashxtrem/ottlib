@@ -310,4 +310,26 @@ describe('MovieRepository filters', () => {
       close();
     }
   });
+
+  it('lists the credits sources of one show only, by imdb id or by provider id', () => {
+    const { repository, close } = createRepository();
+    try {
+      const episode = (n: number, providerId: string, imdbId: string | null) => {
+        const { id } = repository.upsertScanned({ folderId: 1, path: `E:/Movies/tv${n}.mkv`, filename: `tv${n}.mkv`, title: `Ep ${n}`, year: 2024, size: 1, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
+        repository.applyMetadata(id, { source: 'tmdb', providerId, mediaType: 'tv', season: 1, episode: n, imdbId, title: `Ep ${n}`, year: 2024, overview: null, posterFile: null, backdropFile: null, genres: [], cast: [], rating: null, runtime: null });
+        repository.applyMediaInfo(id, { container: 'MKV', durationMs: 60_000, width: 1920, height: 1080, videoCodec: 'H.264', videoProfile: null, videoBitRate: null, hdrFormat: null });
+        repository.setCreditsMark(id, 50_000);
+        return id;
+      };
+      const a1 = episode(1, '10', 'tt0000001'); const a2 = episode(2, '11', 'tt0000001'); const b1 = episode(3, '20', 'tt0000002');
+      const c1 = episode(4, '30', null); const c2 = episode(5, '30', null); const d1 = episode(6, '31', null);
+      expect(repository.creditsOfShow('tv:imdb:tt0000001').map((row) => row.id)).toEqual([a1, a2]);
+      expect(repository.creditsOfShow('tv:imdb:tt0000002').map((row) => row.id)).toEqual([b1]);
+      expect(repository.creditsOfShow('tv:tmdb:30').map((row) => row.id)).toEqual([c1, c2]);
+      expect(repository.creditsOfShow('tv:tmdb:31').map((row) => row.id)).toEqual([d1]);
+      expect(repository.creditsOfShow('tv:tmdb:10')).toEqual([]);
+    } finally {
+      close();
+    }
+  });
 });

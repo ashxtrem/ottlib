@@ -71,6 +71,18 @@ describe('frame route', () => {
     } finally { await app.close(); db.close(); }
   });
 
+  it('keeps a replaced request per device, or per User-Agent when no device id is sent', async () => {
+    const { app, db } = fixture();
+    const get = (t: number, headers: Record<string, string>) => app.inject({ method: 'GET', url: `/api/movies/1/frame?t=${t}`, headers });
+    const statuses = async (...requests: Array<ReturnType<typeof get>>) => (await Promise.all(requests)).map((response) => response.statusCode);
+    try {
+      expect(await statuses(get(10_000, { 'user-agent': 'Coil' }), get(20_000, { 'user-agent': 'Firefox' }))).toEqual([200, 200]);
+      expect(await statuses(get(10_000, { 'user-agent': 'Coil' }), get(20_000, { 'user-agent': 'Coil' }))).toEqual([204, 200]);
+      expect(await statuses(get(10_000, { 'x-device-id': 'device-a' }), get(20_000, { 'x-device-id': 'device-b' }))).toEqual([200, 200]);
+      expect(await statuses(get(10_000, { 'x-device-id': 'device-a', 'user-agent': 'Coil' }), get(20_000, { 'x-device-id': 'device-a', 'user-agent': 'Firefox' }))).toEqual([204, 200]);
+    } finally { await app.close(); db.close(); }
+  });
+
   it('loads with the playback source\'s framePreviewUrl plus &t= when an access PIN is set, and without one', async () => {
     const { app, db, pins, playback } = fixture();
     try {

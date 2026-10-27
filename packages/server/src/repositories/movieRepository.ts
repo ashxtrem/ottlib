@@ -321,8 +321,9 @@ export class MovieRepository {
   /** Episodes of a show with a known duration and credits from a mark or a chapter (the only ones series learning trusts). */
   public creditsOfShow(showKey: string): CreditsRow[] {
     const rows = this.db.prepare(`SELECT id, credits_mark_ms, credits_chapter_ms, duration_ms, metadata_media_type, imdb_id, metadata_source, provider_id
-      FROM movies WHERE metadata_media_type = 'tv' AND media_probe_status = 'completed' AND duration_ms IS NOT NULL AND (credits_mark_ms IS NOT NULL OR credits_chapter_ms IS NOT NULL) ORDER BY id`).all() as CreditsDbRow[];
-    return rows.filter((row) => showKeyOf(row) === showKey).map((row) => this.mapCredits(row));
+      FROM movies WHERE metadata_media_type = 'tv' AND media_probe_status = 'completed' AND duration_ms IS NOT NULL AND (credits_mark_ms IS NOT NULL OR credits_chapter_ms IS NOT NULL)
+      AND CASE WHEN TRIM(COALESCE(imdb_id, '')) <> '' THEN 'tv:imdb:' || TRIM(imdb_id) ELSE 'tv:' || metadata_source || ':' || provider_id END = ? ORDER BY id`).all(showKey) as CreditsDbRow[];
+    return rows.filter((row) => showKeyOf(row) === showKey).map((row) => this.mapCredits(row)); // the JS filter guards the SQL match's edge cases
   }
 
   private mapCredits(row: CreditsDbRow): CreditsRow {
