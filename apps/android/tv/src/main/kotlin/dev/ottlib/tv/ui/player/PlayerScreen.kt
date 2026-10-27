@@ -43,6 +43,9 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
         else Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
     }
 
+    // Outside the Ended branch so it fires during playback; the player stays paused with its controls up on return.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pauseForBackground() }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (val current = state) {
             PlayerUiState.Loading -> LoadingMessage("Starting playback…")

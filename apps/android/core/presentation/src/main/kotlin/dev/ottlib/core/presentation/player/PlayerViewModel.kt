@@ -225,6 +225,14 @@ class PlayerViewModel(
 
     fun cancelAutoPlay() = countdown.cancel()
 
+    /**
+     * The app left the foreground (Home, input switch): pause so nothing plays to an empty room. The progress reporter
+     * saves the position on the pause; the player stays paused, so the controls are still up on return.
+     */
+    fun pauseForBackground() {
+        player?.pause()
+    }
+
     fun pictureHintSeen() {
         backgroundScope.launch { preferences.markPictureHintShown() }
     }
