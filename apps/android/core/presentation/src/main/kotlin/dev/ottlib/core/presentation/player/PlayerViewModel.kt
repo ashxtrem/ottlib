@@ -88,8 +88,8 @@ class PlayerViewModel(
     val nextWarning = warning.asStateFlow()
     private val completion = MutableStateFlow<String?>(null)
     val completionError = completion.asStateFlow()
-    // A countdown that started at the credits marks the title watched as it fires (before the screen moves on), not at the credits start.
-    private val countdown = AutoPlayCountdown(viewModelScope, autoPlayStreak) { if (!ended) finishEarly() }
+    // A countdown that started at the credits marks the title watched as it fires, and the screen moves on only once that is saved.
+    private val countdown = AutoPlayCountdown(viewModelScope, autoPlayStreak) { ended || finishEarly() }
     val autoPlay: StateFlow<AutoPlayState> = countdown.state
     private var autoPlaySeconds = 0
     private val saving = Mutex()
@@ -151,8 +151,6 @@ class PlayerViewModel(
 
     init {
         autoPlayStreak.playerOpened()
-        // Leaving the title unwatched because the save failed would be worse than waiting for the viewer.
-        viewModelScope.launch { completion.collect { if (it != null) countdown.cancel() } }
         start()
     }
 
@@ -233,17 +231,26 @@ class PlayerViewModel(
 
     fun cancelAutoPlay() = countdown.cancel()
 
-    /** "Skip credits": marks the title watched now; answers the title to play next, or null to leave the player. */
-    fun skipCredits(): Long? {
-        finishEarly()
-        return next.value?.id
+    /**
+     * "Skip credits": marks the title watched, then calls [onDone] with the title to play next (null leaves the player).
+     * If the save fails, [onDone] isn't called: the end screen shows the error and its retry instead.
+     */
+    fun skipCredits(onDone: (Long?) -> Unit) {
+        countdown.cancel()
+        viewModelScope.launch { if (finishEarly()) onDone(next.value?.id) }
     }
 
-    /** Before the end (skip pressed, or the early countdown fired): progress saves stop so they can't undo the completion. */
-    private fun finishEarly() {
+    /**
+     * Before the end (skip pressed, or the early countdown fired): progress saves stop so they can't undo the completion.
+     * Answers whether /complete was saved; if not, playback pauses and the end screen holds with the error and retry.
+     */
+    private suspend fun finishEarly(): Boolean {
         ended = true
         credits.finish()
-        saveCompletion()
+        if (backgroundScope.async { completeNow() }.await()) return true
+        player?.pause()
+        state.value = PlayerUiState.Ended
+        return false
     }
 
     /**
@@ -310,24 +317,30 @@ class PlayerViewModel(
         backgroundScope.launch { runCatching { api.stopSession(sessionUrl) } }
     }
 
+    /** Saves on [backgroundScope] so leaving can't cut it short. A failure stops the end-screen countdown: leaving the title unwatched would be worse than waiting for the viewer. */
     fun saveCompletion() {
-        backgroundScope.launch {
-            saving.withLock {
-                if (completionSaved) return@withLock
-                try {
-                    api.complete(movieId, collectionId)
-                    completionSaved = true
-                    completion.value = null
-                    runCatching {
-                        continueWatching.remove(movieId)
-                        next.value?.let { upcoming ->
-                            val queued = api.continueWatching().find { it.id == upcoming.id }
-                            if (queued != null) continueWatching.upsert(ContinueWatchingEntry(queued.id, queued.title, api.resolve(queued.posterUrl), queued.resumePositionMs ?: 0, queued.durationMs ?: 0, nextUp = queued.nextUp != null))
-                        }
-                    }
-                } catch (error: CancellationException) { throw error }
-                catch (_: Exception) { completion.value = "Couldn't save watched status. Check your connection and retry." }
+        viewModelScope.launch { if (!backgroundScope.async { completeNow() }.await()) countdown.cancel() }
+    }
+
+    /** Marks the title watched (once); answers false, with [completionError] set, when the server couldn't be reached. */
+    private suspend fun completeNow(): Boolean = saving.withLock {
+        if (completionSaved) return@withLock true
+        try {
+            api.complete(movieId, collectionId)
+            completionSaved = true
+            completion.value = null
+            runCatching {
+                continueWatching.remove(movieId)
+                next.value?.let { upcoming ->
+                    val queued = api.continueWatching().find { it.id == upcoming.id }
+                    if (queued != null) continueWatching.upsert(ContinueWatchingEntry(queued.id, queued.title, api.resolve(queued.posterUrl), queued.resumePositionMs ?: 0, queued.durationMs ?: 0, nextUp = queued.nextUp != null))
+                }
             }
+            true
+        } catch (error: CancellationException) { throw error }
+        catch (_: Exception) {
+            completion.value = "Couldn't save watched status. Check your connection and retry."
+            false
         }
     }
 

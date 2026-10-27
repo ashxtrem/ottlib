@@ -80,10 +80,11 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                 credits = viewModel.credits,
                 upNext = nextMovie?.let { autoPlay.message(it) },
                 onSkipCredits = {
-                    // Marks the title watched, then plays the next title or leaves the player.
-                    val nextId = viewModel.skipCredits()
-                    viewModel.releasePlayback()
-                    if (nextId != null) onNext(nextId) else onExit()
+                    // Marks the title watched, then plays the next title or leaves the player (a failed save stays here).
+                    viewModel.skipCredits { nextId ->
+                        viewModel.releasePlayback()
+                        if (nextId != null) onNext(nextId) else onExit()
+                    }
                 },
             )
         }

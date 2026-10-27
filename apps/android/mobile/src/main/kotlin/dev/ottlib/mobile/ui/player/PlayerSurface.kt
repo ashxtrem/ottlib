@@ -163,6 +163,8 @@ fun PlayerSurface(
         }
     }
     LaunchedEffect(inPictureInPicture) { if (inPictureInPicture) panel = null }
+    // The pill is hidden under a panel, so its countdown must not run (and navigate away) unseen.
+    LaunchedEffect(panel) { credits.hold(panel != null) }
     if (controls.showPictureHint) LaunchedEffect(Unit) {
         delay(PICTURE_HINT_DELAY_MS)
         hint = PlayerHint("Pinch to fill the screen", Icons.Filled.ZoomOutMap, visibleMs = PICTURE_HINT_VISIBLE_MS)
@@ -209,7 +211,7 @@ fun PlayerSurface(
         when (panel) {
             Panel.Tracks -> TrackPanel(player, onFindSubtitles = { onFindSubtitles(); panel = Panel.Subtitles },
                 creditsSummary = creditsSummary(creditsState.credits), onCredits = { panel = Panel.Credits }, onDismiss = { panel = null })
-            Panel.Credits -> CreditsPanel(creditsState, player.currentPosition, onMark = { credits.mark(player.currentPosition) },
+            Panel.Credits -> CreditsPanel(creditsState, { player.currentPosition }, onMark = { credits.mark(player.currentPosition) },
                 onClearMark = credits::clearMark, onAutoSkip = credits::chooseAutoSkip, onDismiss = { panel = null })
             Panel.Subtitles -> SubtitlePanel(subtitleState, subtitles, onRetry = onFindSubtitles, onDismiss = { panel = null })
             Panel.Picture -> PicturePanel(pictureMode, onChoose = onPictureModeChosen, onDismiss = { panel = null })

@@ -59,6 +59,45 @@ class CreditsControllerTest {
         assertEquals(AutoPlayState.Off, countdown.state.value)
         assertFalse(controller.state.value.counting)
         assertFalse(controller.state.value.showSkip)
+
+        // The title ends: the end screen counts down as usual.
+        controller.finish()
+        countdown.start(7, seconds)
+        runCurrent()
+        assertEquals(AutoPlayState.Counting(10), countdown.state.value)
+    }
+
+    @Test
+    fun pausingInTheCreditsWithdrawsTheCountdownAndPlayingRestartsItAtFull() = runTest {
+        val (controller, countdown) = setup(autoSkip = true).let { it.controller to it.countdown }
+        controller.onPosition(90_000, isPlaying = true)
+        advanceTimeBy(3_000); runCurrent()
+        assertTrue(countdown.state.value is AutoPlayState.Counting)
+
+        controller.onPosition(93_000, isPlaying = false)
+        advanceTimeBy(15_000); runCurrent()
+        controller.onPosition(93_000, isPlaying = false)
+        runCurrent()
+        assertEquals(AutoPlayState.Off, countdown.state.value)
+        assertFalse(controller.state.value.counting)
+
+        controller.onPosition(93_000, isPlaying = true)
+        runCurrent()
+        assertEquals(AutoPlayState.Counting(10), countdown.state.value)
+    }
+
+    @Test
+    fun anOpenPanelHoldsTheCountdownUntilItCloses() = runTest {
+        val (controller, countdown) = setup(autoSkip = true).let { it.controller to it.countdown }
+        controller.onPosition(90_000, isPlaying = true)
+        runCurrent()
+        controller.hold(true)
+        advanceTimeBy(15_000); runCurrent()
+        assertEquals(AutoPlayState.Off, countdown.state.value)
+
+        controller.hold(false)
+        runCurrent()
+        assertEquals(AutoPlayState.Counting(10), countdown.state.value)
     }
 
     @Test

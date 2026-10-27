@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,22 +38,30 @@ import dev.ottlib.core.presentation.player.CreditsUiState
 import dev.ottlib.core.presentation.player.creditsSummary
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.tryRequestFocus
+import kotlinx.coroutines.delay
 
 /**
- * Side sheet from the controls row: mark where the credits start (at [positionMs]), clear the mark, and choose
- * auto-skip for this movie or series. Rows stay focusable while a change saves (presses are ignored), so focus never
- * drops out of the sheet. Back closes it; focus is trapped inside while it is open.
+ * Side sheet from the controls row: mark where the credits start (at the playhead, read from [position] as it plays),
+ * clear the mark, and choose auto-skip for this movie or series. Rows stay focusable while a change saves (presses are
+ * ignored), so focus never drops out of the sheet. Back closes it; focus is trapped inside while it is open.
  */
 @Composable
 fun CreditsPanel(
     state: CreditsUiState,
-    positionMs: Long,
+    position: () -> Long,
     onMark: () -> Unit,
     onClearMark: () -> Unit,
     onAutoSkip: (AutoSkipChoice) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var positionMs by remember { mutableLongStateOf(position()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            positionMs = position()
+            delay(POSITION_TICK_MS)
+        }
+    }
     var focusInside by remember { mutableStateOf(false) }
     val initialFocus = remember { FocusRequester() }
     BackHandler(onBack = onDismiss)
@@ -109,3 +118,4 @@ fun CreditsPanel(
 }
 
 private const val FOCUS_ATTEMPTS = 10
+private const val POSITION_TICK_MS = 500L

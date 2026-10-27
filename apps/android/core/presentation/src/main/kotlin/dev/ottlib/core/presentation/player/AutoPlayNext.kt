@@ -55,9 +55,10 @@ class AutoPlayStreak(private val limit: Int = LIMIT) {
 
 /**
  * The countdown to the next title (on the ended screen, or from the credits). Runs at most once per player: a cancelled
- * countdown stays off. [onDue] runs as it finishes, before [AutoPlayState.Due] is published.
+ * countdown stays off. [onDue] runs as it finishes, before [AutoPlayState.Due] is published; when it answers false
+ * (the title couldn't be marked watched) the countdown ends Off instead and the screen stays.
  */
-class AutoPlayCountdown(private val scope: CoroutineScope, private val streak: AutoPlayStreak, private val onDue: () -> Unit = {}) {
+class AutoPlayCountdown(private val scope: CoroutineScope, private val streak: AutoPlayStreak, private val onDue: suspend () -> Boolean = { true }) {
     private val current = MutableStateFlow<AutoPlayState>(AutoPlayState.Off)
     val state: StateFlow<AutoPlayState> = current.asStateFlow()
     private var started = false
@@ -77,8 +78,11 @@ class AutoPlayCountdown(private val scope: CoroutineScope, private val streak: A
                 current.value = AutoPlayState.Counting(left)
                 delay(1_000)
             }
+            if (!onDue()) {
+                current.value = AutoPlayState.Off
+                return@launch
+            }
             streak.autoPlayed()
-            onDue()
             current.value = AutoPlayState.Due(nextId)
         }
     }
