@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Movie } from '@ottlib/shared';
 import { api } from './apiClient';
+import { completeThen } from '../utils/completeThen';
 import { heldCountdownStart, reachedStartAt, upNextPhase, type UpNextPhase } from '../utils/upNextTiming';
 
 interface UpNextOptions {
@@ -16,6 +17,8 @@ interface UpNextOptions {
   startAtMs?: number | null;
   /** Runs before opening the next title when the countdown started at `startAtMs` (posts complete). */
   beforeEarlyNext?: () => Promise<void>;
+  /** `beforeEarlyNext` rejected: the next title is not opened. */
+  onEarlyNextFailed?: () => void;
 }
 
 export function watchPath(movieId: number, shelfId?: number): string {
@@ -27,7 +30,7 @@ export function watchPath(movieId: number, shelfId?: number): string {
  * countdown after the end that opens it. With `startAtMs` the countdown starts there instead. Cancel keeps the viewer
  * on the finished one.
  */
-export function useUpNext({ movieId, shelfId, positionMs, durationMs, ended, paused = false, startAtMs = null, beforeEarlyNext }: UpNextOptions) {
+export function useUpNext({ movieId, shelfId, positionMs, durationMs, ended, paused = false, startAtMs = null, beforeEarlyNext, onEarlyNextFailed }: UpNextOptions) {
   const navigate = useNavigate();
   // Undefined until GET /next answers.
   const [loaded, setNext] = useState<Movie | null | undefined>(undefined);
@@ -78,8 +81,11 @@ export function useUpNext({ movieId, shelfId, positionMs, durationMs, ended, pau
     if (!next || advancing.current) return;
     advancing.current = true;
     const open = () => navigate(watchPath(next.id, shelfId), { replace: true });
-    if (early && beforeEarlyNext) void beforeEarlyNext().finally(open); else open();
-  }, [next, shelfId, navigate, early, beforeEarlyNext]);
+    if (early && beforeEarlyNext) {
+      // A failed complete keeps the viewer here (and the countdown off, so it doesn't loop).
+      void completeThen(beforeEarlyNext, open, () => { advancing.current = false; setCancelled(true); onEarlyNextFailed?.(); });
+    } else open();
+  }, [next, shelfId, navigate, early, beforeEarlyNext, onEarlyNextFailed]);
   const cancel = useCallback(() => setCancelled(true), []);
 
   useEffect(() => { if (phase.kind === 'advance') playNow(); }, [phase.kind, playNow]);

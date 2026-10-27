@@ -1,7 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Credits } from '@ottlib/shared';
+import { useToast } from './useToast';
 import { useUpNext, watchPath } from './useUpNext';
+import { completeThen } from '../utils/completeThen';
+
+const COMPLETE_FAILED_MESSAGE = "Couldn't mark this title as watched. Try again.";
 
 interface CreditsRule {
   credits: Credits | null;
@@ -55,7 +59,7 @@ interface CreditsOptions {
   paused: boolean;
   /** The credits start this player marked, if any (see `CreditsRule.markedHereMs`). */
   markedHereMs: number | null;
-  /** Posts complete (and stops the later progress PUTs). */
+  /** Posts complete (and stops the later progress PUTs); rejects, with the PUTs resumed, if the POST fails. */
   complete: () => Promise<void>;
 }
 
@@ -68,7 +72,9 @@ export function useCredits({ movieId, shelfId, credits, autoSkip, positionMs, du
   const navigate = useNavigate();
   const [watching, setWatching] = useState(false);
   const rule = { credits, autoSkip, watching, markedHereMs };
-  const upNext = useUpNext({ movieId, shelfId, positionMs, durationMs, ended, paused, startAtMs: creditsStartAt(rule), beforeEarlyNext: complete });
+  const { show } = useToast();
+  const onCompleteFailed = useCallback(() => show(COMPLETE_FAILED_MESSAGE, 'error'), [show]);
+  const upNext = useUpNext({ movieId, shelfId, positionMs, durationMs, ended, paused, startAtMs: creditsStartAt(rule), beforeEarlyNext: complete, onEarlyNextFailed: onCompleteFailed });
   const buttons = creditsButtons({ ...rule, hasNext: upNext.next !== null, nextKnown: upNext.nextKnown, positionMs, ended, upNextCancelled: upNext.cancelled });
 
   const skipping = useRef(false);
@@ -76,11 +82,13 @@ export function useCredits({ movieId, shelfId, credits, autoSkip, positionMs, du
   const skipCredits = useCallback(() => {
     if (skipping.current) return;
     skipping.current = true;
-    void complete().finally(() => {
+    const open = () => {
       if (next) navigate(watchPath(next.id, shelfId), { replace: true });
       else navigate(`/movie/${movieId}`, { replace: true });
-    });
-  }, [complete, next, shelfId, movieId, navigate]);
+    };
+    // A failed complete keeps the viewer on the player, where Skip credits can be pressed again.
+    void completeThen(complete, open, () => { skipping.current = false; onCompleteFailed(); });
+  }, [complete, next, shelfId, movieId, navigate, onCompleteFailed]);
   const watchCredits = useCallback(() => setWatching(true), []);
 
   return { upNext, showSkip: buttons.skip, showWatch: buttons.watch, skipCredits, watchCredits };

@@ -1,11 +1,10 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { pageStorage, type StorageLike } from '../utils/pageStorage';
 import { parsePictureDefault, parsePictureModes, pictureModeFor, type PictureModeId } from '../utils/pictureModes';
 
 /** Picture modes live only in this browser: each device remembers its own mode per title and its own default. */
 export const PICTURE_MODES_KEY = 'ottlib-picture-modes';
 export const PICTURE_DEFAULT_KEY = 'ottlib-picture-default';
-
-type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
 function readRaw(storage: StorageLike, key: string): string | null {
   try { return storage.getItem(key); } catch { return null; /* Storage can be unavailable (private mode). */ }
@@ -42,38 +41,6 @@ function subscribe(listener: () => void): () => void {
 
 function notify(): void {
   listeners.forEach((listener) => listener());
-}
-
-/** `window.localStorage` throws a SecurityError when storage is blocked; null then. */
-export function safeStorage(): Storage | null {
-  try { return window.localStorage; } catch { return null; }
-}
-
-/** Holds what was picked when the browser store is blocked or refuses writes, so a pick still applies for the session. */
-export function memoryStorage(): StorageLike & { clear(): void } {
-  const data = new Map<string, string>();
-  return { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => { data.set(key, value); }, clear: () => data.clear() };
-}
-
-const sessionStore = memoryStorage();
-
-/** Keys whose last write the browser store refused: the session copy is the truth for those. */
-const sessionOnly = new Set<string>();
-
-/** The browser store when it works, the session copy when it is blocked or refuses a write. */
-export function pageStorage(): StorageLike {
-  const real = safeStorage();
-  return {
-    getItem: (key) => (!real || sessionOnly.has(key) ? sessionStore.getItem(key) : readRaw(real, key)),
-    setItem: (key, value) => {
-      sessionStore.setItem(key, value);
-      try {
-        if (!real) throw new Error('storage blocked');
-        real.setItem(key, value);
-        sessionOnly.delete(key);
-      } catch { sessionOnly.add(key); }
-    }
-  };
 }
 
 /** The raw stored strings are the snapshots: equal strings compare equal, so nothing re-renders without a change. */
