@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlaybackSource, SubtitleSource } from '@ottlib/shared';
 import type { HlsEngine } from '../../utils/browserCaps';
+import { CueOverlay } from './CueOverlay';
+import { useActiveCues } from '../../hooks/useActiveCues';
 import { usePictureLayout } from '../../hooks/usePictureLayout';
 import { isRealVideoEnd, type EndGuard } from '../../utils/playbackEnd';
 import type { PictureModeId } from '../../utils/pictureModes';
@@ -52,7 +54,10 @@ async function attachHlsJs(video: HTMLVideoElement, url: string, startSec: numbe
 }
 
 export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks, endGuard, pictureMode = 'Fit' }: VideoSurfaceProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+  const setVideoRef = useCallback((element: HTMLVideoElement | null) => { videoRef.current = element; setVideoEl(element); }, []);
+  const cueLines = useActiveCues(videoEl);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const layout = usePictureLayout(box, videoRef, source.pictureArea, pictureMode);
   const errorRef = useRef(onPlaybackError); errorRef.current = onPlaybackError;
@@ -110,7 +115,7 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
 
   // The video is placed by hand in an overflow-hidden box (see pictureGeometry); until its size is known it just fits.
   return <div ref={setBox} className="absolute inset-0 overflow-hidden bg-black"><video
-    ref={videoRef}
+    ref={setVideoRef}
     playsInline
     autoPlay
     onError={(event) => {
@@ -128,5 +133,5 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
       srcLang={subtitle.language ?? undefined}
       label={subtitle.title ?? subtitle.language ?? `Subtitles ${index + 1}`}
     />)}
-  </video></div>;
+  </video><CueOverlay lines={cueLines} /></div>;
 }
