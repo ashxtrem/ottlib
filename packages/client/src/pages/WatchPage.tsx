@@ -9,7 +9,7 @@ import { ResumeChip } from '../components/player/ResumeChip';
 import { UpNextOverlay } from '../components/player/UpNextOverlay';
 import { VideoSurface } from '../components/player/VideoSurface';
 import { useAutoHide } from '../hooks/useAutoHide';
-import { useFullscreen } from '../hooks/useFullscreen';
+import { useFullscreen, type FullscreenControls } from '../hooks/useFullscreen';
 import { usePlaybackProgress } from '../hooks/usePlaybackProgress';
 import { usePlaybackSource } from '../hooks/usePlaybackSource';
 import { usePlayerCommands } from '../hooks/usePlayerCommands';
@@ -36,21 +36,38 @@ function useLeaveWatch(movieId: number): () => void {
   }, [movieId, navigate]);
 }
 
-/** Full-screen black player at /watch/:id (outside the header layout). `?shelf=` scopes progress to a shelf. */
+/**
+ * Full-screen black player at /watch/:id (outside the header layout). `?shelf=` scopes progress to a shelf.
+ * The `fixed inset-0` container and fullscreen live here, above the per-title key: up next remounts the player but
+ * not the element that is fullscreen, so fullscreen survives it (browsers refuse a new request without a gesture).
+ */
 export function WatchPage() {
   const movieId = positiveInt(useParams().id) ?? 0;
   const shelfId = positiveInt(useSearchParams()[0].get('shelf'));
-  // Up next replaces the URL: a fresh player per title, so no state (resume chip, tracks, countdown) carries over.
-  return <WatchPlayer key={`${movieId}:${shelfId ?? ''}`} movieId={movieId} shelfId={shelfId} />;
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  // The current title's <video> (null between titles): only the iOS path, which fullscreens the video itself, needs it.
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  const screen = useFullscreen(container, video);
+  return <div ref={setContainer} className="fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-black text-white">
+    {/* Up next replaces the URL: a fresh player per title, so no state (resume chip, tracks, countdown) carries over. */}
+    <WatchPlayer key={`${movieId}:${shelfId ?? ''}`} movieId={movieId} shelfId={shelfId} screen={screen} onVideoElement={setVideo} />
+  </div>;
 }
 
-function WatchPlayer({ movieId, shelfId }: { movieId: number; shelfId?: number }) {
+interface WatchPlayerProps {
+  movieId: number;
+  shelfId?: number;
+  screen: FullscreenControls;
+  onVideoElement: (video: HTMLVideoElement | null) => void;
+}
+
+function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerProps) {
   const caps = useMemo(() => probeBrowserCaps(), []);
   const hlsEngine = chooseHlsEngine(caps);
   const playback = usePlaybackSource(movieId, caps.request);
   const source = playback.source;
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const handleVideo = useCallback((element: HTMLVideoElement | null) => { setVideo(element); onVideoElement(element); }, [onVideoElement]);
   const [failure, setFailure] = useState<PlaybackFailure | null>(null);
   const [menu, setMenu] = useState<PlayerMenu>(null);
   // Set by an audio/burn-in switch: the reopened stream starts here instead of at the saved resume position.
@@ -64,7 +81,6 @@ function WatchPlayer({ movieId, shelfId }: { movieId: number; shelfId?: number }
   usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard });
   const state = useVideoState(video, source?.durationMs ?? null, endGuard);
   const commands = usePlayerCommands(video);
-  const screen = useFullscreen(container, video);
   const controls = useAutoHide(state.paused || menu !== null);
 
   useEffect(() => setFailure(null), [source?.streamUrl]);
@@ -113,10 +129,10 @@ function WatchPlayer({ movieId, shelfId }: { movieId: number; shelfId?: number }
   }, screen.fullscreen, menu === null && !problem);
 
   const phase = upNext.phase;
-  return <div ref={setContainer} onPointerMove={controls.show} className={`fixed inset-0 z-50 h-[100dvh] w-screen overflow-hidden bg-black text-white ${controls.visible ? '' : 'cursor-none'}`}>
+  return <div onPointerMove={controls.show} className={`relative h-full w-full ${controls.visible ? '' : 'cursor-none'}`}>
     {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} />
       : source ? <>
-        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={setVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} />
+        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} />
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls
           state={state} visible={controls.visible} fullscreen={screen.fullscreen} onBack={leave}
