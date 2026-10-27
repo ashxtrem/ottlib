@@ -6,16 +6,18 @@ import { PlaybackProblem } from '../components/player/PlaybackProblem';
 import { PlayerControls, type PlayerMenu } from '../components/player/PlayerControls';
 import { PlayerTapLayer } from '../components/player/PlayerTapLayer';
 import { ResumeChip } from '../components/player/ResumeChip';
+import { SkipCreditsButton } from '../components/player/SkipCreditsButton';
 import { UpNextOverlay } from '../components/player/UpNextOverlay';
 import { VideoSurface } from '../components/player/VideoSurface';
 import { useAutoHide } from '../hooks/useAutoHide';
+import { useCredits } from '../hooks/useCredits';
+import { useCreditsActions } from '../hooks/useCreditsActions';
 import { useFullscreen, type FullscreenControls } from '../hooks/useFullscreen';
 import { usePlaybackProgress } from '../hooks/usePlaybackProgress';
 import { usePlaybackSource } from '../hooks/usePlaybackSource';
 import { usePlayerCommands } from '../hooks/usePlayerCommands';
 import { usePlayerShortcuts } from '../hooks/usePlayerShortcuts';
 import { usePlayerTracks } from '../hooks/usePlayerTracks';
-import { useUpNext } from '../hooks/useUpNext';
 import { useVideoState } from '../hooks/useVideoState';
 import { chooseHlsEngine, probeBrowserCaps, type PlaybackSwitch } from '../utils/browserCaps';
 import type { EndGuard } from '../utils/playbackEnd';
@@ -78,7 +80,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   const lastFalseEnd = useRef<number | null>(null);
   const endGuardMs = source?.kind === 'hls' ? source.durationMs ?? null : null;
   const endGuard = useMemo<EndGuard>(() => ({ durationMs: endGuardMs, lastFalseEnd }), [endGuardMs]);
-  usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard });
+  const { complete } = usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard });
   const state = useVideoState(video, source?.durationMs ?? null, endGuard);
   const commands = usePlayerCommands(video);
   const controls = useAutoHide(state.paused || menu !== null);
@@ -113,7 +115,12 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
     }
     setFailure(reason);
   }, [source, reopen]);
-  const upNext = useUpNext({ movieId, shelfId, positionMs: state.positionMs, durationMs: state.durationMs, ended: state.ended });
+  const credits = useCredits({
+    movieId, shelfId, credits: source?.credits ?? null, autoSkip: source?.autoSkipCredits ?? false,
+    positionMs: state.positionMs, durationMs: state.durationMs, ended: state.ended, complete
+  });
+  const upNext = credits.upNext;
+  const creditsActions = useCreditsActions(movieId, playback.patchSource);
 
   usePlayerShortcuts({
     'toggle-play': commands.togglePlay,
@@ -141,9 +148,11 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
           audioItems={audioItems(tracks.audioTracks, source.audioOrder)} onSelectAudio={tracks.selectAudio}
           subtitleItems={subtitleItems({ text: tracks.text, burnIn: tracks.burnIn, status: tracks.status, current: tracks.current })} onSelectSubtitle={tracks.selectSubtitle}
           menu={menu} onMenu={setMenu}
+          more={{ positionMs: state.positionMs, credits: source.credits, autoSkip: source.autoSkipCredits, choice: creditsActions.choice, onCommand: (command) => void creditsActions.run(command, state.positionMs) }}
         />
         {resumeAtMs && switchStartMs === null ? <ResumeChip positionMs={resumeAtMs} onStartOver={() => commands.seekTo(0)} /> : null}
         {upNext.next && (phase.kind === 'preview' || phase.kind === 'countdown') && <UpNextOverlay next={upNext.next} phase={phase} onPlayNow={upNext.playNow} onCancel={upNext.cancel} />}
+        {(credits.showSkip || credits.showWatch) && <SkipCreditsButton kind={credits.showSkip ? 'skip' : 'watch'} onPress={credits.showSkip ? credits.skipCredits : credits.watchCredits} />}
       </>
         : <div className="flex h-full items-center justify-center" aria-live="polite"><svg aria-hidden="true" className="h-8 w-8 animate-spin text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12a8 8 0 1 1-2.34-5.66" /></svg><span className="sr-only">Loading…</span></div>}
     {!problem && !source && <button type="button" onClick={leave} aria-label="Back" title="Back" className={`absolute left-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 md:left-5 md:top-5 ${focusRing}`}><BackIcon /></button>}

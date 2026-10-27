@@ -13,6 +13,8 @@ export interface TrackMenuItem {
   detail?: string;
   selected: boolean;
   disabled?: boolean;
+  /** A command (e.g. "Clear credits mark") rather than one choice of a set: a plain menu item, never checked. */
+  action?: boolean;
 }
 
 const channelNames: Record<number, string> = { 1: 'Mono', 2: 'Stereo', 6: '5.1', 8: '7.1' };

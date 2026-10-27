@@ -14,7 +14,7 @@ interface TrackMenuProps<T extends TrackMenuItem> {
   buttonClassName: string;
 }
 
-/** A player menu above its button (audio tracks or subtitles); closes on Escape, outside press or a pick. */
+/** A player menu above its button (audio tracks, subtitles, More); closes on Escape, outside press or a pick. */
 export function TrackMenu<T extends TrackMenuItem>({ label, icon, items, open, onOpenChange, onSelect, buttonClassName }: TrackMenuProps<T>) {
   const menu = useRef<HTMLDivElement>(null);
 
@@ -34,8 +34,8 @@ export function TrackMenu<T extends TrackMenuItem>({ label, icon, items, open, o
       {items.map((item) => <button
         key={item.key}
         type="button"
-        role="menuitemradio"
-        aria-checked={item.selected}
+        role={item.action ? 'menuitem' : 'menuitemradio'}
+        aria-checked={item.action ? undefined : item.selected}
         disabled={item.disabled}
         onClick={() => { onSelect(item); onOpenChange(false); }}
         className={`flex min-h-11 items-center gap-2 rounded px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-9 ${focusRing}`}
