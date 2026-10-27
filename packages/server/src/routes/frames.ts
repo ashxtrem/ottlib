@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { framePreviewConfig } from '../config/framePreview.js';
 import { FrameError, type FrameService } from '../services/frames/frameService.js';
 import { MovieUnavailableError } from '../services/playbackService.js';
@@ -9,6 +10,14 @@ export const frameRoute = '/api/movies/:id/frame';
  * A seek-bar preview frame (JPEG) at `t` milliseconds. Reachable with the movie's `?key=` so `<img>` and Coil need no headers.
  * The playback source's `framePreviewUrl` ends in `?key=<k>` or a bare `?`, so `t` may come after an empty parameter (`?&t=...`).
  */
+/** Who a newer frame request replaces: the device when it sends `x-device-id`, else IP + User-Agent (img/Coil send no device id). */
+function clientKeyOf(request: FastifyRequest): string {
+  const device = request.headers['x-device-id'];
+  if (typeof device === 'string' && device.length > 0 && device.length <= 64) return `device:${device}`;
+  const agent = createHash('sha1').update(request.headers['user-agent'] ?? '').digest('hex').slice(0, 12);
+  return `${request.ip}|${agent}`;
+}
+
 export function registerFrameRoutes(app: FastifyInstance, frames: FrameService): void {
   app.get(frameRoute, async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
@@ -19,7 +28,7 @@ export function registerFrameRoutes(app: FastifyInstance, frames: FrameService):
     // `close` also fires after a finished response; only an unfinished one means the client went away.
     reply.raw.once('close', () => { if (!reply.raw.writableFinished) controller.abort(); });
     try {
-      const jpeg = await frames.frame(id, Number(t), request.ip, controller.signal);
+      const jpeg = await frames.frame(id, Number(t), clientKeyOf(request), controller.signal);
       if (!jpeg) return reply.code(204).send();
       return reply.header('content-type', 'image/jpeg').header('cache-control', framePreviewConfig.cacheControl).send(jpeg);
     } catch (error) {
