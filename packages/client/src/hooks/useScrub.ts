@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { PlaybackSource } from '@ottlib/shared';
 import { createScrubSession, liveSeek, type ScrubSession } from '../utils/scrubSession';
 
@@ -11,6 +11,10 @@ export interface ScrubControls {
   showsFrame: boolean;
   /** The preview frame (an object URL), or null until the first one lands. */
   frameSrc: string | null;
+  /** True from the first drag step until release: progress reporting and credits/up-next hold off meanwhile. */
+  scrubbing: boolean;
+  /** The same flag as a ref, for listeners that must read it at event time (the `seeked` handler). */
+  scrubbingRef: RefObject<boolean>;
 }
 
 const noSession: ScrubSession = { scrub: () => undefined, end: () => undefined };
@@ -29,6 +33,8 @@ async function fetchFrame(url: string, signal: AbortSignal): Promise<string | nu
  */
 export function useScrub(video: HTMLVideoElement | null, source: PlaybackSource | null): ScrubControls {
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
+  const [scrubbing, setScrubbing] = useState(false);
+  const scrubbingRef = useRef(false);
   const kind = source?.kind ?? null;
   const framePreviewUrl = source?.framePreviewUrl ?? null;
   const durationMs = source?.durationMs ?? null;
@@ -43,5 +49,19 @@ export function useScrub(video: HTMLVideoElement | null, source: PlaybackSource 
     });
   }, [kind, framePreviewUrl, durationMs, video]);
   useEffect(() => () => session.end(), [session]);
-  return useMemo(() => ({ onScrub: session.scrub, onScrubEnd: session.end, showsFrame: kind === 'hls', frameSrc }), [session, kind, frameSrc]);
+  useEffect(() => () => { scrubbingRef.current = false; setScrubbing(false); }, [session]);
+  const onScrub = useCallback((ms: number) => {
+    scrubbingRef.current = true;
+    setScrubbing(true);
+    session.scrub(ms);
+  }, [session]);
+  const onScrubEnd = useCallback(() => {
+    scrubbingRef.current = false;
+    setScrubbing(false);
+    session.end();
+  }, [session]);
+  return useMemo(
+    () => ({ onScrub, onScrubEnd, showsFrame: kind === 'hls', frameSrc, scrubbing, scrubbingRef }),
+    [onScrub, onScrubEnd, kind, frameSrc, scrubbing]
+  );
 }

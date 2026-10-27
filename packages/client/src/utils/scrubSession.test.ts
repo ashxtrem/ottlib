@@ -14,10 +14,22 @@ describe('liveSeek', () => {
     const video = { duration: 100, currentTime: 0 };
     liveSeek(video, 42);
     expect(video.currentTime).toBe(42);
-    liveSeek(video, 500);
-    expect(video.currentTime).toBe(100);
     liveSeek(video, -3);
     expect(video.currentTime).toBe(0);
+  });
+
+  it('never lands on the exact end (that would fire ended mid-drag), fastSeek included', () => {
+    const video = { duration: 100, currentTime: 0 };
+    liveSeek(video, 100);
+    expect(video.currentTime).toBe(98);
+    liveSeek(video, 500);
+    expect(video.currentTime).toBeLessThan(video.duration);
+    const fastSeek = vi.fn();
+    liveSeek({ duration: 100, currentTime: 0, fastSeek }, 100);
+    expect(fastSeek).toHaveBeenCalledWith(98);
+    const short = { duration: 1, currentTime: 5 };
+    liveSeek(short, 1);
+    expect(short.currentTime).toBe(0);
   });
 
   it('does not clamp to an unknown duration', () => {
