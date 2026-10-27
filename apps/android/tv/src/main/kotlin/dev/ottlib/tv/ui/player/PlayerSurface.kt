@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +45,8 @@ import dev.ottlib.tv.ui.components.tryRequestFocus
 import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.PictureModeController
+import dev.ottlib.core.player.ExoScrubTarget
+import dev.ottlib.core.player.ScrubController
 import dev.ottlib.core.player.SeekAccumulator
 import dev.ottlib.core.presentation.player.PlayerControls
 import dev.ottlib.tv.InterceptKeys
@@ -66,6 +70,8 @@ fun PlayerSurface(
     /** The up-next countdown's message while it runs during playback (it started at the credits). */
     upNext: String?,
     onSkipCredits: () -> Unit,
+    /** A preview frame URL near a position on "Play via server"; null on direct play, where scrubbing moves the video. */
+    framePreview: (Long) -> String?,
 ) {
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var picture by remember { mutableStateOf<PictureModeController?>(null) }
@@ -83,7 +89,13 @@ fun PlayerSurface(
     var hint by remember { mutableStateOf<SeekHint?>(null) }
     var showPictureHint by remember { mutableStateOf(controls.showPictureHint) }
 
-    val seeker = remember(player, controls) { RemoteSeeker(player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs)) { hint = it } }
+    var frame by remember { mutableStateOf<String?>(null) }
+    val frameUrl by rememberUpdatedState(framePreview)
+
+    val seeker = remember(player, controls) {
+        val scrub = ScrubController(ExoScrubTarget(player), frameUrl = { frameUrl(it) }, onFrame = { frame = it })
+        RemoteSeeker(player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs), scrub) { hint = it }
+    }
     val remoteKeys = remember(player, seeker) {
         RemoteKeys(player, seeker) {
             playerView?.run {
@@ -194,7 +206,11 @@ fun PlayerSurface(
             }, modifier = Modifier.align(Alignment.CenterEnd))
         }
         hint?.let { current ->
-            OverlayText(current.text, Modifier.align(Alignment.Center))
+            // Not focusable: the seek hint (and its preview frame on "Play via server") never takes focus.
+            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                frame?.let { FramePreview(it) }
+                OverlayText(current.text, Modifier)
+            }
             LaunchedEffect(current.id) {
                 delay(HINT_VISIBLE_MS)
                 hint = null
