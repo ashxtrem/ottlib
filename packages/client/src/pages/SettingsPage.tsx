@@ -20,6 +20,7 @@ import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection
 import { ProfilesSettingsSection } from '../components/ProfilesSettingsSection';
 import { useAuthStatus } from '../hooks/useAccessPin';
 import { SubtitleSettingsSection } from '../components/SubtitleSettingsSection';
+import { PlayerSettingsSection } from '../components/PlayerSettingsSection';
 import { TranscodeSettingsSection } from '../components/settings/TranscodeSettingsSection';
 
 export function SettingsPage() {
@@ -98,6 +99,7 @@ export function SettingsPage() {
       <p className="mt-2 text-xs text-muted">This preference is saved on this device and applies immediately.</p>
     </section>
 
+    <PlayerSettingsSection />
     <AccessPinSettingsSection />
     <ProfilesSettingsSection />
     <SubtitleSettingsSection />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { upNextPhase, type UpNextInput } from './upNextTiming';
+import { reachedStartAt, upNextPhase, type UpNextInput } from './upNextTiming';
 
 const base: UpNextInput = { hasNext: true, cancelled: false, positionMs: 0, durationMs: 1_500_000, endedAtMs: null, nowMs: 0 };
 
@@ -15,6 +15,26 @@ describe('upNextPhase', () => {
     expect(upNextPhase({ ...base, endedAtMs: 5_000, nowMs: 5_001 })).toEqual({ kind: 'countdown', secondsLeft: 10 });
     expect(upNextPhase({ ...base, endedAtMs: 5_000, nowMs: 14_500 })).toEqual({ kind: 'countdown', secondsLeft: 1 });
     expect(upNextPhase({ ...base, endedAtMs: 5_000, nowMs: 15_000 })).toEqual({ kind: 'advance' });
+  });
+
+  it('with a start-at (the credits), skips the 20 s preview and counts down from the credits start', () => {
+    const credits = { ...base, startAtMs: 1_400_000 };
+    expect(upNextPhase({ ...credits, positionMs: 1_399_999 })).toEqual({ kind: 'hidden' });
+    // Not reached yet (the hook sets endedAtMs when the position reaches the start): no preview, even in the last 20 s.
+    expect(upNextPhase({ ...credits, positionMs: 1_480_000 })).toEqual({ kind: 'hidden' });
+    expect(upNextPhase({ ...credits, positionMs: 1_400_000, endedAtMs: 7_000, nowMs: 7_000 })).toEqual({ kind: 'countdown', secondsLeft: 10 });
+    expect(upNextPhase({ ...credits, positionMs: 1_409_000, endedAtMs: 7_000, nowMs: 17_000 })).toEqual({ kind: 'advance' });
+    expect(upNextPhase({ ...credits, cancelled: true, endedAtMs: 7_000, nowMs: 8_000 })).toEqual({ kind: 'hidden' });
+  });
+
+  it('keeps the 20 s preview when the start-at is null', () => {
+    expect(upNextPhase({ ...base, startAtMs: null, positionMs: 1_480_000 })).toEqual({ kind: 'preview' });
+  });
+
+  it('reachedStartAt only with a start-at at or before the position', () => {
+    expect(reachedStartAt(1_400_000, 1_400_000)).toBe(true);
+    expect(reachedStartAt(1_399_999, 1_400_000)).toBe(false);
+    expect(reachedStartAt(1_400_000, null)).toBe(false);
   });
 
   it('shows nothing after Cancel, without a next one, or while the duration is unknown', () => {
