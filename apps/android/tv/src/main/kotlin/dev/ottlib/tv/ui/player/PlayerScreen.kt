@@ -86,6 +86,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                         if (nextId != null) onNext(nextId) else onExit()
                     }
                 },
+                framePreview = viewModel::framePreviewUrl,
             )
         }
     }

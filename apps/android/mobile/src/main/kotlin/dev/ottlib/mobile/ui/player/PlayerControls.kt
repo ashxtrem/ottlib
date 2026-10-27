@@ -3,6 +3,7 @@ package dev.ottlib.mobile.ui.player
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -53,6 +54,10 @@ class PlayerActions(
     val onSkip: (SeekDirection) -> Unit,
     val onSeekTo: (Long) -> Unit,
     val onScrubbing: (Boolean) -> Unit,
+    /** Every drag step: moves the video (direct play) or asks for a preview frame (server session). */
+    val onScrubTo: (Long) -> Unit,
+    /** The preview frame to show above the thumb while scrubbing a server session. */
+    val scrubFrame: String?,
     val onTracks: () -> Unit,
     val onPicture: () -> Unit,
     /** Null when the device has no picture-in-picture. */
@@ -104,7 +109,10 @@ fun TransportControls(snapshot: PlaybackSnapshot, skipBackMs: Long, skipForwardM
     }
 }
 
-/** Position, a draggable seek bar and the duration. The bar previews the scrub position and seeks once on release. */
+/**
+ * Position, a draggable seek bar and the duration. Dragging scrubs live (the video moves, or a server session shows
+ * a preview frame above the thumb); release seeks exactly once.
+ */
 @Composable
 fun SeekBar(snapshot: PlaybackSnapshot, actions: PlayerActions, modifier: Modifier = Modifier) {
     var scrub by remember { mutableStateOf<Float?>(null) }
@@ -112,21 +120,26 @@ fun SeekBar(snapshot: PlaybackSnapshot, actions: PlayerActions, modifier: Modifi
     val fraction = scrub ?: if (duration > 0) (snapshot.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         TimeLabel(formatPosition(scrub?.let { (it * duration).toLong() } ?: snapshot.positionMs))
-        Slider(
-            value = fraction,
-            onValueChange = {
-                if (scrub == null) actions.onScrubbing(true)
-                scrub = it
-            },
-            onValueChangeFinished = {
-                scrub?.let { actions.onSeekTo((it * duration).toLong()) }
-                scrub = null
-                actions.onScrubbing(false)
-            },
-            enabled = duration > 0,
-            colors = SliderDefaults.colors(thumbColor = OttlibColors.Accent, activeTrackColor = OttlibColors.Accent, inactiveTrackColor = Color.White.copy(alpha = 0.3f)),
-            modifier = Modifier.weight(1f),
-        )
+        Box(Modifier.weight(1f)) {
+            Slider(
+                value = fraction,
+                onValueChange = {
+                    if (scrub == null) actions.onScrubbing(true)
+                    scrub = it
+                    actions.onScrubTo((it * duration).toLong())
+                },
+                onValueChangeFinished = {
+                    scrub?.let { actions.onSeekTo((it * duration).toLong()) }
+                    scrub = null
+                    actions.onScrubbing(false)
+                },
+                enabled = duration > 0,
+                colors = SliderDefaults.colors(thumbColor = OttlibColors.Accent, activeTrackColor = OttlibColors.Accent, inactiveTrackColor = Color.White.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            val frame = actions.scrubFrame
+            if (scrub != null && frame != null) FramePreviewAboveThumb(frame, fraction, Modifier.matchParentSize())
+        }
         TimeLabel(formatPosition(duration))
     }
 }

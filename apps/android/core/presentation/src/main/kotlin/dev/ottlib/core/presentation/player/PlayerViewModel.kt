@@ -16,6 +16,7 @@ import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.model.TrackChoice
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
+import dev.ottlib.core.player.framePreviewPath
 import dev.ottlib.core.player.PlayerSettings
 import dev.ottlib.core.player.ProgressReporter
 import dev.ottlib.core.player.PlaybackSession
@@ -102,6 +103,8 @@ class PlayerViewModel(
     private var fallback: Job? = null
     /** The server's remux/transcode session behind the current HLS source; stopped on release or a new source. */
     private var serverSession: String? = null
+    /** The server session's frame preview template; scrubbing shows its frames instead of seeking. */
+    @Volatile private var frameTemplate: String? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
     val subtitles = SubtitleSearchController(api, movieId, viewModelScope,
@@ -120,6 +123,9 @@ class PlayerViewModel(
 
     val streamUrl: String? get() = api.resolve("/api/stream/$movieId")
     val title: String get() = movie?.title ?: ""
+
+    /** A preview frame near [positionMs] while playing via the server, else null (direct play scrubs the real video). */
+    fun framePreviewUrl(positionMs: Long): String? = frameTemplate?.let { api.resolve(framePreviewPath(it, positionMs)) }
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
@@ -306,6 +312,7 @@ class PlayerViewModel(
                 }
             serverSession?.let(::stopServerSession)
             serverSession = source.sessionUrl
+            frameTemplate = source.framePreviewUrl.takeIf { source.sessionUrl != null }
             area.value = source.pictureArea
             active.setMediaItem(item, request.startMs ?: 0)
             active.prepare()
@@ -366,6 +373,7 @@ class PlayerViewModel(
         session = null
         serverSession?.let(::stopServerSession)
         serverSession = null
+        frameTemplate = null
     }
 
     override fun onCleared() = releasePlayback()

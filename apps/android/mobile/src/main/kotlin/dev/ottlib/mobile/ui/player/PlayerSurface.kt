@@ -41,6 +41,8 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
+import dev.ottlib.core.player.ExoScrubTarget
+import dev.ottlib.core.player.ScrubController
 import dev.ottlib.core.player.SeekDirection
 import dev.ottlib.core.presentation.player.CreditsController
 import dev.ottlib.core.presentation.player.PlayerControls
@@ -76,6 +78,8 @@ fun PlayerSurface(
     /** The up-next countdown's message while it runs during playback (it started at the credits). */
     upNext: String?,
     onSkipCredits: () -> Unit,
+    /** A preview frame URL near a position on "Play via server"; null on direct play, where scrubbing moves the video. */
+    framePreview: (Long) -> String?,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current as? MainActivity
@@ -93,6 +97,10 @@ fun PlayerSurface(
 
     val seeker = remember(player, controls) { TouchSeeker(player, controls.skipBackMs, controls.skipForwardMs) { hint = it } }
     DisposableEffect(seeker) { onDispose { seeker.release() } }
+    var frame by remember { mutableStateOf<String?>(null) }
+    val frameUrl by rememberUpdatedState(framePreview)
+    val scrubber = remember(player) { ScrubController(ExoScrubTarget(player), frameUrl = { frameUrl(it) }, onFrame = { frame = it }) }
+    DisposableEffect(scrubber) { onDispose { scrubber.cancel() } }
     val brightness = remember(activity) { activity?.window?.let(::ScreenBrightness) }
     DisposableEffect(brightness) { onDispose { brightness?.reset() } }
     val volume = remember(context) { MediaVolume(context) }
@@ -141,8 +149,13 @@ fun PlayerSurface(
             seeker.tap(it)
             interactions++
         },
-        onSeekTo = player::seekTo,
-        onScrubbing = { scrubbing = it },
+        onSeekTo = scrubber::end,
+        onScrubbing = {
+            scrubbing = it
+            if (it) scrubber.begin()
+        },
+        onScrubTo = scrubber::scrubTo,
+        scrubFrame = frame,
         onTracks = { panel = Panel.Tracks },
         onPicture = { panel = Panel.Picture },
         onPictureInPicture = activity?.takeIf { it.supportsPictureInPicture() }?.let { host -> { host.enterPictureInPicture(player, area) } },
