@@ -247,3 +247,19 @@ What runs alongside what:
 
 ## 12. Progress log
 - 2026-10-27: plan written and approved (by the advisor, Fable 5.1 · high; the user decided the server-PC question).
+- 2026-10-27: built by /plan-runner (run 20261027-player-polish), 11 tasks, each reviewed; two gates (Fable 5.1 · high) approved.
+  - Plan-check corrections: a scan never changes path or duration in place, so credits reset on the size/mtime reset and
+    on a probe that changes the duration (`clearMediaInfo` now keeps `duration_ms` until the new probe writes it); the TV
+    `ON_STOP` pause sits outside the `Ended` branch.
+  - Frame preview: 1080p 320 px frame 5.5 KB. Grabs stop one 2 s step before the end; t is capped at 24 h when the
+    duration is unknown; one retry without `-skip_frame` past the last keyframe. Cancel-older keys on `x-device-id`, else
+    IP + User-Agent.
+  - Android uses Media3 scrubbing mode (present in 1.8.0), not the CLOSEST_SYNC fallback.
+  - Web subtitles now render in an overlay inside the visible picture (track mode `hidden`), so zoom modes keep them on
+    screen; iOS native fullscreen switches the track back to `showing`.
+  - Track memory never burns in a remembered subtitle (Android doesn't either); "off" is remembered only when it hid one.
+  - Scrubbing freezes the position seen by credits and up next on both clients, never reaches the exact end, and sends no
+    progress saves mid-drag.
+  - Checks: web 135 test files / 761 tests pass; Android unit tests and both app compiles pass.
+  - Left open: `movieRepository.ts` is ~577 lines (split the credits/picture-area columns out next); a failed auto-skip
+    save also cancels the end-of-title countdown on web; nothing was tried on a device or in a browser.
