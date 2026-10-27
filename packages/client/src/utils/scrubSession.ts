@@ -1,4 +1,4 @@
-import { SCRUB_INTERVAL_MS, createThrottle, frameTimeMs, frameUrl } from './scrubTiming';
+import { FRAME_STEP_MS, SCRUB_INTERVAL_MS, createThrottle, frameTimeMs, frameUrl } from './scrubTiming';
 
 /** The part of a `<video>` a live seek touches. */
 export interface LiveSeekTarget {
@@ -7,9 +7,12 @@ export interface LiveSeekTarget {
   fastSeek?: (seconds: number) => void;
 }
 
-/** A seek that may land on a nearby keyframe (`fastSeek` where the browser has it) and stays inside the film. */
+/**
+ * A seek that may land on a nearby keyframe (`fastSeek` where the browser has it) and stays inside the film: one frame
+ * step short of a known end (as `frameTimeMs` does), because landing on the exact end fires `ended` in the middle of the drag.
+ */
 export function liveSeek(video: LiveSeekTarget, seconds: number): void {
-  const end = Number.isFinite(video.duration) ? video.duration : Number.POSITIVE_INFINITY;
+  const end = Number.isFinite(video.duration) ? Math.max(0, video.duration - FRAME_STEP_MS / 1000) : Number.POSITIVE_INFINITY;
   const clamped = Math.min(Math.max(0, seconds), end);
   if (typeof video.fastSeek === 'function') video.fastSeek(clamped); else video.currentTime = clamped;
 }

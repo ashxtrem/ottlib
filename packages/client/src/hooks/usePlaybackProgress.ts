@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { api } from './apiClient';
 import { isRealVideoEnd, type EndGuard } from '../utils/playbackEnd';
 import { progressAction, progressBody, type ProgressTrigger } from '../utils/progressSchedule';
@@ -10,6 +10,8 @@ interface ProgressOptions {
   shelfId?: number;
   /** An `ended` that isn't a real end (mid-file on an HLS source) doesn't post complete. */
   endGuard: EndGuard;
+  /** True while the seek bar is dragged: the live seeks don't report; the release seek does, once. */
+  scrubbing?: RefObject<boolean>;
 }
 
 /**
@@ -18,7 +20,7 @@ interface ProgressOptions {
  * and the last one survives the page closing. `complete()` posts complete now (skipping the credits) and stops the
  * later PUTs, so the leave on the way out doesn't save a resume position in the credits.
  */
-export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, fallbackDurationMs, shelfId, endGuard }: ProgressOptions): { complete: () => Promise<void> } {
+export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, fallbackDurationMs, shelfId, endGuard, scrubbing }: ProgressOptions): { complete: () => Promise<void> } {
   const guardRef = useRef(endGuard); guardRef.current = endGuard;
   const completed = useRef(false);
   // Keeps the last known duration of this movie: a track switch renders the page without a source (null) while the
@@ -48,7 +50,7 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
     const remember = () => { if (video.readyState > 0) lastPosition.ms = video.currentTime * 1000; };
     const onTick = () => { remember(); if (!video.paused) send('tick'); };
     const onPause = () => send('pause');
-    const onSeeked = () => { remember(); send('seeked'); };
+    const onSeeked = () => { remember(); if (!scrubbing?.current) send('seeked'); };
     const onEnded = () => { if (isRealVideoEnd(video, guardRef.current)) send('ended'); };
     const onLeave = () => send('leave');
     video.addEventListener('timeupdate', onTick);
@@ -66,7 +68,7 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
       remember();
       if (lastPosition.ms > 0) send('leave', lastPosition.ms);
     };
-  }, [video, movieId, shelfId]);
+  }, [video, movieId, shelfId, scrubbing]);
 
   const complete = useCallback(async () => {
     completed.current = true;

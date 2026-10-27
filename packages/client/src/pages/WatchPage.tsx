@@ -16,6 +16,7 @@ import { useCreditsActions } from '../hooks/useCreditsActions';
 import { useFullscreen, type FullscreenControls } from '../hooks/useFullscreen';
 import { usePlaybackProgress } from '../hooks/usePlaybackProgress';
 import { usePlaybackSource } from '../hooks/usePlaybackSource';
+import { useHeldPosition } from '../hooks/useHeldPosition';
 import { useScrub } from '../hooks/useScrub';
 import { usePlayerCommands } from '../hooks/usePlayerCommands';
 import { usePlayerShortcuts } from '../hooks/usePlayerShortcuts';
@@ -85,10 +86,12 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   const lastFalseEnd = useRef<number | null>(null);
   const endGuardMs = source?.kind === 'hls' ? source.durationMs ?? null : null;
   const endGuard = useMemo<EndGuard>(() => ({ durationMs: endGuardMs, lastFalseEnd }), [endGuardMs]);
-  const { complete } = usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard });
+  const scrub = useScrub(video, source);
+  const { complete } = usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard, scrubbing: scrub.scrubbingRef });
   const state = useVideoState(video, source?.durationMs ?? null, endGuard);
   const commands = usePlayerCommands(video);
-  const scrub = useScrub(video, source);
+  // Credits and up next see the pre-drag position until release, so a direct-play drag can't start their countdown.
+  const creditsPositionMs = useHeldPosition(state.positionMs, scrub.scrubbing);
   const finder = useSubtitleFinder(movieId);
   const controls = useAutoHide(state.paused || menu !== null || finder.open);
 
@@ -127,7 +130,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   const creditsActions = useCreditsActions(movieId, playback.patchSource);
   const credits = useCredits({
     movieId, shelfId, credits: source?.credits ?? null, autoSkip: source?.autoSkipCredits ?? false,
-    positionMs: state.positionMs, durationMs: state.durationMs, ended: state.ended, paused: state.paused,
+    positionMs: creditsPositionMs, durationMs: state.durationMs, ended: state.ended, paused: state.paused,
     markedHereMs: creditsActions.markedHereMs, complete
   });
   const upNext = credits.upNext;
