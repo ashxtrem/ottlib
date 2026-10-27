@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { AccessPinService } from '../services/accessPinService.js';
 import { embeddedSubtitleRoute } from './embeddedSubtitles.js';
+import { frameRoute } from './frames.js';
 import { hlsRoutes } from './hls.js';
 import { sessionToken } from './sessionCookie.js';
 
@@ -11,7 +12,7 @@ import { sessionToken } from './sessionCookie.js';
 const publicRoutes = new Set(['/api/server-info', '/api/auth/status', '/api/auth/login', '/api/profiles/reset-local']);
 /** Routes an external player may open with the per-movie `?key=` from the playback source instead of a session. */
 const streamKeyRoutes = new Set<string>([
-  '/api/stream/:id', '/api/stream/:id/playlist.m3u', '/api/movies/:id/subtitles/:order', embeddedSubtitleRoute, hlsRoutes.playlist, hlsRoutes.init, hlsRoutes.segment
+  '/api/stream/:id', '/api/stream/:id/playlist.m3u', '/api/movies/:id/subtitles/:order', embeddedSubtitleRoute, frameRoute, hlsRoutes.playlist, hlsRoutes.init, hlsRoutes.segment
 ]);
 
 /**
