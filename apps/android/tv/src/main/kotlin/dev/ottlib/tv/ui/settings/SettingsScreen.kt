@@ -45,6 +45,7 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onOpenHidden: () -> Uni
     val playback by viewModel.playback.collectAsStateWithLifecycle()
     val languages by viewModel.languageOptions.collectAsStateWithLifecycle()
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
+    val autoSkip by viewModel.autoSkipDefaults.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
     val hiddenCount by remember { container.hiddenTitles.titles.map { it.size } }.collectAsStateWithLifecycle(initialValue = 0)
     val switchFocus = rememberSwitchProfileFocus()
@@ -115,6 +116,10 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onOpenHidden: () -> Uni
                 headlineContent = { Text("Auto-play next") },
                 supportingContent = { Text(autoPlaySummary(playback.autoPlayNextSeconds)) },
             )
+            autoSkip?.let { defaults ->
+                AutoSkipSetting("Skip credits in movies", defaults.movie) { viewModel.setAutoSkipDefaults(defaults.copy(movie = it)) }
+                AutoSkipSetting("Skip credits in series", defaults.tv) { viewModel.setAutoSkipDefaults(defaults.copy(tv = it)) }
+            }
             Text(
                 "During playback, hold OK for picture options. Audio and subtitle tracks are in the player's settings and CC buttons; your choice is remembered for each title.",
                 style = MaterialTheme.typography.bodySmall,
@@ -154,6 +159,18 @@ fun SettingsScreen(onNavigate: (TopDestination) -> Unit, onOpenHidden: () -> Uni
 
 private fun secondsChoices(values: List<Int>) = values.map { Choice("$it seconds", it) }
 private fun autoPlayChoices() = PlaybackSettings.AUTO_PLAY_CHOICES.map { Choice(if (it == 0) "Off" else "After $it seconds", it) }
+
+/** An on/off row for the profile's auto-skip default; the player's Credits panel overrides it per movie or series. */
+@Composable
+private fun AutoSkipSetting(title: String, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    ListItem(
+        selected = false,
+        onClick = { onChange(!enabled) },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(if (enabled) "Up next starts when the credits do" else "A Skip credits button shows during the credits") },
+        trailingContent = { Text(if (enabled) "On" else "Off", color = if (enabled) OttlibColors.Accent else OttlibColors.Muted) },
+    )
+}
 
 @Composable
 internal fun SectionTitle(text: String) {

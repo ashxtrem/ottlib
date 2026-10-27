@@ -8,6 +8,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,24 +29,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.SeekDirection
+import dev.ottlib.core.presentation.player.CreditsController
 import dev.ottlib.core.presentation.player.PlayerControls
+import dev.ottlib.core.presentation.player.creditsSummary
 import dev.ottlib.core.presentation.player.SubtitleSearchController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ottlib.mobile.MainActivity
 import kotlinx.coroutines.delay
 
-private enum class Panel { Tracks, Picture, Subtitles }
+private enum class Panel { Tracks, Picture, Subtitles, Credits }
 
 /**
  * The video with touch controls. Flat, the controls float over the video and fade while it plays; half-folded
@@ -64,11 +72,16 @@ fun PlayerSurface(
     onPlayElsewhere: () -> Unit,
     subtitles: SubtitleSearchController,
     onFindSubtitles: () -> Unit,
+    credits: CreditsController,
+    /** The up-next countdown's message while it runs during playback (it started at the credits). */
+    upNext: String?,
+    onSkipCredits: () -> Unit,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current as? MainActivity
     val snapshot by rememberPlaybackSnapshot(player)
     val subtitleState by subtitles.uiState.collectAsStateWithLifecycle()
+    val creditsState by credits.state.collectAsStateWithLifecycle()
     var controlsVisible by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<Panel?>(null) }
     var scrubbing by remember { mutableStateOf(false) }
@@ -162,6 +175,13 @@ fun PlayerSurface(
         movableContentOf { mode: PictureMode, picture: PictureArea?, modifier: Modifier -> VideoView(player, mode, picture, modifier) }
     }
     val touch = Modifier.fillMaxSize().playerGestures { gestures }
+    // No pill in picture-in-picture (the early countdown still fires); it sits on the video, so on the top half in tabletop.
+    val pillUpNext = upNext.takeIf { creditsState.counting }
+    val pill = @Composable { modifier: Modifier ->
+        if (!inPictureInPicture && panel == null && (creditsState.showSkip || pillUpNext != null)) {
+            CreditsPill(pillUpNext, onSkip = onSkipCredits, onWatchCredits = credits::watchCredits, modifier = modifier)
+        }
+    }
 
     Box(
         Modifier.fillMaxSize().background(Color.Black).onGloballyPositioned { area = it.boundsInWindow() },
@@ -172,6 +192,7 @@ fun PlayerSurface(
                 Box(touch)
                 AnimatedVisibility(controlsVisible, enter = fadeIn(), exit = fadeOut()) { OverlayControls(title, snapshot, controls, actions) }
                 PlayerHintOverlay(hint)
+                pill(Modifier.align(Alignment.BottomEnd).windowInsetsPadding(WindowInsets.safeDrawing).padding(end = 16.dp, bottom = if (controlsVisible) PILL_ABOVE_CONTROLS else 16.dp))
             }
         } else {
             Column(Modifier.fillMaxSize()) {
@@ -179,13 +200,17 @@ fun PlayerSurface(
                     video(pictureMode, pictureArea, Modifier.fillMaxSize())
                     Box(touch)
                     PlayerHintOverlay(hint)
+                    pill(Modifier.align(Alignment.BottomEnd).padding(16.dp))
                 }
                 Spacer(Modifier.height(split.hinge))
                 TabletopControls(title, snapshot, controls, actions, Modifier.weight(1f).fillMaxWidth())
             }
         }
         when (panel) {
-            Panel.Tracks -> TrackPanel(player, onFindSubtitles = { onFindSubtitles(); panel = Panel.Subtitles }, onDismiss = { panel = null })
+            Panel.Tracks -> TrackPanel(player, onFindSubtitles = { onFindSubtitles(); panel = Panel.Subtitles },
+                creditsSummary = creditsSummary(creditsState.credits), onCredits = { panel = Panel.Credits }, onDismiss = { panel = null })
+            Panel.Credits -> CreditsPanel(creditsState, player.currentPosition, onMark = { credits.mark(player.currentPosition) },
+                onClearMark = credits::clearMark, onAutoSkip = credits::chooseAutoSkip, onDismiss = { panel = null })
             Panel.Subtitles -> SubtitlePanel(subtitleState, subtitles, onRetry = onFindSubtitles, onDismiss = { panel = null })
             Panel.Picture -> PicturePanel(pictureMode, onChoose = onPictureModeChosen, onDismiss = { panel = null })
             null -> Unit
@@ -194,5 +219,7 @@ fun PlayerSurface(
 }
 
 private const val CONTROLS_VISIBLE_MS = 3_500L
+/** Clears the overlay's seek bar and button row. */
+private val PILL_ABOVE_CONTROLS = 112.dp
 private const val PICTURE_HINT_DELAY_MS = 1_500L
 private const val PICTURE_HINT_VISIBLE_MS = 4_000L
