@@ -48,18 +48,28 @@ describe('playbackSourceSchema', () => {
       audioTracks: [{ order: 0, language: 'eng', title: null, codec: 'eac3', channels: 6, isDefault: true }],
       audioOrder: 0,
       burnInSubtitles: [{ order: 0, language: 'eng', title: null, codec: 'hdmv_pgs_subtitle', isForced: false }],
-      burnSubtitleOrder: 0
+      burnSubtitleOrder: 0,
+      credits: { startMs: 6_700_000, source: 'chapter' },
+      autoSkipCredits: true,
+      framePreviewUrl: '/api/movies/1/frame?key=abc'
     };
     expect(playbackSourceSchema.parse(hls)).toEqual(hls);
   });
 
   it('carries a picture area as fractions, or null, or nothing', () => {
-    const base = { kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/mp4', durationMs: null, resumePositionMs: null, subtitles: [] };
+    const base = { kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/mp4', durationMs: null, resumePositionMs: null, subtitles: [], credits: null, autoSkipCredits: false, framePreviewUrl: '/api/movies/1/frame?' };
     const pictureArea = { x: 0, y: 0.125, width: 1, height: 0.75 };
     expect(playbackSourceSchema.parse({ ...base, pictureArea }).pictureArea).toEqual(pictureArea);
     expect(playbackSourceSchema.parse({ ...base, pictureArea: null }).pictureArea).toBeNull();
     expect(playbackSourceSchema.parse(base).pictureArea).toBeUndefined();
     expect(playbackSourceSchema.safeParse({ ...base, pictureArea: { ...pictureArea, height: 1.5 } }).success).toBe(false);
+  });
+
+  it('requires the credits fields and refuses an unknown credits source', () => {
+    const base = { kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/mp4', durationMs: null, resumePositionMs: null, subtitles: [], autoSkipCredits: false, framePreviewUrl: '/api/movies/1/frame?' };
+    expect(playbackSourceSchema.parse({ ...base, credits: { startMs: 1000, source: 'series' } }).credits).toEqual({ startMs: 1000, source: 'series' });
+    expect(playbackSourceSchema.safeParse(base).success).toBe(false);
+    expect(playbackSourceSchema.safeParse({ ...base, credits: { startMs: 1000, source: 'guess' } }).success).toBe(false);
   });
 });
 

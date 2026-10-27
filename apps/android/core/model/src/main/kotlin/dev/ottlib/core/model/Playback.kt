@@ -21,6 +21,11 @@ data class PlaybackSource(
     val burnSubtitleOrder: Int? = null,
     // Null when not detected yet, the frame size is unknown, or burned-in subtitles sit in the bars.
     val pictureArea: PictureArea? = null,
+    // Null when no mark, credit chapter or sibling episode tells where the credits start.
+    val credits: Credits? = null,
+    val autoSkipCredits: Boolean = false,
+    // Server-relative and always with a query string: append `&t=<ms>`, then resolve it like any other URL.
+    val framePreviewUrl: String? = null,
 )
 
 /** Mirrors `pictureAreaSchema`: the real picture inside the frame as fractions (0..1) of frame width and height. */

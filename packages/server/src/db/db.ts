@@ -23,6 +23,7 @@ import { ensureProfiles } from './migrations/019_profiles.js';
 import { ensureProfileScope } from './migrations/020_profile_scope.js';
 import { ensureStreamSecretRotated } from './migrations/021_stream_secret_rotation.js';
 import { ensurePictureArea } from './migrations/022_picture_area.js';
+import { ensureCredits } from './migrations/023_credits.js';
 
 export function createDatabase(appDataPath: string): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
@@ -52,5 +53,6 @@ export function createDatabase(appDataPath: string): Database.Database {
   ensureProfileScope(db);
   ensureStreamSecretRotated(db);
   ensurePictureArea(db);
+  ensureCredits(db);
   return db;
 }

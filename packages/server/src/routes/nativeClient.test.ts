@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PROFILE_SESSION_HEADER, authStatusSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { PROFILE_SESSION_HEADER, authStatusSchema, autoSkipDefaultsSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
@@ -196,10 +196,11 @@ describe('native client endpoints', () => {
       const response = await app.inject({ method: 'GET', url: '/api/movies/1/playback', headers });
       expect(response.statusCode).toBe(200);
       const source = playbackSourceSchema.parse(response.json());
-      expect(source).toMatchObject({ kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/x-matroska', durationMs: 6_960_000, resumePositionMs: null });
+      expect(source).toMatchObject({ kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/x-matroska', durationMs: 6_960_000, resumePositionMs: null, autoSkipCredits: false, framePreviewUrl: '/api/movies/1/frame?' });
       expect(source.subtitles).toHaveLength(1);
       expect(source.subtitles[0]).toMatchObject({ language: 'eng', codec: 'SRT' });
       await snapshot('playback-source', source, media);
+      expect(source.credits).toBeNull();
 
       const subtitle = await app.inject({ method: 'GET', url: source.subtitles[0].url });
       expect(subtitle.statusCode).toBe(200);
@@ -214,6 +215,7 @@ describe('native client endpoints', () => {
     const open = vi.fn<HlsSessionOpener['open']>().mockResolvedValue({ playlistUrl: '/api/hls/1/session-1/main.m3u8', sessionUrl: '/api/hls/1/session-1' });
     const { app, db, media } = fixture({ sessions: { open }, ffmpegAvailable: async () => true });
     try {
+      new MovieRepository(db).applyCreditsChapter(1, 6_780_000);
       // A client that plays only H.264/AAC in MP4: the HDR10 HEVC MKV (no readable Cues) must be transcoded with tone mapping.
       const query = 'containers=mp4,webm&video=h264&audio=aac&hdr=false&audioOrder=1&burnSubtitleOrder=2&startMs=90000';
       const response = await app.inject({ method: 'GET', url: `/api/movies/1/playback?${query}`, headers });
@@ -221,6 +223,7 @@ describe('native client endpoints', () => {
       const source = playbackSourceSchema.parse(response.json());
       expect(source).toMatchObject({ kind: 'hls', streamUrl: '/api/hls/1/session-1/main.m3u8', mimeType: 'application/vnd.apple.mpegurl', mode: 'transcode', sessionUrl: '/api/hls/1/session-1', audioOrder: 1, burnSubtitleOrder: 2 });
       expect(source.reasons).toEqual(['container', 'video-codec', 'audio-codec', 'burn-in', 'hdr']);
+      expect(source.credits).toEqual({ startMs: 6_780_000, source: 'chapter' });
       expect(open).toHaveBeenCalledWith(expect.objectContaining({ deviceId: device, startMs: 90_000, keyframesMs: [], decision: expect.objectContaining({ mode: 'transcode', toneMap: true, audioCopy: false }) }));
       await snapshot('playback-source-hls', source, media);
 
@@ -246,6 +249,18 @@ describe('native client endpoints', () => {
       expect(noFfmpeg).toMatchObject({ kind: 'direct', mode: 'direct', streamUrl: '/api/stream/1' });
       expect(noFfmpeg.reasons).toContain('ffmpeg-missing');
     } finally { await app.close(); db.close(); await bare.close(); bareDb.close(); }
+  });
+
+  it('reads and sets the profile auto-skip defaults', async () => {
+    const { app, db, media } = fixture();
+    try {
+      const saved = await app.inject({ method: 'PUT', url: '/api/profiles/current/auto-skip', headers, payload: { movie: true, tv: true } });
+      expect(saved.statusCode).toBe(200);
+      const defaults = autoSkipDefaultsSchema.parse((await app.inject({ method: 'GET', url: '/api/profiles/current/auto-skip', headers })).json());
+      expect(defaults).toEqual({ movie: true, tv: true });
+      await snapshot('auto-skip-defaults', defaults, media);
+      expect(playbackSourceSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/1/playback', headers })).json()).autoSkipCredits).toBe(true);
+    } finally { await app.close(); db.close(); }
   });
 
   it('records progress, lists continue watching, and clears it when marked watched', async () => {
@@ -350,6 +365,7 @@ describe('native client endpoints', () => {
 
       const source = playbackSourceSchema.parse((await app.inject({ method: 'GET', url: '/api/movies/1/playback', headers: authorized })).json());
       expect(source.streamUrl).toMatch(/^\/api\/stream\/1\?key=[\w-]+$/);
+      expect(source.framePreviewUrl).toBe(source.streamUrl.replace('/api/stream/1', '/api/movies/1/frame'));
       expect((await app.inject({ method: 'HEAD', url: source.streamUrl })).statusCode).toBe(200);
       expect((await app.inject({ method: 'GET', url: source.subtitles[0].url })).statusCode).toBe(200);
       expect((await app.inject({ method: 'HEAD', url: '/api/stream/1' })).statusCode).toBe(401);

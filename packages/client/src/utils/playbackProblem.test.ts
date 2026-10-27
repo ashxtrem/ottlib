@@ -3,7 +3,7 @@ import type { PlaybackSource } from '@ottlib/shared';
 import { ApiError } from '../hooks/apiClient';
 import { playbackProblem } from './playbackProblem';
 
-const source = (reasons?: string[]): PlaybackSource => ({ kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/x-matroska', durationMs: 1000, resumePositionMs: null, subtitles: [], reasons });
+const source = (reasons?: string[]): PlaybackSource => ({ kind: 'direct', streamUrl: '/api/stream/1', mimeType: 'video/x-matroska', durationMs: 1000, resumePositionMs: null, subtitles: [], reasons, credits: null, autoSkipCredits: false, framePreviewUrl: '/api/movies/1/frame?' });
 
 describe('playbackProblem', () => {
   it('explains a missing ffmpeg', () => {

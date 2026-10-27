@@ -26,11 +26,18 @@ interface MovieListItemRow {
 }
 
 /** Every episode of a show shares this key, so a client can treat the show as one hideable title. */
-function showKeyOf(row: { metadata_media_type: string | null; imdb_id: string | null; metadata_source: string | null; provider_id: string | null }): string | null {
+export function showKeyOf(row: { metadata_media_type: string | null; imdb_id: string | null; metadata_source: string | null; provider_id: string | null }): string | null {
   if (row.metadata_media_type !== 'tv') return null;
   if (row.imdb_id?.trim()) return `tv:imdb:${row.imdb_id.trim()}`;
   return row.metadata_source && row.provider_id ? `tv:${row.metadata_source}:${row.provider_id}` : null;
 }
+
+interface CreditsDbRow {
+  id: number; credits_mark_ms: number | null; credits_chapter_ms: number | null; duration_ms: number | null;
+  metadata_media_type: 'movie' | 'tv' | null; imdb_id: string | null; metadata_source: string | null; provider_id: string | null;
+}
+/** A title's own credits data: the mark, the chapter start (null until read or when there is none), and what series learning compares. */
+export interface CreditsRow { id: number; markMs: number | null; chapterMs: number | null; durationMs: number | null; mediaType: 'movie' | 'tv' | null; showKey: string | null }
 
 /** Matched, available titles with just the fields recommendations compare. */
 export interface RecommendationPoolRow {
@@ -273,6 +280,34 @@ export class MovieRepository {
       Pick<MovieRow, 'picture_x' | 'picture_y' | 'picture_width' | 'picture_height' | 'picture_status'> | undefined;
     if (row?.picture_status !== 'done' || row.picture_x === null || row.picture_y === null || row.picture_width === null || row.picture_height === null) return null;
     return { x: row.picture_x, y: row.picture_y, width: row.picture_width, height: row.picture_height };
+  }
+
+  /** Stores the chapter pass's answer (null: no credit chapter) and marks the file as read. */
+  public applyCreditsChapter(id: number, ms: number | null): void {
+    this.db.prepare("UPDATE movies SET credits_chapter_ms = ?, credits_status = 'done' WHERE id = ?").run(ms, id);
+  }
+
+  /** Sets or clears (null) the user's "credits start here" mark. */
+  public setCreditsMark(id: number, ms: number | null): void {
+    this.db.prepare('UPDATE movies SET credits_mark_ms = ? WHERE id = ?').run(ms, id);
+  }
+
+  /** What the credits resolver needs about one title; undefined when the title does not exist. */
+  public getCredits(id: number): CreditsRow | undefined {
+    const row = this.db.prepare(`SELECT id, credits_mark_ms, credits_chapter_ms, duration_ms, metadata_media_type, imdb_id, metadata_source, provider_id
+      FROM movies WHERE id = ?`).get(id) as CreditsDbRow | undefined;
+    return row && this.mapCredits(row);
+  }
+
+  /** Episodes of a show with a known duration and credits from a mark or a chapter (the only ones series learning trusts). */
+  public creditsOfShow(showKey: string): CreditsRow[] {
+    const rows = this.db.prepare(`SELECT id, credits_mark_ms, credits_chapter_ms, duration_ms, metadata_media_type, imdb_id, metadata_source, provider_id
+      FROM movies WHERE metadata_media_type = 'tv' AND duration_ms IS NOT NULL AND (credits_mark_ms IS NOT NULL OR credits_chapter_ms IS NOT NULL) ORDER BY id`).all() as CreditsDbRow[];
+    return rows.filter((row) => showKeyOf(row) === showKey).map((row) => this.mapCredits(row));
+  }
+
+  private mapCredits(row: CreditsDbRow): CreditsRow {
+    return { id: row.id, markMs: row.credits_mark_ms, chapterMs: row.credits_chapter_ms, durationMs: row.duration_ms, mediaType: row.metadata_media_type, showKey: showKeyOf(row) };
   }
 
   public applyMediaInfo(id: number, mediaInfo: ProbedMediaInfo): void {
