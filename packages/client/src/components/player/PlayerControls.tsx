@@ -36,7 +36,7 @@ interface PlayerControlsProps {
 }
 
 /** Bigger touch targets at phone width, compact from `md:` up. */
-const iconButton = 'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/15 md:h-10 md:w-10';
+const iconButton = 'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/15 sm:h-12 sm:w-12 md:h-10 md:w-10';
 
 /**
  * Play/pause, ±10 s, the seek bar with its buffered range, time, volume/mute, subtitles, audio, fullscreen and back.
@@ -52,13 +52,13 @@ export function PlayerControls(props: PlayerControlsProps) {
     </div>
     <div className={`absolute inset-x-0 bottom-0 z-10 flex flex-col gap-1 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-10 md:px-6 md:pb-4 ${fade}`}>
       <SeekBar positionMs={state.positionMs} durationMs={state.durationMs} bufferedMs={state.bufferedMs} onSeek={props.onSeekTo} />
-      <div className="flex items-center gap-1 md:gap-2">
+      <div className="flex items-center gap-0 sm:gap-1 md:gap-2">
         <button type="button" onClick={props.onTogglePlay} aria-label={state.paused ? 'Play' : 'Pause'} title={state.paused ? 'Play (k)' : 'Pause (k)'} className={`${iconButton} ${focusRing}`}>{state.paused ? <PlayGlyph /> : <PauseGlyph />}</button>
         <button type="button" onClick={() => props.onSeekBy(-SEEK_STEP_SECONDS)} aria-label="Back 10 seconds" title="Back 10 s (←)" className={`${iconButton} hidden sm:inline-flex ${focusRing}`}><BackTenGlyph /></button>
         <button type="button" onClick={() => props.onSeekBy(SEEK_STEP_SECONDS)} aria-label="Forward 10 seconds" title="Forward 10 s (→)" className={`${iconButton} hidden sm:inline-flex ${focusRing}`}><ForwardTenGlyph /></button>
         <button type="button" onClick={props.onToggleMute} aria-label={state.muted ? 'Unmute' : 'Mute'} title={state.muted ? 'Unmute (m)' : 'Mute (m)'} className={`${iconButton} ${focusRing}`}>{volumeLevel === 0 ? <MutedGlyph /> : <VolumeGlyph />}</button>
         <input type="range" aria-label="Volume" min={0} max={1} step={0.05} value={volumeLevel} onChange={(event) => props.onVolume(Number(event.currentTarget.value))} className={`hidden h-1 w-24 cursor-pointer accent-white md:block ${focusRing}`} />
-        <span className="ml-1 whitespace-nowrap text-xs tabular-nums text-white/80 md:text-sm">{formatClock(state.positionMs)} / {formatClock(state.durationMs)}</span>
+        <span className="ml-1 whitespace-nowrap text-xs tabular-nums text-white/80 md:text-sm">{formatClock(state.positionMs)}<span className="hidden sm:inline"> / {formatClock(state.durationMs)}</span></span>
         <span className="flex-1" />
         {props.subtitleItems.length > 1 && <TrackMenu label="Subtitles" icon={<SubtitlesGlyph />} items={props.subtitleItems} open={menu === 'subtitles'} onOpenChange={(open) => onMenu(open ? 'subtitles' : null)} onSelect={(item) => props.onSelectSubtitle(item.choice)} buttonClassName={iconButton} />}
         {props.audioItems.length > 1 && <TrackMenu label="Audio" icon={<AudioGlyph />} items={props.audioItems} open={menu === 'audio'} onOpenChange={(open) => onMenu(open ? 'audio' : null)} onSelect={(item) => props.onSelectAudio(item.order)} buttonClassName={iconButton} />}

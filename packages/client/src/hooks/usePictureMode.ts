@@ -44,15 +44,47 @@ function notify(): void {
   listeners.forEach((listener) => listener());
 }
 
+/** `window.localStorage` throws a SecurityError when storage is blocked; null then. */
+export function safeStorage(): Storage | null {
+  try { return window.localStorage; } catch { return null; }
+}
+
+/** Holds what was picked when the browser store is blocked or refuses writes, so a pick still applies for the session. */
+export function memoryStorage(): StorageLike & { clear(): void } {
+  const data = new Map<string, string>();
+  return { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => { data.set(key, value); }, clear: () => data.clear() };
+}
+
+const sessionStore = memoryStorage();
+
+/** Keys whose last write the browser store refused: the session copy is the truth for those. */
+const sessionOnly = new Set<string>();
+
+/** The browser store when it works, the session copy when it is blocked or refuses a write. */
+export function pageStorage(): StorageLike {
+  const real = safeStorage();
+  return {
+    getItem: (key) => (!real || sessionOnly.has(key) ? sessionStore.getItem(key) : readRaw(real, key)),
+    setItem: (key, value) => {
+      sessionStore.setItem(key, value);
+      try {
+        if (!real) throw new Error('storage blocked');
+        real.setItem(key, value);
+        sessionOnly.delete(key);
+      } catch { sessionOnly.add(key); }
+    }
+  };
+}
+
 /** The raw stored strings are the snapshots: equal strings compare equal, so nothing re-renders without a change. */
-const rawModes = () => readRaw(localStorage, PICTURE_MODES_KEY);
-const rawDefault = () => readRaw(localStorage, PICTURE_DEFAULT_KEY);
+const rawModes = () => readRaw(pageStorage(), PICTURE_MODES_KEY);
+const rawDefault = () => readRaw(pageStorage(), PICTURE_DEFAULT_KEY);
 
 /** This device's default picture mode (used by titles with no mode of their own). */
 export function usePictureDefault() {
   const raw = useSyncExternalStore(subscribe, rawDefault, () => null);
   const defaultMode = useMemo(() => parsePictureDefault(raw), [raw]);
-  const setDefaultMode = useCallback((mode: PictureModeId) => { writePictureDefault(localStorage, mode); notify(); }, []);
+  const setDefaultMode = useCallback((mode: PictureModeId) => { writePictureDefault(pageStorage(), mode); notify(); }, []);
   return { defaultMode, setDefaultMode };
 }
 
@@ -62,6 +94,6 @@ export function usePictureMode(movieId: number) {
   const { defaultMode } = usePictureDefault();
   const modes = useMemo(() => parsePictureModes(raw), [raw]);
   const mode = pictureModeFor(modes, movieId, defaultMode);
-  const setMode = useCallback((next: PictureModeId) => { writePictureMode(localStorage, movieId, next); notify(); }, [movieId]);
+  const setMode = useCallback((next: PictureModeId) => { writePictureMode(pageStorage(), movieId, next); notify(); }, [movieId]);
   return { mode, setMode };
 }

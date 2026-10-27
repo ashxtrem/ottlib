@@ -35,7 +35,7 @@ export function usePlayerTracks({ video, source, reopen }: TracksOptions) {
   useEffect(() => {
     if (!video) return;
     video.querySelectorAll('track').forEach((element) => {
-      element.track.mode = textUrl !== null && element.getAttribute('src') === textUrl ? 'showing' : 'disabled';
+      element.track.mode = textUrl !== null && element.getAttribute('src') === textUrl ? 'hidden' : 'disabled'; // 'hidden': cues load and fire but the page draws them (CueOverlay), inside the visible box
     });
   }, [video, textUrl, readyTracks]);
 
