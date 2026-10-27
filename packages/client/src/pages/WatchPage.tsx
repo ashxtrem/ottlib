@@ -16,6 +16,7 @@ import { useCreditsActions } from '../hooks/useCreditsActions';
 import { useFullscreen, type FullscreenControls } from '../hooks/useFullscreen';
 import { usePlaybackProgress } from '../hooks/usePlaybackProgress';
 import { usePlaybackSource } from '../hooks/usePlaybackSource';
+import { useScrub } from '../hooks/useScrub';
 import { usePlayerCommands } from '../hooks/usePlayerCommands';
 import { usePlayerShortcuts } from '../hooks/usePlayerShortcuts';
 import { usePictureMode } from '../hooks/usePictureMode';
@@ -87,6 +88,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   const { complete } = usePlaybackProgress(video, { movieId, fallbackDurationMs: source?.durationMs ?? null, shelfId, endGuard });
   const state = useVideoState(video, source?.durationMs ?? null, endGuard);
   const commands = usePlayerCommands(video);
+  const scrub = useScrub(video, source);
   const finder = useSubtitleFinder(movieId);
   const controls = useAutoHide(state.paused || menu !== null || finder.open);
 
@@ -154,7 +156,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls
           state={state} visible={controls.visible} fullscreen={screen.fullscreen} onBack={leave}
-          onTogglePlay={commands.togglePlay} onSeekBy={commands.seekBy} onSeekTo={commands.seekTo}
+          onTogglePlay={commands.togglePlay} onSeekBy={commands.seekBy} onSeekTo={commands.seekTo} scrub={scrub}
           onVolume={commands.setVolume} onToggleMute={commands.toggleMute} onToggleFullscreen={screen.toggle}
           audioItems={audioItems(tracks.audioTracks, source.audioOrder)} onSelectAudio={tracks.selectAudio}
           subtitleItems={subtitleItems({ text: tracks.text, burnIn: tracks.burnIn, status: tracks.status, current: tracks.current })} onSelectSubtitle={tracks.selectSubtitle} onFindSubtitles={finder.show}
