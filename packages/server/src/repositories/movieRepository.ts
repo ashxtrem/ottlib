@@ -297,13 +297,13 @@ export class MovieRepository {
   }
 
   /** Stores the chapter pass's answer (null: no credit chapter) and marks the file as read. With `expected`, dropped if the file changed or was reset meanwhile. */
-  public applyCreditsChapter(id: number, ms: number | null, expected?: { size: number; mtimeMs: number }): void {
+  public applyCreditsChapter(id: number, ms: number | null, expected?: { size: number; mtimeMs: number; durationMs: number }): void {
     if (!expected) {
       this.db.prepare("UPDATE movies SET credits_chapter_ms = ?, credits_status = 'done' WHERE id = ?").run(ms, id);
       return;
     }
-    this.db.prepare("UPDATE movies SET credits_chapter_ms = ?, credits_status = 'done' WHERE id = ? AND size = ? AND mtime_ms = ? AND credits_status = 'pending'")
-      .run(ms, id, expected.size, expected.mtimeMs);
+    this.db.prepare("UPDATE movies SET credits_chapter_ms = ?, credits_status = 'done' WHERE id = ? AND size = ? AND mtime_ms = ? AND duration_ms = ? AND credits_status = 'pending'")
+      .run(ms, id, expected.size, expected.mtimeMs, expected.durationMs);
   }
 
   /** Sets or clears (null) the user's "credits start here" mark. */
@@ -321,7 +321,7 @@ export class MovieRepository {
   /** Episodes of a show with a known duration and credits from a mark or a chapter (the only ones series learning trusts). */
   public creditsOfShow(showKey: string): CreditsRow[] {
     const rows = this.db.prepare(`SELECT id, credits_mark_ms, credits_chapter_ms, duration_ms, metadata_media_type, imdb_id, metadata_source, provider_id
-      FROM movies WHERE metadata_media_type = 'tv' AND duration_ms IS NOT NULL AND (credits_mark_ms IS NOT NULL OR credits_chapter_ms IS NOT NULL) ORDER BY id`).all() as CreditsDbRow[];
+      FROM movies WHERE metadata_media_type = 'tv' AND media_probe_status = 'completed' AND duration_ms IS NOT NULL AND (credits_mark_ms IS NOT NULL OR credits_chapter_ms IS NOT NULL) ORDER BY id`).all() as CreditsDbRow[];
     return rows.filter((row) => showKeyOf(row) === showKey).map((row) => this.mapCredits(row));
   }
 

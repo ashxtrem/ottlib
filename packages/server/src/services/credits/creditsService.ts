@@ -44,7 +44,7 @@ export class CreditsService {
         cursor = row.id;
         try {
           // Applied only while the row still has the size and mtime it was read with, so a file changed mid-read keeps its reset.
-          this.movies.applyCreditsChapter(row.id, await this.reader.read(row.path, row.durationMs), { size: row.size, mtimeMs: row.mtimeMs });
+          this.movies.applyCreditsChapter(row.id, await this.reader.read(row.path, row.durationMs), { size: row.size, mtimeMs: row.mtimeMs, durationMs: row.durationMs });
         } catch (error) {
           this.log(`Credits chapter read failed for movie ${row.id}: ${error instanceof Error ? error.message : String(error)}`);
         }
