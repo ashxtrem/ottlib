@@ -48,7 +48,7 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
     };
     // An emptied element (after `load()` without a src) reports 0: keep the last real position.
     const remember = () => { if (video.readyState > 0) lastPosition.ms = video.currentTime * 1000; };
-    const onTick = () => { remember(); if (!video.paused) send('tick'); };
+    const onTick = () => { remember(); if (!video.paused && !scrubbing?.current) send('tick'); };
     const onPause = () => send('pause');
     const onSeeked = () => { remember(); if (!scrubbing?.current) send('seeked'); };
     const onEnded = () => { if (isRealVideoEnd(video, guardRef.current)) send('ended'); };
