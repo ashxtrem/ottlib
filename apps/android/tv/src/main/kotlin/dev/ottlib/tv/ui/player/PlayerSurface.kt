@@ -97,7 +97,7 @@ fun PlayerSurface(
 
     InterceptKeys { event ->
         val view = playerView ?: return@InterceptKeys false
-        if (pillFocused && keysEnabled && !anyPanelOpen) {
+        if (pillFocused && !controlsVisible && keysEnabled && !anyPanelOpen) {
             // OK presses the pill; D-pad directions fall through to the player (seek, or show the controls with focus on them).
             if (event.keyCode !in PILL_PASS_THROUGH_KEYS) return@InterceptKeys false
             view.requestFocus()
@@ -114,6 +114,8 @@ fun PlayerSurface(
         if (pillWasVisible && !pillVisible && !controlsVisible && !anyPanelOpen) playerView?.requestFocus()
         pillWasVisible = pillVisible
     }
+    // The pill is hidden under a panel, so its countdown must not run (and navigate away) unseen.
+    LaunchedEffect(anyPanelOpen) { credits.hold(anyPanelOpen) }
     LaunchedEffect(picture, pictureMode, pictureArea) {
         picture?.setPictureArea(pictureArea)
         picture?.apply(pictureMode)
@@ -172,7 +174,7 @@ fun PlayerSurface(
         if (creditsOpen) {
             CreditsPanel(
                 state = creditsState,
-                positionMs = player.currentPosition,
+                position = { player.currentPosition },
                 onMark = { credits.mark(player.currentPosition) },
                 onClearMark = credits::clearMark,
                 onAutoSkip = credits::chooseAutoSkip,

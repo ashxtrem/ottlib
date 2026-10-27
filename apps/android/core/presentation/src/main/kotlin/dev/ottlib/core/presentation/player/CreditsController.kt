@@ -68,6 +68,8 @@ class CreditsController(
     private var watching = false
     /** Skipped or ended: nothing more to show, and the end screen owns the countdown. */
     private var finished = false
+    /** A panel is open over the player, so the pill (and its countdown) can't be seen. */
+    private var held = false
     private var follower: Job? = null
 
     fun load(credits: Credits?, autoSkip: Boolean) {
@@ -97,9 +99,16 @@ class CreditsController(
         evaluate()
     }
 
+    /** Withdrawn, not cancelled: [watching] keeps it off through the credits, and the end screen counts down as usual. */
     fun watchCredits() {
         watching = true
-        countdown.cancel()
+        countdown.withdraw()
+        evaluate()
+    }
+
+    /** A panel covers the pill: the early countdown is withdrawn while [covered], and may start again once it closes. */
+    fun hold(covered: Boolean) {
+        held = covered
         evaluate()
     }
 
@@ -146,7 +155,7 @@ class CreditsController(
         val inCredits = !finished && start != null && at != null && at >= start
         val nextId = upcoming()
         val seconds = autoPlaySeconds()
-        val countdownWanted = inCredits && shown.autoSkip && nextId != null && seconds > 0 && !watching
+        val countdownWanted = inCredits && shown.autoSkip && nextId != null && seconds > 0 && !watching && !held
         when {
             countdownWanted && playing -> countdown.start(nextId!!, seconds)
             // Paused or back before the credits: stop counting, and count again when they play on.
