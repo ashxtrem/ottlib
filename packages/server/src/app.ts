@@ -29,6 +29,7 @@ import { registerEmbeddedSubtitleRoutes } from './routes/embeddedSubtitles.js';
 import { EmbeddedSubtitleService } from './services/embeddedSubtitleService.js';
 import { PosterCacheService } from './services/posterCacheService.js';
 import { ScanService } from './services/scanService.js';
+import { CreditsService } from './services/credits/creditsService.js';
 import { PictureAreaService } from './services/pictureArea/pictureAreaService.js';
 import { SchedulerService } from './services/schedulerService.js';
 import { ServerInfoService } from './services/serverInfoService.js';
@@ -95,6 +96,8 @@ declare module 'fastify' {
     hlsSessions: TranscodeSessionService;
     /** The picture-area pass; index.ts starts it at server start so files still pending (an upgrade, an interrupted pass) are measured without waiting for a scan. */
     pictureArea: PictureAreaService;
+    /** The credits chapter pass; index.ts starts it at server start and each scan starts it again. */
+    credits: CreditsService;
   }
 }
 
@@ -112,7 +115,8 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
   const ffmpeg = overrides.ffmpeg ?? new FfmpegLocator(); const locate = () => ffmpeg.locate();
   const pictureArea = new PictureAreaService(movies, locate, undefined, (message) => app.log.warn(message));
-  const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo, pictureArea); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
+  const credits = new CreditsService(movies, undefined, (message) => app.log.warn(message));
+  const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo, pictureArea, credits); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
   const subtitleLibrary = new SubtitleLibraryService(new DownloadedSubtitleRepository(db), appDataPath, id => pins.streamQuery(id));
   const encoderSetting = () => settings.get().transcodeEncoder;
   const registries = new WeakMap<FfmpegBinary, EncoderRegistry>();
@@ -141,7 +145,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/media/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
   scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
-  app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions); app.decorate('pictureArea', pictureArea);
+  app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions); app.decorate('pictureArea', pictureArea); app.decorate('credits', credits);
   app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }

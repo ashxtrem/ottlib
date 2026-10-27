@@ -14,7 +14,7 @@ import { ScanService } from './scanService.js';
 const directories: string[] = [];
 afterEach(() => { directories.splice(0).forEach((directory) => rmSync(directory, { force: true, recursive: true })); });
 
-function setup(runPending: () => Promise<void>) {
+function setup(runPending: () => Promise<void>, runCredits: () => Promise<void> = async () => undefined) {
   const root = mkdtempSync(join(tmpdir(), 'ottlib-scan-'));
   directories.push(root);
   const library = join(root, 'library');
@@ -25,8 +25,9 @@ function setup(runPending: () => Promise<void>) {
   folders.create(library);
   const runs = new ScanRunRepository(db);
   const pictureArea = { runPending: vi.fn(runPending) };
-  const service = new ScanService(folders, new MovieRepository(db), runs, new SettingRepository(db), { suggest: vi.fn() } as unknown as MetadataMatchService, { refresh: vi.fn() } as unknown as MediaInfoService, pictureArea);
-  return { db, runs, pictureArea, service };
+  const credits = { runPending: vi.fn(runCredits) };
+  const service = new ScanService(folders, new MovieRepository(db), runs, new SettingRepository(db), { suggest: vi.fn() } as unknown as MetadataMatchService, { refresh: vi.fn() } as unknown as MediaInfoService, pictureArea, credits);
+  return { db, runs, pictureArea, credits, service };
 }
 
 async function finished(runs: ScanRunRepository, id: number) {
@@ -67,6 +68,19 @@ describe('ScanService picture detection', () => {
     const { db, runs, service } = setup(() => { throw new Error('sync boom'); });
     try {
       expect((await finished(runs, service.start().id)).status).toBe('completed');
+    } finally { error.mockRestore(); db.close(); }
+  });
+
+  it('starts the credits chapter pass after the scan and never lets its failure into the scan', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { db, runs, credits, service } = setup(async () => undefined, () => Promise.reject(new Error('ffprobe exploded')));
+    try {
+      const run = await finished(runs, service.start().id);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(run.status).toBe('completed');
+      expect(run.errorSummary).toBeNull();
+      expect(credits.runPending).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalled();
     } finally { error.mockRestore(); db.close(); }
   });
 });

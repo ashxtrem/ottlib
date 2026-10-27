@@ -6,12 +6,13 @@ import { SettingRepository } from '../repositories/settingRepository.js';
 import type { ScanRun } from '@ottlib/shared';
 import { MetadataMatchService } from './metadataMatchService.js';
 import { MediaInfoService } from './mediaInfoService.js';
+import type { CreditsService } from './credits/creditsService.js';
 import type { PictureAreaService } from './pictureArea/pictureAreaService.js';
 import { parseTitle } from './scanner/titleParser.js';
 import { walkMovies } from './scanner/walker.js';
 
 export class ScanService {
-  public constructor(private readonly folders: FolderRepository, private readonly movies: MovieRepository, private readonly runs: ScanRunRepository, private readonly settings: SettingRepository, private readonly matcher: MetadataMatchService, private readonly mediaInfo: MediaInfoService, private readonly pictureArea: Pick<PictureAreaService, 'runPending'>) {}
+  public constructor(private readonly folders: FolderRepository, private readonly movies: MovieRepository, private readonly runs: ScanRunRepository, private readonly settings: SettingRepository, private readonly matcher: MetadataMatchService, private readonly mediaInfo: MediaInfoService, private readonly pictureArea: Pick<PictureAreaService, 'runPending'>, private readonly credits: Pick<CreditsService, 'runPending'>) {}
 
   public start(): ScanRun {
     const active = this.runs.active('scan'); if (active) return active;
@@ -37,6 +38,13 @@ export class ScanService {
     }
     this.runs.finish(runId, errors.length ? 'failed' : 'completed', errors.length ? errors.join('\n') : null);
     this.startPictureDetection();
+    this.startCreditsPass();
+  }
+
+  /** The credits chapter pass runs on its own after the scan, like picture detection. */
+  private startCreditsPass(): void {
+    try { void this.credits.runPending().catch((error) => console.error('Credits chapter pass failed', error)); }
+    catch (error) { console.error('Credits chapter pass failed', error); }
   }
 
   /** Picture-area detection runs in its own pass after the scan; the scan never waits for it and never sees its errors. */
