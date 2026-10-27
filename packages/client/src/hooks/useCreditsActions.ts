@@ -13,6 +13,8 @@ const overrideBody: Record<AutoSkipChoice, boolean | null> = { on: true, off: fa
 export function useCreditsActions(movieId: number, patchSource: (changes: Partial<PlaybackSource>) => void) {
   const { show } = useToast();
   const [choice, setChoice] = useState<AutoSkipChoice | null>(null);
+  // The credits start marked here: it doesn't start the early countdown in this play (see creditsStartAt).
+  const [markedHereMs, setMarkedHereMs] = useState<number | null>(null);
 
   const run = useCallback(async (command: MoreCommand, positionMs: number) => {
     try {
@@ -24,11 +26,12 @@ export function useCreditsActions(movieId: number, patchSource: (changes: Partia
       }
       const startMs = command.kind === 'mark' ? Math.max(0, Math.round(positionMs)) : null;
       const result = await api<CreditsMarkResult>(`/api/movies/${movieId}/credits`, { method: 'PUT', body: JSON.stringify({ startMs }) });
+      setMarkedHereMs(command.kind === 'mark' ? result.credits?.startMs ?? null : null);
       patchSource({ credits: result.credits });
     } catch (error) {
       show(error instanceof Error ? error.message : 'Could not save the change.', 'error');
     }
   }, [movieId, patchSource, show]);
 
-  return { choice, run };
+  return { choice, markedHereMs, run };
 }

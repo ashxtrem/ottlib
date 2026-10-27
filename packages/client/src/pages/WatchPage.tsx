@@ -115,12 +115,13 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
     }
     setFailure(reason);
   }, [source, reopen]);
+  const creditsActions = useCreditsActions(movieId, playback.patchSource);
   const credits = useCredits({
     movieId, shelfId, credits: source?.credits ?? null, autoSkip: source?.autoSkipCredits ?? false,
-    positionMs: state.positionMs, durationMs: state.durationMs, ended: state.ended, complete
+    positionMs: state.positionMs, durationMs: state.durationMs, ended: state.ended, paused: state.paused,
+    markedHereMs: creditsActions.markedHereMs, complete
   });
   const upNext = credits.upNext;
-  const creditsActions = useCreditsActions(movieId, playback.patchSource);
 
   usePlayerShortcuts({
     'toggle-play': commands.togglePlay,
@@ -136,6 +137,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   }, screen.fullscreen, menu === null && !problem);
 
   const phase = upNext.phase;
+  const upNextShown = upNext.next !== null && (phase.kind === 'preview' || phase.kind === 'countdown');
   return <div onPointerMove={controls.show} className={`relative h-full w-full ${controls.visible ? '' : 'cursor-none'}`}>
     {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} />
       : source ? <>
@@ -152,7 +154,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
         />
         {resumeAtMs && switchStartMs === null ? <ResumeChip positionMs={resumeAtMs} onStartOver={() => commands.seekTo(0)} /> : null}
         {upNext.next && (phase.kind === 'preview' || phase.kind === 'countdown') && <UpNextOverlay next={upNext.next} phase={phase} onPlayNow={upNext.playNow} onCancel={upNext.cancel} />}
-        {(credits.showSkip || credits.showWatch) && <SkipCreditsButton kind={credits.showSkip ? 'skip' : 'watch'} onPress={credits.showSkip ? credits.skipCredits : credits.watchCredits} />}
+        {(credits.showSkip || credits.showWatch) && <SkipCreditsButton kind={credits.showSkip ? 'skip' : 'watch'} aboveUpNext={upNextShown} onPress={credits.showSkip ? credits.skipCredits : credits.watchCredits} />}
       </>
         : <div className="flex h-full items-center justify-center" aria-live="polite"><svg aria-hidden="true" className="h-8 w-8 animate-spin text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12a8 8 0 1 1-2.34-5.66" /></svg><span className="sr-only">Loading…</span></div>}
     {!problem && !source && <button type="button" onClick={leave} aria-label="Back" title="Back" className={`absolute left-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 md:left-5 md:top-5 ${focusRing}`}><BackIcon /></button>}

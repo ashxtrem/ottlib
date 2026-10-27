@@ -29,6 +29,14 @@ export function reachedStartAt(positionMs: number, startAtMs: number | null | un
 }
 
 /**
+ * The countdown start after a tick from `lastTickMs` to `nowMs`. The early (credits) countdown holds while the video is
+ * paused, so its start moves forward by the paused time; the countdown after the end always runs.
+ */
+export function heldCountdownStart(endedAtMs: number, lastTickMs: number, nowMs: number, hold: boolean): number {
+  return hold ? endedAtMs + Math.max(0, nowMs - lastTickMs) : endedAtMs;
+}
+
+/**
  * Hidden → preview at 20 s left → a 10 s countdown after the end → advance to the next one.
  * With `startAtMs`, no preview: the 10 s countdown runs from the moment the position reaches it.
  */

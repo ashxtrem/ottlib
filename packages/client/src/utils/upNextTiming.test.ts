@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reachedStartAt, upNextPhase, type UpNextInput } from './upNextTiming';
+import { heldCountdownStart, reachedStartAt, upNextPhase, type UpNextInput } from './upNextTiming';
 
 const base: UpNextInput = { hasNext: true, cancelled: false, positionMs: 0, durationMs: 1_500_000, endedAtMs: null, nowMs: 0 };
 
@@ -35,6 +35,17 @@ describe('upNextPhase', () => {
     expect(reachedStartAt(1_400_000, 1_400_000)).toBe(true);
     expect(reachedStartAt(1_399_999, 1_400_000)).toBe(false);
     expect(reachedStartAt(1_400_000, null)).toBe(false);
+  });
+
+  it('holds the early countdown while paused and resumes counting on play', () => {
+    const credits = { ...base, startAtMs: 1_400_000, positionMs: 1_400_000 };
+    // Counted 3 s, then paused for 20 s: the start moves forward tick by tick, so 7 s are still left.
+    let endedAtMs = 7_000;
+    for (let now = 10_250; now <= 30_000; now += 250) endedAtMs = heldCountdownStart(endedAtMs, now - 250, now, true);
+    expect(upNextPhase({ ...credits, endedAtMs, nowMs: 30_000 })).toEqual({ kind: 'countdown', secondsLeft: 7 });
+    // Playing again: the start stays put and the countdown runs out 7 s later.
+    expect(heldCountdownStart(endedAtMs, 30_000, 30_250, false)).toBe(endedAtMs);
+    expect(upNextPhase({ ...credits, endedAtMs, nowMs: 37_000 })).toEqual({ kind: 'advance' });
   });
 
   it('shows nothing after Cancel, without a next one, or while the duration is unknown', () => {
