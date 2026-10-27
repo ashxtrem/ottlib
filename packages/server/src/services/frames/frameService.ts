@@ -84,11 +84,14 @@ export class FrameService {
     }
   }
 
-  /** Rounded to the cache step, then kept inside [0, duration] when the duration is known. */
+  /** Rounded to the cache step, then kept inside [0, duration) when the duration is known, or under a sane cap when not. */
   private snap(movieId: number, requestedMs: number): number {
     const rounded = Math.round(Math.max(0, requestedMs) / framePreviewConfig.roundMs) * framePreviewConfig.roundMs;
     const duration = this.movies.get(movieId)?.mediaInfo?.durationMs;
-    return duration != null && duration >= 0 ? Math.min(rounded, duration) : rounded;
+    // One step short of the end: a seek to EOF yields no frame.
+    return duration != null && duration >= 0
+      ? Math.min(rounded, Math.max(0, duration - framePreviewConfig.roundMs))
+      : Math.min(rounded, framePreviewConfig.maxUnknownMs);
   }
 
   private remember(key: string, jpeg: Buffer): void {

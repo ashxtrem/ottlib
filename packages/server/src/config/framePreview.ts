@@ -6,6 +6,8 @@ export const framePreviewConfig = {
   cacheSize: 300,
   /** The requested time is rounded to this before ffmpeg runs, so a scrub reuses frames. */
   roundMs: 2000,
+  /** Upper bound on t when the title's duration is unknown (24 h). */
+  maxUnknownMs: 86_400_000,
   /** Output frame width in pixels; the height follows the aspect ratio (kept even). */
   width: 320,
   /** mjpeg quality scale (2 best, 31 worst). */

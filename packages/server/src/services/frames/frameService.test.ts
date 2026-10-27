@@ -155,12 +155,13 @@ describe('FrameService', () => {
     expect(runs).toHaveLength(4);
   });
 
-  it('clamps the time into [0, duration]', async () => {
+  it('clamps the time into [0, duration), or under the cap when the duration is unknown', async () => {
     const { service, runs } = fixture({ auto: true });
     await service.frame(1, 9_999_999, 'a');
     await service.frame(2, -5_000, 'a');
     await service.frame(4, 7_000_000, 'a');
-    expect(runs.map(seek)).toEqual(['60.000', '0.000', '7000.000']);
+    await service.frame(4, 1e20, 'b');
+    expect(runs.map(seek)).toEqual(['58.000', '0.000', '7000.000', '86400.000']);
   });
 
   it('rejects with MovieUnavailableError for an unknown movie', async () => {

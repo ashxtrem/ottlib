@@ -47,7 +47,7 @@ describe('frame route', () => {
       expect(response.rawPayload.equals(fakeJpeg)).toBe(true);
       await app.inject({ method: 'GET', url: '/api/movies/1/frame?t=9999999' });
       await app.inject({ method: 'GET', url: '/api/movies/1/frame?t=-100' });
-      expect(runs.map((run) => run.args[run.args.indexOf('-ss') + 1])).toEqual(['6.000', '60.000', '0.000']);
+      expect(runs.map((run) => run.args[run.args.indexOf('-ss') + 1])).toEqual(['6.000', '58.000', '0.000']);
     } finally { await app.close(); db.close(); }
   });
 
