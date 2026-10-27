@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PICTURE_DEFAULT_KEY, PICTURE_MODES_KEY, memoryStorage, pageStorage, readPictureDefault, readPictureModes, safeStorage, writePictureDefault, writePictureMode } from './usePictureMode';
+import { PICTURE_DEFAULT_KEY, PICTURE_MODES_KEY, readPictureDefault, readPictureModes, writePictureDefault, writePictureMode } from './usePictureMode';
+import { pageStorage } from '../utils/pageStorage';
 import { parsePictureDefault, parsePictureModes, pictureMenuItems, pictureModeFor } from '../utils/pictureModes';
 
 function fakeStorage(initial: Record<string, string> = {}) {
@@ -47,20 +48,11 @@ describe('picture mode storage', () => {
 describe('blocked browser storage', () => {
   it('has no store to hand out, yet a picked mode still applies for the session', () => {
     // The node test environment has no `window`, which is the same failure as a SecurityError on access.
-    expect(safeStorage()).toBeNull();
     const storage = pageStorage();
     writePictureMode(storage, 3, 'Zoom');
     writePictureDefault(storage, 'Stretch');
     expect(readPictureModes(pageStorage())).toEqual({ 3: 'Zoom' });
     expect(readPictureDefault(pageStorage())).toBe('Stretch');
-  });
-
-  it('memoryStorage reads back what it was given and can be cleared', () => {
-    const memory = memoryStorage();
-    memory.setItem('a', '1');
-    expect(memory.getItem('a')).toBe('1');
-    memory.clear();
-    expect(memory.getItem('a')).toBeNull();
   });
 });
 

@@ -18,7 +18,8 @@ interface ProgressOptions {
  * Reports playback progress for the given `<video>`: PUT every 10 s while playing and on pause, seek end, `pagehide` and
  * leaving the page; POST complete on `ended`. Requests go through `api` with `keepalive`, so the profile headers go along
  * and the last one survives the page closing. `complete()` posts complete now (skipping the credits) and stops the
- * later PUTs, so the leave on the way out doesn't save a resume position in the credits.
+ * later PUTs, so the leave on the way out doesn't save a resume position in the credits. If the POST fails it rejects
+ * and the PUTs resume.
  */
 export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, fallbackDurationMs, shelfId, endGuard, scrubbing }: ProgressOptions): { complete: () => Promise<void> } {
   const guardRef = useRef(endGuard); guardRef.current = endGuard;
@@ -73,7 +74,13 @@ export function usePlaybackProgress(video: HTMLVideoElement | null, { movieId, f
   const complete = useCallback(async () => {
     completed.current = true;
     const shelfQuery = shelfId === undefined ? '' : `?shelfId=${shelfId}`;
-    await api(`/api/movies/${movieId}/complete${shelfQuery}`, { method: 'POST', keepalive: true }).catch(() => undefined);
+    try {
+      await api(`/api/movies/${movieId}/complete${shelfQuery}`, { method: 'POST', keepalive: true });
+    } catch (error) {
+      // Not completed after all: progress reports resume, so the title stays resumable. The caller shows the error.
+      completed.current = false;
+      throw error;
+    }
   }, [movieId, shelfId]);
   return { complete };
 }
