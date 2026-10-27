@@ -110,7 +110,7 @@ export function pickSubtitle(text: SubtitleSource[], burnIn: BurnInSubtitle[], l
 export interface RememberedStart {
   /** A text subtitle to show right away. */
   text: string | null;
-  /** Ask the server again (another audio track or a burned-in subtitle); null when its first answer already fits. */
+  /** Ask the server again for another audio track; null when its first answer already fits. */
   change: Omit<PlaybackSwitch, 'startMs'> | null;
 }
 
@@ -121,7 +121,7 @@ export function rememberedStart(source: PlaybackSource, wanted: TrackLanguages):
   const audio = pickAudioOrder(tracks, wanted.audio);
   const subtitle = pickSubtitle(source.subtitles ?? [], source.burnInSubtitles ?? [], wanted.subtitle);
   const audioChanges = audio !== undefined && audio !== currentAudio;
-  const burn = subtitle?.kind === 'burn' ? subtitle.order : undefined;
-  const change = audioChanges || burn !== undefined ? { audioOrder: audioChanges ? audio : source.audioOrder, burnSubtitleOrder: burn } : null;
+  // Burn-in transcodes the video, so it stays an explicit menu pick (as on Android), never a remembered start.
+  const change = audioChanges ? { audioOrder: audio } : null;
   return { text: subtitle?.kind === 'text' ? subtitle.url : null, change };
 }

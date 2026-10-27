@@ -91,7 +91,8 @@ export function usePlayerTracks({ video, source, reopen, restart, remembered, on
 
   const selectSubtitle = useCallback((choice: SubtitleChoice) => {
     if (choice.kind !== 'off') lastShown.current = choice;
-    onPick({ subtitle: subtitleLanguage(choice) });
+    // "Off" is remembered only when it turned a showing subtitle off (as TrackMemory.kt's turnedOff).
+    if (choice.kind !== 'off' || current.kind !== 'off') onPick({ subtitle: subtitleLanguage(choice) });
     const audioOrder = source?.audioOrder;
     if (choice.kind === 'burn') {
       setTextUrl(null);
@@ -100,7 +101,7 @@ export function usePlayerTracks({ video, source, reopen, restart, remembered, on
     }
     if (choice.kind === 'text') showText(choice.url); else setTextUrl(null);
     if (burning !== undefined) reopen({ audioOrder });
-  }, [source?.audioOrder, burning, reopen, showText, onPick, subtitleLanguage]);
+  }, [source?.audioOrder, burning, current.kind, reopen, showText, onPick, subtitleLanguage]);
 
   /** A subtitle the finder just downloaded: show it, and reopen at the position so the new answer lists it. */
   const showDownloaded = useCallback((subtitle: SubtitleSource) => {

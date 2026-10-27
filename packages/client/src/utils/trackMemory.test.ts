@@ -81,7 +81,7 @@ describe('rememberedStart', () => {
     expect(rememberedStart(source({}), { audio: 'hi', subtitle: 'en' })).toEqual({ text: '/en.vtt', change: { audioOrder: 2, burnSubtitleOrder: undefined } });
   });
 
-  it('asks for a burned-in subtitle when that is the only one in the language', () => {
-    expect(rememberedStart(source({}), { subtitle: 'fr' })).toEqual({ text: null, change: { audioOrder: undefined, burnSubtitleOrder: 5 } });
+  it('never burns in a remembered subtitle: an image-only language leaves the answer as it is', () => {
+    expect(rememberedStart(source({}), { subtitle: 'fr' })).toEqual({ text: null, change: null });
   });
 });
