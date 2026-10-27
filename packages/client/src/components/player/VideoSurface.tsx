@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlaybackSource, SubtitleSource } from '@ottlib/shared';
 import type { HlsEngine } from '../../utils/browserCaps';
-import { CueOverlay } from './CueOverlay';
+import { CueOverlay, type CueClearance } from './CueOverlay';
 import { useActiveCues } from '../../hooks/useActiveCues';
 import { usePictureLayout } from '../../hooks/usePictureLayout';
 import { isRealVideoEnd, type EndGuard } from '../../utils/playbackEnd';
@@ -22,6 +22,8 @@ interface VideoSurfaceProps {
   endGuard: EndGuard;
   /** How the picture is fitted to the player box (Fit when absent). */
   pictureMode?: PictureModeId;
+  /** Lifts the subtitle lines above the credits button and up next's card while they show. */
+  cueClearance?: CueClearance;
 }
 
 type HlsInstance = { destroy(): void };
@@ -53,7 +55,7 @@ async function attachHlsJs(video: HTMLVideoElement, url: string, startSec: numbe
   return hls;
 }
 
-export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks, endGuard, pictureMode = 'Fit' }: VideoSurfaceProps) {
+export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks, endGuard, pictureMode = 'Fit', cueClearance }: VideoSurfaceProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const setVideoRef = useCallback((element: HTMLVideoElement | null) => { videoRef.current = element; setVideoEl(element); }, []);
@@ -133,5 +135,5 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
       srcLang={subtitle.language ?? undefined}
       label={subtitle.title ?? subtitle.language ?? `Subtitles ${index + 1}`}
     />)}
-  </video><CueOverlay lines={cueLines} /></div>;
+  </video><CueOverlay lines={cueLines} clearance={cueClearance} /></div>;
 }

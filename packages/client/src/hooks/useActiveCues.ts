@@ -4,7 +4,8 @@ import { cuesToLines } from '../utils/cueLines';
 /**
  * The lines of the cues showing now on the video's hidden text track. The browser would lay native cues out inside the
  * `<video>` box, which can reach past the visible player box (Zoom, Smart fill, Stretch), so the track is kept `hidden`
- * (loaded, fires `cuechange`, draws nothing) and the page draws the lines itself. At most one track is `hidden` at a time.
+ * (loaded, fires `cuechange`, draws nothing) and the page draws the lines itself. At most one of our tracks is `hidden`
+ * at a time (none in iOS native fullscreen, where the browser shows it).
  */
 export function useActiveCues(video: HTMLVideoElement | null): string[] {
   const [lines, setLines] = useState<string[]>([]);
@@ -19,8 +20,9 @@ export function useActiveCues(video: HTMLVideoElement | null): string[] {
       setLines((previous) => (previous.length === next.length && previous.every((line, i) => line === next[i]) ? previous : next));
     };
     const bind = () => {
-      let hidden: TextTrack | null = null;
-      for (let i = 0; i < list.length; i++) if (list[i].mode === 'hidden') { hidden = list[i]; break; }
+      // Only a track of our own `<track>` elements: Safari's native HLS can add in-band caption tracks that are hidden too.
+      const ours = Array.from(video.querySelectorAll('track'), (element) => element.track);
+      const hidden = ours.find((track) => track.mode === 'hidden') ?? null;
       if (hidden === bound) return;
       bound?.removeEventListener('cuechange', update);
       bound = hidden;

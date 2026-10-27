@@ -16,7 +16,11 @@ const LOW = 'bottom-28 md:bottom-32';
  * countdown), otherwise in the card's place.
  */
 export function skipCreditsPlace(kind: 'skip' | 'watch', aboveUpNext: boolean): string {
-  return kind === 'watch' || aboveUpNext ? RAISED : LOW;
+  return isSkipCreditsRaised(kind, aboveUpNext) ? RAISED : LOW;
+}
+
+export function isSkipCreditsRaised(kind: 'skip' | 'watch', aboveUpNext: boolean): boolean {
+  return kind === 'watch' || aboveUpNext;
 }
 
 /** Bottom-right, above the controls, and clear of up next's card. */

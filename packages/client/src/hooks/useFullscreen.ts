@@ -14,7 +14,8 @@ export function toggleFullscreen(doc: FullscreenDocument, container: HTMLElement
 /**
  * Fullscreen for the player's container (so the custom controls stay on top). WatchPage owns the container above the
  * per-title key, so up next keeps fullscreen. iOS Safari has no element fullscreen, so there the `<video>` itself goes
- * fullscreen with Safari's own controls (`<track>` subtitles still show); that drops on the next title.
+ * fullscreen with Safari's own controls; that drops on the next title. The page's cue overlay isn't drawn there, so
+ * usePlayerTracks switches the chosen `<track>` to 'showing' while it lasts (useNativeFullscreen).
  */
 export function useFullscreen(container: HTMLElement | null, video: HTMLVideoElement | null) {
   const [fullscreen, setFullscreen] = useState(false);
