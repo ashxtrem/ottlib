@@ -26,6 +26,8 @@ class RemoteSeeker(
     private val accumulator: SeekAccumulator,
     private val scrub: ScrubController,
     private val onHint: (SeekHint) -> Unit,
+    /** True when a scrub starts, false when it ends or is dropped. */
+    private val onScrubbing: (Boolean) -> Unit = {},
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val commitWhenSettled = Runnable { if (accumulator.readyToCommit(SystemClock.uptimeMillis())) commit() }
@@ -46,6 +48,15 @@ class RemoteSeeker(
     fun release() {
         handler.removeCallbacksAndMessages(null)
         scrub.cancel()
+        onScrubbing(false)
+    }
+
+    /** The screen left the foreground: settle a half-finished scrub where it is, so the player isn't left scrubbing. */
+    fun stopScrubbing() {
+        handler.removeCallbacks(commitWhenSettled)
+        if (!scrub.scrubbing) return
+        scrub.end(target(accumulator.take()))
+        onScrubbing(false)
     }
 
     private fun commit() {
@@ -53,6 +64,7 @@ class RemoteSeeker(
         val offset = accumulator.take()
         val target = target(offset)
         if (scrub.scrubbing) scrub.end(target) else if (offset != 0L) player.seekTo(target)
+        onScrubbing(false)
         if (offset != 0L) onHint(hint(offset, target))
     }
 
@@ -62,6 +74,7 @@ class RemoteSeeker(
         if (!scrub.scrubbing) {
             base = player.currentPosition
             scrub.begin()
+            onScrubbing(true)
         }
         val target = target(offset)
         scrub.scrubTo(target)

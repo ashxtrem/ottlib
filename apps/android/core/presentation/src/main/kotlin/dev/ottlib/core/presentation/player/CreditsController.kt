@@ -71,6 +71,9 @@ class CreditsController(
     /** A panel is open over the player, so the pill (and its countdown) can't be seen. */
     private var held = false
     private var follower: Job? = null
+    private var sampler: (() -> Pair<Long, Boolean>?)? = null
+    /** A scrub is in progress: the playhead moves under the finger, so nothing changes until release. */
+    private var scrubbing = false
 
     fun load(credits: Credits?, autoSkip: Boolean) {
         current.update { it.copy(credits = credits, autoSkip = autoSkip) }
@@ -80,6 +83,7 @@ class CreditsController(
     /** Samples the playhead (position, playing) every [intervalMs] until [stop]; null while there is no player. */
     fun follow(intervalMs: Long = FOLLOW_INTERVAL_MS, sample: () -> Pair<Long, Boolean>?) {
         follower?.cancel()
+        sampler = sample
         follower = scope.launch {
             while (isActive) {
                 sample()?.let { (at, isPlaying) -> onPosition(at, isPlaying) }
@@ -91,9 +95,18 @@ class CreditsController(
     fun stop() {
         follower?.cancel()
         follower = null
+        sampler = null
+    }
+
+    /** The surface began ([active]) or released a scrub; positions are ignored meanwhile, and the playhead is read once on release. */
+    fun scrubbing(active: Boolean) {
+        if (scrubbing == active) return
+        scrubbing = active
+        if (!active) sampler?.invoke()?.let { (at, isPlaying) -> onPosition(at, isPlaying) }
     }
 
     fun onPosition(positionMs: Long, isPlaying: Boolean) {
+        if (scrubbing) return
         position = positionMs
         playing = isPlaying
         evaluate()

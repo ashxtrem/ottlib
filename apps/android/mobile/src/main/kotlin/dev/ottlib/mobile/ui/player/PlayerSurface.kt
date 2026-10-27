@@ -48,6 +48,8 @@ import dev.ottlib.core.presentation.player.CreditsController
 import dev.ottlib.core.presentation.player.PlayerControls
 import dev.ottlib.core.presentation.player.creditsSummary
 import dev.ottlib.core.presentation.player.SubtitleSearchController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ottlib.mobile.MainActivity
 import kotlinx.coroutines.delay
@@ -100,7 +102,19 @@ fun PlayerSurface(
     var frame by remember { mutableStateOf<String?>(null) }
     val frameUrl by rememberUpdatedState(framePreview)
     val scrubber = remember(player) { ScrubController(ExoScrubTarget(player), frameUrl = { frameUrl(it) }, onFrame = { frame = it }) }
-    DisposableEffect(scrubber) { onDispose { scrubber.cancel() } }
+    DisposableEffect(scrubber) {
+        onDispose {
+            scrubber.cancel()
+            credits.scrubbing(false)
+        }
+    }
+    /** A drag cut short (picture-in-picture, a panel, the app stopping) never reports its release: settle it here. */
+    fun endScrub() {
+        if (!scrubbing && !scrubber.scrubbing) return
+        scrubber.end(player.currentPosition)
+        scrubbing = false
+        credits.scrubbing(false)
+    }
     val brightness = remember(activity) { activity?.window?.let(::ScreenBrightness) }
     DisposableEffect(brightness) { onDispose { brightness?.reset() } }
     val volume = remember(context) { MediaVolume(context) }
@@ -152,6 +166,7 @@ fun PlayerSurface(
         onSeekTo = scrubber::end,
         onScrubbing = {
             scrubbing = it
+            credits.scrubbing(it)
             if (it) scrubber.begin()
         },
         onScrubTo = scrubber::scrubTo,
@@ -175,9 +190,18 @@ fun PlayerSurface(
             hint = null
         }
     }
-    LaunchedEffect(inPictureInPicture) { if (inPictureInPicture) panel = null }
+    LaunchedEffect(inPictureInPicture) {
+        if (inPictureInPicture) {
+            panel = null
+            endScrub()
+        }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { endScrub() }
     // The pill is hidden under a panel, so its countdown must not run (and navigate away) unseen.
-    LaunchedEffect(panel) { credits.hold(panel != null) }
+    LaunchedEffect(panel) {
+        credits.hold(panel != null)
+        if (panel != null) endScrub()
+    }
     if (controls.showPictureHint) LaunchedEffect(Unit) {
         delay(PICTURE_HINT_DELAY_MS)
         hint = PlayerHint("Pinch to fill the screen", Icons.Filled.ZoomOutMap, visibleMs = PICTURE_HINT_VISIBLE_MS)
