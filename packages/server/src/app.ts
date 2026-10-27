@@ -26,6 +26,8 @@ import { TranscodeSessionService } from './services/hls/transcodeSessionService.
 import { TranscodeInfoService } from './services/transcodeInfoService.js';
 import { registerHlsRoutes } from './routes/hls.js';
 import { registerEmbeddedSubtitleRoutes } from './routes/embeddedSubtitles.js';
+import { registerFrameRoutes } from './routes/frames.js';
+import { FrameService } from './services/frames/frameService.js';
 import { EmbeddedSubtitleService } from './services/embeddedSubtitleService.js';
 import { PosterCacheService } from './services/posterCacheService.js';
 import { ScanService } from './services/scanService.js';
@@ -131,6 +133,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback); registerEmbeddedSubtitleRoutes(app, playback, embeddedSubtitles);
   registerCreditsRoutes(app, new CreditsEditService(movies, autoSkip, creditsResolver));
   registerHlsRoutes(app, hlsSessions, new TranscodeInfoService(locate, encodersFor, encoderSetting));
+  registerFrameRoutes(app, new FrameService(playback, movies, locate));
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
   app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
