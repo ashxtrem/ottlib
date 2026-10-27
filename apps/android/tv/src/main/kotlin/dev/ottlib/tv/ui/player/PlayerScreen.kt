@@ -19,6 +19,7 @@ import dev.ottlib.core.presentation.openInExternalPlayer
 import dev.ottlib.core.presentation.player.AutoPlayState
 import dev.ottlib.core.presentation.player.PlayerUiState
 import dev.ottlib.core.presentation.player.PlayerViewModel
+import dev.ottlib.core.presentation.player.message
 import dev.ottlib.tv.ui.components.ErrorMessage
 import dev.ottlib.tv.ui.components.LoadingMessage
 
@@ -42,6 +43,9 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
         if (url != null && openInExternalPlayer(context, url, viewModel.title)) onExit()
         else Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
     }
+
+    // Outside the Ended branch so it fires during playback; the player stays paused with its controls up on return.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.pauseForBackground() }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (val current = state) {
@@ -73,6 +77,16 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                 onPictureHintSeen = viewModel::pictureHintSeen,
                 subtitles = viewModel.subtitles,
                 onFindSubtitles = viewModel::findSubtitles,
+                credits = viewModel.credits,
+                upNext = nextMovie?.let { autoPlay.message(it) },
+                onSkipCredits = {
+                    // Marks the title watched, then plays the next title or leaves the player (a failed save stays here).
+                    viewModel.skipCredits { nextId ->
+                        viewModel.releasePlayback()
+                        if (nextId != null) onNext(nextId) else onExit()
+                    }
+                },
+                framePreview = viewModel::framePreviewUrl,
             )
         }
     }

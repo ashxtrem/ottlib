@@ -10,6 +10,8 @@ export interface PlaybackSourceState {
   loading: boolean;
   /** Asks the server again with another audio track, burned-in subtitle or start position (the old session is stopped). */
   switchTo: (change: PlaybackSwitch) => void;
+  /** Applies a change the server confirmed (credits mark, auto-skip) without reopening the stream. */
+  patchSource: (changes: Partial<PlaybackSource>) => void;
 }
 
 /** Stops a transcode session; keepalive so it still goes out while the page unloads. */
@@ -28,7 +30,7 @@ function pingSession(url: string): Promise<unknown> {
  */
 export function usePlaybackSource(movieId: number, capabilities: PlaybackCapabilities | null): PlaybackSourceState {
   const [change, setChange] = useState<PlaybackSwitch>({});
-  const [state, setState] = useState<Omit<PlaybackSourceState, 'switchTo'>>({ source: null, error: null, loading: true });
+  const [state, setState] = useState<Omit<PlaybackSourceState, 'switchTo' | 'patchSource'>>({ source: null, error: null, loading: true });
   const session = useRef<string | undefined>(undefined);
   const stopKeepAlive = useRef<(() => void) | undefined>(undefined);
   const endKeepAlive = () => { stopKeepAlive.current?.(); stopKeepAlive.current = undefined; };
@@ -68,5 +70,8 @@ export function usePlaybackSource(movieId: number, capabilities: PlaybackCapabil
   }, []);
 
   const switchTo = useCallback((next: PlaybackSwitch) => setChange({ ...next }), []);
-  return { ...state, switchTo };
+  const patchSource = useCallback((changes: Partial<PlaybackSource>) => {
+    setState((previous) => (previous.source ? { ...previous, source: { ...previous.source, ...changes } } : previous));
+  }, []);
+  return { ...state, switchTo, patchSource };
 }

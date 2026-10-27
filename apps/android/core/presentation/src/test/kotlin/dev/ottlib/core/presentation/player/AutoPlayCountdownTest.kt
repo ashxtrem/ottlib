@@ -44,6 +44,17 @@ class AutoPlayCountdownTest {
     }
 
     @Test
+    fun aFailedOnDueHoldsTheScreenInsteadOfMovingOn() = runTest {
+        val countdown = AutoPlayCountdown(CoroutineScope(StandardTestDispatcher(testScheduler)), AutoPlayStreak()) { false }
+        countdown.start(nextId = 7, seconds = 2)
+        advanceUntilIdle()
+        assertEquals(AutoPlayState.Off, countdown.state.value)
+        countdown.start(nextId = 7, seconds = 2)
+        advanceUntilIdle()
+        assertEquals(AutoPlayState.Off, countdown.state.value)
+    }
+
+    @Test
     fun zeroSecondsMeansAutoPlayIsOff() = runTest {
         val countdown = countdown()
         countdown.start(nextId = 7, seconds = 0)

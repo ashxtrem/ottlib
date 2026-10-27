@@ -53,8 +53,12 @@ class AutoPlayStreak(private val limit: Int = LIMIT) {
     }
 }
 
-/** The ended screen's countdown to the next title. Runs at most once per player: a cancelled countdown stays off. */
-class AutoPlayCountdown(private val scope: CoroutineScope, private val streak: AutoPlayStreak) {
+/**
+ * The countdown to the next title (on the ended screen, or from the credits). Runs at most once per player: a cancelled
+ * countdown stays off. [onDue] runs as it finishes, before [AutoPlayState.Due] is published; when it answers false
+ * (the title couldn't be marked watched) the countdown ends Off instead and the screen stays.
+ */
+class AutoPlayCountdown(private val scope: CoroutineScope, private val streak: AutoPlayStreak, private val onDue: suspend () -> Boolean = { true }) {
     private val current = MutableStateFlow<AutoPlayState>(AutoPlayState.Off)
     val state: StateFlow<AutoPlayState> = current.asStateFlow()
     private var started = false
@@ -68,14 +72,31 @@ class AutoPlayCountdown(private val scope: CoroutineScope, private val streak: A
             current.value = AutoPlayState.StillWatching
             return
         }
+        current.value = AutoPlayState.Counting(seconds) // at once, so callers see the countdown as started
         job = scope.launch {
             for (left in seconds downTo 1) {
                 current.value = AutoPlayState.Counting(left)
                 delay(1_000)
             }
+            if (!onDue()) {
+                current.value = AutoPlayState.Off
+                return@launch
+            }
             streak.autoPlayed()
             current.value = AutoPlayState.Due(nextId)
         }
+    }
+
+    /**
+     * Stops a running countdown without ruling out a later one: the viewer left the credits early (seeked back, paused),
+     * so it may start again when they reach them. A countdown the viewer cancelled, or one that finished, is left alone.
+     */
+    fun withdraw() {
+        if (current.value !is AutoPlayState.Counting) return
+        job?.cancel()
+        job = null
+        started = false
+        current.value = AutoPlayState.Off
     }
 
     fun cancel() {

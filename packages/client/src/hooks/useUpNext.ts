@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Movie } from '@ottlib/shared';
 import { api } from './apiClient';
-import { upNextPhase, type UpNextPhase } from '../utils/upNextTiming';
+import { completeThen } from '../utils/completeThen';
+import { heldCountdownStart, reachedStartAt, upNextPhase, type UpNextPhase } from '../utils/upNextTiming';
 
 interface UpNextOptions {
   movieId: number;
@@ -10,6 +11,14 @@ interface UpNextOptions {
   positionMs: number;
   durationMs: number;
   ended: boolean;
+  /** The video is paused: the early countdown holds meanwhile. */
+  paused?: boolean;
+  /** Position where the countdown starts early (the credits, auto-skip on); null keeps the 20 s lead. */
+  startAtMs?: number | null;
+  /** Runs before opening the next title when the countdown started at `startAtMs` (posts complete). */
+  beforeEarlyNext?: () => Promise<void>;
+  /** `beforeEarlyNext` rejected: the next title is not opened. */
+  onEarlyNextFailed?: () => void;
 }
 
 export function watchPath(movieId: number, shelfId?: number): string {
@@ -18,14 +27,18 @@ export function watchPath(movieId: number, shelfId?: number): string {
 
 /**
  * The next episode (or next title of the shelf) from GET /api/movies/:id/next: shown when 20 s remain, then a 10 s
- * countdown after the end that opens it. Cancel keeps the viewer on the finished one.
+ * countdown after the end that opens it. With `startAtMs` the countdown starts there instead. Cancel keeps the viewer
+ * on the finished one.
  */
-export function useUpNext({ movieId, shelfId, positionMs, durationMs, ended }: UpNextOptions) {
+export function useUpNext({ movieId, shelfId, positionMs, durationMs, ended, paused = false, startAtMs = null, beforeEarlyNext, onEarlyNextFailed }: UpNextOptions) {
   const navigate = useNavigate();
-  const [next, setNext] = useState<Movie | null>(null);
+  // Undefined until GET /next answers.
+  const [loaded, setNext] = useState<Movie | null | undefined>(undefined);
+  const next = loaded ?? null;
   const [cancelled, setCancelled] = useState(false);
   const [endedAtMs, setEndedAtMs] = useState<number | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const advancing = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -36,24 +49,46 @@ export function useUpNext({ movieId, shelfId, positionMs, durationMs, ended }: U
     return () => { active = false; };
   }, [movieId, shelfId]);
 
-  // Seeking back after the end clears `ended`, which stops the countdown.
+  // Seeking back after the end (or before the early start) clears the trigger, which stops the countdown.
+  const early = !ended && reachedStartAt(positionMs, startAtMs);
+  const triggered = ended || early;
+  const lastTick = useRef(0);
   useEffect(() => {
     const now = Date.now();
-    setEndedAtMs(ended ? now : null);
+    lastTick.current = now;
+    setEndedAtMs(triggered ? now : null);
     setNowMs(now);
-  }, [ended]);
+  }, [triggered]);
 
+  // The early countdown holds while paused (the start moves forward by the paused time); the one after the end runs.
+  const hold = early && paused;
+  const counting = endedAtMs !== null && !cancelled && next !== null;
   useEffect(() => {
-    if (endedAtMs === null || cancelled || !next) return;
-    const timer = setInterval(() => setNowMs(Date.now()), 250);
+    if (!counting) return;
+    lastTick.current = Date.now();
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const since = lastTick.current;
+      lastTick.current = now;
+      setEndedAtMs((start) => start === null ? null : heldCountdownStart(start, since, now, hold));
+      setNowMs(now);
+    }, 250);
     return () => clearInterval(timer);
-  }, [endedAtMs, cancelled, next]);
+  }, [counting, hold]);
 
-  const phase: UpNextPhase = upNextPhase({ hasNext: next !== null, cancelled, positionMs, durationMs, endedAtMs, nowMs });
-  const playNow = useCallback(() => { if (next) navigate(watchPath(next.id, shelfId), { replace: true }); }, [next, shelfId, navigate]);
+  const phase: UpNextPhase = upNextPhase({ hasNext: next !== null, cancelled, positionMs, durationMs, endedAtMs, nowMs, startAtMs });
+  const playNow = useCallback(() => {
+    if (!next || advancing.current) return;
+    advancing.current = true;
+    const open = () => navigate(watchPath(next.id, shelfId), { replace: true });
+    if (early && beforeEarlyNext) {
+      // A failed complete keeps the viewer here (and the countdown off, so it doesn't loop).
+      void completeThen(beforeEarlyNext, open, () => { advancing.current = false; setCancelled(true); onEarlyNextFailed?.(); });
+    } else open();
+  }, [next, shelfId, navigate, early, beforeEarlyNext, onEarlyNextFailed]);
   const cancel = useCallback(() => setCancelled(true), []);
 
   useEffect(() => { if (phase.kind === 'advance') playNow(); }, [phase.kind, playNow]);
 
-  return { next, phase, playNow, cancel };
+  return { next, nextKnown: loaded !== undefined, phase, playNow, cancel, cancelled };
 }

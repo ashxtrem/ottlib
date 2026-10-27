@@ -16,6 +16,7 @@ import dev.ottlib.core.model.PlaybackProgressUpdate
 import dev.ottlib.core.model.TrackChoice
 import dev.ottlib.core.network.OttlibApi
 import dev.ottlib.core.player.OttlibPlayerFactory
+import dev.ottlib.core.player.framePreviewPath
 import dev.ottlib.core.player.PlayerSettings
 import dev.ottlib.core.player.ProgressReporter
 import dev.ottlib.core.player.PlaybackSession
@@ -88,7 +89,8 @@ class PlayerViewModel(
     val nextWarning = warning.asStateFlow()
     private val completion = MutableStateFlow<String?>(null)
     val completionError = completion.asStateFlow()
-    private val countdown = AutoPlayCountdown(viewModelScope, autoPlayStreak)
+    // A countdown that started at the credits marks the title watched as it fires, and the screen moves on only once that is saved.
+    private val countdown = AutoPlayCountdown(viewModelScope, autoPlayStreak) { ended || finishEarly() }
     val autoPlay: StateFlow<AutoPlayState> = countdown.state
     private var autoPlaySeconds = 0
     private val saving = Mutex()
@@ -101,6 +103,8 @@ class PlayerViewModel(
     private var fallback: Job? = null
     /** The server's remux/transcode session behind the current HLS source; stopped on release or a new source. */
     private var serverSession: String? = null
+    /** The server session's frame preview template; scrubbing shows its frames instead of seeking. */
+    @Volatile private var frameTemplate: String? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
     val subtitles = SubtitleSearchController(api, movieId, viewModelScope,
@@ -111,10 +115,17 @@ class PlayerViewModel(
             rememberTracks(active.useSubtitle(source) { api.resolve(it) ?: error("No server selected") })
         })
 
+    /** The skip pill, the early up-next countdown and the Credits panel. */
+    val credits = CreditsController(viewModelScope, countdown, upcoming = { next.value?.id }, autoPlaySeconds = { autoPlaySeconds },
+        saveMark = { api.setCreditsMark(movieId, it) }, saveAutoSkip = { api.setAutoSkip(movieId, it) })
+
     fun findSubtitles() = subtitles.open(movie)
 
     val streamUrl: String? get() = api.resolve("/api/stream/$movieId")
     val title: String get() = movie?.title ?: ""
+
+    /** A preview frame near [positionMs] while playing via the server, else null (direct play scrubs the real video). */
+    fun framePreviewUrl(positionMs: Long): String? = frameTemplate?.let { api.resolve(framePreviewPath(it, positionMs)) }
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
@@ -136,6 +147,7 @@ class PlayerViewModel(
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) {
                 ended = true
+                credits.finish()
                 state.value = PlayerUiState.Ended
                 saveCompletion()
                 startAutoPlay()
@@ -145,8 +157,6 @@ class PlayerViewModel(
 
     init {
         autoPlayStreak.playerOpened()
-        // Leaving the title unwatched because the save failed would be worse than waiting for the viewer.
-        viewModelScope.launch { completion.collect { if (it != null) countdown.cancel() } }
         start()
     }
 
@@ -167,6 +177,7 @@ class PlayerViewModel(
                 autoPlaySeconds = settings.autoPlayNextSeconds
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
                 area.value = source.pictureArea
+                credits.load(source.credits, source.autoSkipCredits)
                 val skipBackMs = settings.skipBackSeconds * 1_000L
                 val skipForwardMs = settings.skipForwardSeconds * 1_000L
                 // Read preferences before creating a decoder: cancellation during a suspended read must not leak a player.
@@ -181,6 +192,7 @@ class PlayerViewModel(
                 exo.setMediaItem(source.toMediaItem(movieId, loaded.title) { api.resolve(it)!! }, if (fromStart) 0 else source.resumePositionMs ?: 0)
                 exo.prepare()
                 exo.playWhenReady = true
+                credits.follow { player?.let { it.currentPosition to it.isPlaying } }
                 state.value = PlayerUiState.Ready(exo, loaded.title, PlayerControls(skipBackMs, skipForwardMs, showPictureHint = !settings.pictureHintShown))
             } catch (error: CancellationException) {
                 throw error
@@ -224,6 +236,36 @@ class PlayerViewModel(
     }
 
     fun cancelAutoPlay() = countdown.cancel()
+
+    /**
+     * "Skip credits": marks the title watched, then calls [onDone] with the title to play next (null leaves the player).
+     * If the save fails, [onDone] isn't called: the end screen shows the error and its retry instead.
+     */
+    fun skipCredits(onDone: (Long?) -> Unit) {
+        countdown.cancel()
+        viewModelScope.launch { if (finishEarly()) onDone(next.value?.id) }
+    }
+
+    /**
+     * Before the end (skip pressed, or the early countdown fired): progress saves stop so they can't undo the completion.
+     * Answers whether /complete was saved; if not, playback pauses and the end screen holds with the error and retry.
+     */
+    private suspend fun finishEarly(): Boolean {
+        ended = true
+        credits.finish()
+        if (backgroundScope.async { completeNow() }.await()) return true
+        player?.pause()
+        state.value = PlayerUiState.Ended
+        return false
+    }
+
+    /**
+     * The app left the foreground (Home, input switch): pause so nothing plays to an empty room. The progress reporter
+     * saves the position on the pause; the player stays paused, so the controls are still up on return.
+     */
+    fun pauseForBackground() {
+        player?.pause()
+    }
 
     fun pictureHintSeen() {
         backgroundScope.launch { preferences.markPictureHintShown() }
@@ -270,6 +312,7 @@ class PlayerViewModel(
                 }
             serverSession?.let(::stopServerSession)
             serverSession = source.sessionUrl
+            frameTemplate = source.framePreviewUrl.takeIf { source.sessionUrl != null }
             area.value = source.pictureArea
             active.setMediaItem(item, request.startMs ?: 0)
             active.prepare()
@@ -281,24 +324,30 @@ class PlayerViewModel(
         backgroundScope.launch { runCatching { api.stopSession(sessionUrl) } }
     }
 
+    /** Saves on [backgroundScope] so leaving can't cut it short. A failure stops the end-screen countdown: leaving the title unwatched would be worse than waiting for the viewer. */
     fun saveCompletion() {
-        backgroundScope.launch {
-            saving.withLock {
-                if (completionSaved) return@withLock
-                try {
-                    api.complete(movieId, collectionId)
-                    completionSaved = true
-                    completion.value = null
-                    runCatching {
-                        continueWatching.remove(movieId)
-                        next.value?.let { upcoming ->
-                            val queued = api.continueWatching().find { it.id == upcoming.id }
-                            if (queued != null) continueWatching.upsert(ContinueWatchingEntry(queued.id, queued.title, api.resolve(queued.posterUrl), queued.resumePositionMs ?: 0, queued.durationMs ?: 0, nextUp = queued.nextUp != null))
-                        }
-                    }
-                } catch (error: CancellationException) { throw error }
-                catch (_: Exception) { completion.value = "Couldn't save watched status. Check your connection and retry." }
+        viewModelScope.launch { if (!backgroundScope.async { completeNow() }.await()) countdown.cancel() }
+    }
+
+    /** Marks the title watched (once); answers false, with [completionError] set, when the server couldn't be reached. */
+    private suspend fun completeNow(): Boolean = saving.withLock {
+        if (completionSaved) return@withLock true
+        try {
+            api.complete(movieId, collectionId)
+            completionSaved = true
+            completion.value = null
+            runCatching {
+                continueWatching.remove(movieId)
+                next.value?.let { upcoming ->
+                    val queued = api.continueWatching().find { it.id == upcoming.id }
+                    if (queued != null) continueWatching.upsert(ContinueWatchingEntry(queued.id, queued.title, api.resolve(queued.posterUrl), queued.resumePositionMs ?: 0, queued.durationMs ?: 0, nextUp = queued.nextUp != null))
+                }
             }
+            true
+        } catch (error: CancellationException) { throw error }
+        catch (_: Exception) {
+            completion.value = "Couldn't save watched status. Check your connection and retry."
+            false
         }
     }
 
@@ -316,6 +365,7 @@ class PlayerViewModel(
     /** Call before navigating away; Navigation may retain the old ViewModel through its exit animation. */
     fun releasePlayback() {
         countdown.cancel()
+        credits.stop()
         subtitles.cancel()
         startup?.cancel()
         fallback?.cancel()
@@ -323,6 +373,7 @@ class PlayerViewModel(
         session = null
         serverSession?.let(::stopServerSession)
         serverSession = null
+        frameTemplate = null
     }
 
     override fun onCleared() = releasePlayback()

@@ -4,10 +4,17 @@ import type { PlaybackSource } from '@ottlib/shared';
 import { subtitleSearchSchema, type SubtitleDownloadResponse, type SubtitleOptions, type SubtitleSearch, type SubtitleSearchResponse } from '@ottlib/shared/subtitles';
 import { api } from './apiClient';
 
-export function useSubtitles(movieId: number) {
+/** Stops a transcode session the playback answer opened: it is only read here for its subtitle list. */
+function stopSession(source: PlaybackSource): PlaybackSource {
+  if (source.sessionUrl) void api(source.sessionUrl, { method: 'DELETE' }).catch(() => undefined);
+  return source;
+}
+
+/** `listFiles: false` skips the saved-files list (the player lists them in its own menu and needs no second answer). */
+export function useSubtitles(movieId: number, { listFiles = true }: { listFiles?: boolean } = {}) {
   const client = useQueryClient();
   const options = useQuery({ queryKey: ['subtitle-options'], queryFn: () => api<SubtitleOptions>('/api/subtitles/options') });
-  const available = useQuery({ queryKey: ['subtitle-files', movieId], queryFn: () => api<PlaybackSource>(`/api/movies/${movieId}/playback`) });
+  const available = useQuery({ queryKey: ['subtitle-files', movieId], enabled: listFiles, queryFn: () => api<PlaybackSource>(`/api/movies/${movieId}/playback`).then(stopSession) });
   const [languages, setLanguages] = useState('');
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const initialized = useRef(false);
@@ -27,7 +34,7 @@ export function useSubtitles(movieId: number) {
   });
   const download = useMutation({
     mutationFn: (resultId: string) => api<SubtitleDownloadResponse>(`/api/movies/${movieId}/subtitles/download`, { method: 'POST', body: JSON.stringify({ resultId }) }),
-    onSuccess: (_result, resultId) => { setSavedIds(previous => new Set(previous).add(resultId)); void available.refetch(); void client.invalidateQueries({ queryKey: ['movie', String(movieId)] }); },
+    onSuccess: (_result, resultId) => { setSavedIds(previous => new Set(previous).add(resultId)); if (listFiles) void available.refetch(); void client.invalidateQueries({ queryKey: ['movie', String(movieId)] }); },
   });
   return { options, available, languages, setLanguages, search, download, savedIds };
 }

@@ -2,6 +2,12 @@ package dev.ottlib.core.network
 
 import dev.ottlib.core.model.AuthStatus
 import dev.ottlib.core.model.AcceptMetadataRequest
+import dev.ottlib.core.model.AutoSkipDefaults
+import dev.ottlib.core.model.AutoSkipOverrideRequest
+import dev.ottlib.core.model.AutoSkipOverrideResult
+import dev.ottlib.core.model.Credits
+import dev.ottlib.core.model.CreditsMarkRequest
+import dev.ottlib.core.model.CreditsMarkResult
 import dev.ottlib.core.model.EpisodeSelection
 import dev.ottlib.core.model.ImdbLookupRequest
 import dev.ottlib.core.model.MetadataCandidate
@@ -126,6 +132,16 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     suspend fun complete(id: Long, shelfId: Long? = null): Movie = post<Movie>(sequenceUrl(id, "complete", shelfId)).also { watched(id, true) }
     private fun sequenceUrl(id: Long, action: String, shelfId: Long?): HttpUrl =
         url("/api/movies/$id/$action").newBuilder().apply { shelfId?.let { addQueryParameter("shelfId", it.toString()) } }.build()
+
+    /** Sets the shared "credits start here" mark at [startMs], or clears it with null; answers the credits the title now resolves to. */
+    suspend fun setCreditsMark(id: Long, startMs: Long?): Credits? =
+        send<CreditsMarkResult>("PUT", url("/api/movies/$id/credits"), OttlibJson.encodeToString(CreditsMarkRequest.serializer(), CreditsMarkRequest(startMs))).credits
+    /** This profile's auto-skip override for the title (an episode: its series), or null for the default; answers the effective value. */
+    suspend fun setAutoSkip(id: Long, enabled: Boolean?): Boolean =
+        send<AutoSkipOverrideResult>("PUT", url("/api/movies/$id/auto-skip"), OttlibJson.encodeToString(AutoSkipOverrideRequest.serializer(), AutoSkipOverrideRequest(enabled))).autoSkipCredits
+    suspend fun autoSkipDefaults(): AutoSkipDefaults = get(url("/api/profiles/current/auto-skip"))
+    suspend fun setAutoSkipDefaults(defaults: AutoSkipDefaults): AutoSkipDefaults =
+        send("PUT", url("/api/profiles/current/auto-skip"), OttlibJson.encodeToString(AutoSkipDefaults.serializer(), defaults))
 
     suspend fun setWatched(id: Long, watched: Boolean): Movie =
         send<Movie>("PUT", url("/api/movies/$id/watch-state"), OttlibJson.encodeToString(WatchStateUpdate.serializer(), WatchStateUpdate(watched))).also { watched(id, it.watched) }

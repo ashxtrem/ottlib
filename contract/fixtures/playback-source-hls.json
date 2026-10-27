@@ -44,5 +44,11 @@
     }
   ],
   "burnSubtitleOrder": 2,
-  "pictureArea": null
+  "pictureArea": null,
+  "credits": {
+    "startMs": 6780000,
+    "source": "chapter"
+  },
+  "autoSkipCredits": false,
+  "framePreviewUrl": "/api/movies/1/frame?"
 }

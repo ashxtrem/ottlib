@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Movie } from '@ottlib/shared';
+import type { Movie, SubtitleSource } from '@ottlib/shared';
 import { subtitleLanguageSchema } from '@ottlib/shared/subtitles';
 import { useSubtitles } from '../hooks/useSubtitles';
 import { Modal } from './Modal';
 
 const inputClass = 'mt-1 w-full rounded-lg border border-border bg-field px-3 py-2';
 const buttonClass = 'rounded-lg border border-border-strong px-3 py-2 hover:bg-surface-raised disabled:opacity-50';
-export function SubtitleDialog({ movie, onClose }: { movie: Movie; onClose: () => void }) {
-  const subtitles = useSubtitles(movie.id);
+interface SubtitleDialogProps {
+  movie: Movie;
+  onClose: () => void;
+  /** After a download (the player shows the new subtitle and reopens at the position). */
+  onDownloaded?: (subtitle: SubtitleSource) => void;
+  /** Lists the saved subtitle files (default); the player lists them in its own menu instead. */
+  listFiles?: boolean;
+}
+
+export function SubtitleDialog({ movie, onClose, onDownloaded, listFiles = true }: SubtitleDialogProps) {
+  const subtitles = useSubtitles(movie.id, { listFiles });
   const [mode, setMode] = useState<'auto' | 'filename' | 'manual'>('auto');
   const [query, setQuery] = useState(movie.title.replace(/\s*·\s*S\d+E\d+\s*$/i, ''));
   const [year, setYear] = useState(movie.year?.toString() ?? '');
@@ -24,7 +33,7 @@ export function SubtitleDialog({ movie, onClose }: { movie: Movie; onClose: () =
     didSearch.current = true; runSearch();
   }, [configured, validLanguages]);
   const languageName = (code: string) => subtitles.options.data?.languages.find(language => language.code === code)?.name ?? code.toUpperCase();
-  return <Modal open title="Find subtitles" subtitle={movie.title} onClose={onClose} maxWidthClassName="max-w-3xl">
+  return <Modal open title="Find subtitles" subtitle={movie.title} onClose={onClose} maxWidthClassName="max-w-3xl" panelClassName="text-foreground">
     <div className="space-y-4 p-5">
       {subtitles.options.isLoading && <p>Loading subtitle services…</p>}
       {subtitles.options.error && <p role="alert" className="text-error">{subtitles.options.error.message}</p>}
@@ -54,7 +63,7 @@ export function SubtitleDialog({ movie, onClose }: { movie: Movie; onClose: () =
       </div>
       <ul className="space-y-2">{subtitles.search.data?.results.map(result => <li key={result.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
         <div className="min-w-0 flex-1"><p className="font-medium">{languageName(result.language)} · {result.provider}</p><p className="break-all text-sm text-muted">{result.releaseName}</p><p className="text-xs text-muted">{[result.format.toUpperCase(), result.hashMatch ? 'File hash match' : result.score >= 0.9 ? 'Release match' : null, result.hearingImpaired ? 'SDH' : null, result.forced ? 'Forced' : null, result.downloads ? `${result.downloads} downloads` : null].filter(Boolean).join(' · ')}</p></div>
-        <button type="button" disabled={subtitles.download.isPending} className={buttonClass} onClick={() => subtitles.download.mutate(result.id)}>{subtitles.download.isPending && subtitles.download.variables === result.id ? 'Downloading…' : result.downloaded || subtitles.savedIds.has(result.id) ? 'Already saved' : 'Download'}</button>
+        <button type="button" disabled={subtitles.download.isPending} className={buttonClass} onClick={() => subtitles.download.mutate(result.id, { onSuccess: (data) => onDownloaded?.(data.subtitle) })}>{subtitles.download.isPending && subtitles.download.variables === result.id ? 'Downloading…' : result.downloaded || subtitles.savedIds.has(result.id) ? 'Already saved' : 'Download'}</button>
       </li>)}</ul>
       {subtitles.available.data?.subtitles.length ? <div><h3 className="font-medium">Available subtitle files</h3><ul className="mt-2 space-y-1">{subtitles.available.data.subtitles.map(subtitle => <li key={subtitle.url}><a className="break-all text-sm text-accent hover:underline" href={subtitle.url} download>{subtitle.title || languageName(subtitle.language || '')} · {subtitle.codec}</a></li>)}</ul></div> : null}
     </div>

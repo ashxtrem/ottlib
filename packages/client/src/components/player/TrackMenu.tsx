@@ -12,10 +12,15 @@ interface TrackMenuProps<T extends TrackMenuItem> {
   onSelect: (item: T) => void;
   /** Bigger touch target at phone width. */
   buttonClassName: string;
+  /** Below the items, after a divider (e.g. the subtitle menu's "Find subtitles…"); it closes the menu itself. */
+  footer?: ReactNode;
 }
 
-/** A player menu above its button (audio tracks or subtitles); closes on Escape, outside press or a pick. */
-export function TrackMenu<T extends TrackMenuItem>({ label, icon, items, open, onOpenChange, onSelect, buttonClassName }: TrackMenuProps<T>) {
+/** One row of a player menu; exported so a footer's rows look like the items. */
+export const menuItemClass = 'flex min-h-11 items-center gap-2 rounded px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-9';
+
+/** A player menu above its button (audio tracks, subtitles, More); closes on Escape, outside press or a pick. */
+export function TrackMenu<T extends TrackMenuItem>({ label, icon, items, open, onOpenChange, onSelect, buttonClassName, footer }: TrackMenuProps<T>) {
   const menu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,16 +39,17 @@ export function TrackMenu<T extends TrackMenuItem>({ label, icon, items, open, o
       {items.map((item) => <button
         key={item.key}
         type="button"
-        role="menuitemradio"
-        aria-checked={item.selected}
+        role={item.action ? 'menuitem' : 'menuitemradio'}
+        aria-checked={item.action ? undefined : item.selected}
         disabled={item.disabled}
         onClick={() => { onSelect(item); onOpenChange(false); }}
-        className={`flex min-h-11 items-center gap-2 rounded px-3 py-2 text-left hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-9 ${focusRing}`}
+        className={`${menuItemClass} ${focusRing}`}
       >
         <span aria-hidden="true" className="w-4 shrink-0 text-accent">{item.selected ? '✓' : ''}</span>
         <span className="flex-1">{item.label}</span>
         {item.detail && <span className="text-xs text-white/60">{item.detail}</span>}
       </button>)}
+      {footer && <div className="mt-0.5 grid border-t border-white/10 pt-0.5">{footer}</div>}
     </div>}
   </div>;
 }

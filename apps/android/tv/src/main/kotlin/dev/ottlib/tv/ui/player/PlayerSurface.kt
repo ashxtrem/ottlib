@@ -7,7 +7,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,18 +38,23 @@ import androidx.tv.material3.Button
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.ottlib.core.presentation.player.CreditsController
 import dev.ottlib.core.presentation.player.SubtitleSearchController
 import dev.ottlib.tv.ui.components.tryRequestFocus
 import dev.ottlib.core.model.PictureArea
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.player.PictureModeController
+import dev.ottlib.core.player.ExoScrubTarget
+import dev.ottlib.core.player.ScrubController
 import dev.ottlib.core.player.SeekAccumulator
 import dev.ottlib.core.presentation.player.PlayerControls
 import dev.ottlib.tv.InterceptKeys
 import kotlinx.coroutines.delay
 
-/** The video, Media3's controls, remote shortcuts, and the overlays drawn on top (seek hints, picture panel). */
+/** The video, Media3's controls, remote shortcuts, and the overlays drawn on top (seek hints, credits, panels). */
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerSurface(
@@ -59,18 +68,36 @@ fun PlayerSurface(
     onPictureHintSeen: () -> Unit,
     subtitles: SubtitleSearchController,
     onFindSubtitles: () -> Unit,
+    credits: CreditsController,
+    /** The up-next countdown's message while it runs during playback (it started at the credits). */
+    upNext: String?,
+    onSkipCredits: () -> Unit,
+    /** A preview frame URL near a position on "Play via server"; null on direct play, where scrubbing moves the video. */
+    framePreview: (Long) -> String?,
 ) {
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var picture by remember { mutableStateOf<PictureModeController?>(null) }
     var controlsVisible by remember { mutableStateOf(false) }
     var panelOpen by remember { mutableStateOf(false) }
     var subtitlesOpen by remember { mutableStateOf(false) }
+    var creditsOpen by remember { mutableStateOf(false) }
     val subtitleFocus = remember { FocusRequester() }
+    val creditsFocus = remember { FocusRequester() }
+    val creditsState by credits.state.collectAsStateWithLifecycle()
+    var pillFocused by remember { mutableStateOf(false) }
+    val anyPanelOpen = panelOpen || subtitlesOpen || creditsOpen
+    val pillVisible = (creditsState.showSkip || (creditsState.counting && upNext != null)) && !anyPanelOpen
     val subtitleState by subtitles.uiState.collectAsStateWithLifecycle()
     var hint by remember { mutableStateOf<SeekHint?>(null) }
     var showPictureHint by remember { mutableStateOf(controls.showPictureHint) }
 
-    val seeker = remember(player, controls) { RemoteSeeker(player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs)) { hint = it } }
+    var frame by remember { mutableStateOf<String?>(null) }
+    val frameUrl by rememberUpdatedState(framePreview)
+
+    val seeker = remember(player, controls) {
+        val scrub = ScrubController(ExoScrubTarget(player), frameUrl = { frameUrl(it) }, onFrame = { frame = it })
+        RemoteSeeker(player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs), scrub, onHint = { hint = it }, onScrubbing = credits::scrubbing)
+    }
     val remoteKeys = remember(player, seeker) {
         RemoteKeys(player, seeker) {
             playerView?.run {
@@ -81,9 +108,30 @@ fun PlayerSurface(
         }
     }
     DisposableEffect(seeker) { onDispose { seeker.release() } }
+    // A scrub cut short by the screen leaving the foreground must not leave the player scrubbing.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { seeker.stopScrubbing() }
 
-    InterceptKeys { event -> playerView?.let { remoteKeys.handle(event, it, enabled = keysEnabled && !panelOpen && !subtitlesOpen) } ?: false }
-    BackHandler(enabled = controlsVisible && !panelOpen && !subtitlesOpen) { playerView?.hideController() }
+    InterceptKeys { event ->
+        val view = playerView ?: return@InterceptKeys false
+        if (pillFocused && !controlsVisible && keysEnabled && !anyPanelOpen) {
+            // OK presses the pill; D-pad directions fall through to the player (seek, or show the controls with focus on them).
+            if (event.keyCode !in PILL_PASS_THROUGH_KEYS) return@InterceptKeys false
+            view.requestFocus()
+        }
+        remoteKeys.handle(event, view, enabled = keysEnabled && !anyPanelOpen)
+    }
+    BackHandler(enabled = controlsVisible && !anyPanelOpen) { playerView?.hideController() }
+    // Back dismisses the pill once for this title (on the countdown it means "Watch credits").
+    BackHandler(enabled = pillVisible && !controlsVisible) { if (creditsState.counting) credits.watchCredits() else credits.dismiss() }
+    // When the pill goes (skipped, dismissed, credits over), focus returns to the player surface.
+    var pillWasVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(pillVisible) {
+        if (!pillVisible) pillFocused = false
+        if (pillWasVisible && !pillVisible && !controlsVisible && !anyPanelOpen) playerView?.requestFocus()
+        pillWasVisible = pillVisible
+    }
+    // The pill is hidden under a panel, so its countdown must not run (and navigate away) unseen.
+    LaunchedEffect(anyPanelOpen) { credits.hold(anyPanelOpen) }
     LaunchedEffect(picture, pictureMode, pictureArea) {
         picture?.setPictureArea(pictureArea)
         picture?.apply(pictureMode)
@@ -121,11 +169,38 @@ fun PlayerSurface(
         AnimatedVisibility(visible = controlsVisible, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopStart)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, color = Color.White, modifier = Modifier.padding(40.dp))
         }
-        if (controlsVisible && !panelOpen && !subtitlesOpen) {
-            Button(onClick = { playerView?.clearFocus(); onFindSubtitles(); subtitlesOpen = true },
-                modifier = Modifier.align(Alignment.TopEnd).padding(40.dp).focusRequester(subtitleFocus).onFocusChanged {
-                    playerView?.controllerShowTimeoutMs = if (it.isFocused) 0 else 4_000
-                }) { Text("Find subtitles") }
+        if (controlsVisible && !anyPanelOpen) {
+            val holdControls = Modifier.onFocusChanged { playerView?.controllerShowTimeoutMs = if (it.isFocused) 0 else 4_000 }
+            Row(Modifier.align(Alignment.TopEnd).padding(40.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = { playerView?.clearFocus(); creditsOpen = true }, modifier = Modifier.focusRequester(creditsFocus).then(holdControls)) { Text("Credits") }
+                Button(onClick = { playerView?.clearFocus(); onFindSubtitles(); subtitlesOpen = true },
+                    modifier = Modifier.focusRequester(subtitleFocus).then(holdControls)) { Text("Find subtitles") }
+            }
+        }
+        if (pillVisible) {
+            CreditsPill(
+                upNext = upNext.takeIf { creditsState.counting },
+                controlsVisible = controlsVisible,
+                onFocused = { pillFocused = it },
+                onSkip = onSkipCredits,
+                onWatchCredits = credits::watchCredits,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(start = 40.dp, end = 40.dp, bottom = if (controlsVisible) 140.dp else 40.dp),
+            )
+        }
+        if (creditsOpen) {
+            CreditsPanel(
+                state = creditsState,
+                position = { player.currentPosition },
+                onMark = { credits.mark(player.currentPosition) },
+                onClearMark = credits::clearMark,
+                onAutoSkip = credits::chooseAutoSkip,
+                onDismiss = {
+                    creditsOpen = false
+                    playerView?.showController()
+                    playerView?.post { creditsFocus.tryRequestFocus() }
+                },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
         }
         if (subtitlesOpen) {
             SubtitlePanel(subtitleState, subtitles, onRetry = onFindSubtitles, onDismiss = {
@@ -135,13 +210,17 @@ fun PlayerSurface(
             }, modifier = Modifier.align(Alignment.CenterEnd))
         }
         hint?.let { current ->
-            OverlayText(current.text, Modifier.align(Alignment.Center))
+            // Not focusable: the seek hint (and its preview frame on "Play via server") never takes focus.
+            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                frame?.let { FramePreview(it) }
+                OverlayText(current.text, Modifier)
+            }
             LaunchedEffect(current.id) {
                 delay(HINT_VISIBLE_MS)
                 hint = null
             }
         }
-        if (showPictureHint && !panelOpen && !subtitlesOpen) {
+        if (showPictureHint && !anyPanelOpen) {
             OverlayText("Hold OK for picture options", Modifier.align(Alignment.BottomStart).padding(40.dp), small = true)
             LaunchedEffect(Unit) {
                 delay(PICTURE_HINT_VISIBLE_MS)

@@ -3,6 +3,7 @@
 package dev.ottlib.mobile.ui.player
 
 import androidx.annotation.OptIn
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ListItem
@@ -11,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -23,11 +25,11 @@ import androidx.media3.ui.TrackNameProvider
 private class TrackOption(val group: Tracks.Group, val index: Int, val label: String, val selected: Boolean)
 
 /**
- * Audio and subtitle picker. Choices go through track-selection parameters, so TrackMemory remembers them for the
+ * Audio and subtitle picker, with a row into the Credits panel. Choices go through track-selection parameters, so TrackMemory remembers them for the
  * title exactly as it does for the TV player's menus.
  */
 @Composable
-fun BoxScope.TrackPanel(player: Player, onFindSubtitles: () -> Unit, onDismiss: () -> Unit) {
+fun BoxScope.TrackPanel(player: Player, onFindSubtitles: () -> Unit, creditsSummary: String, onCredits: () -> Unit, onDismiss: () -> Unit) {
     val resources = LocalResources.current
     val names = remember(resources) { DefaultTrackNameProvider(resources) }
     val tracks by produceState(player.currentTracks, player) {
@@ -50,6 +52,15 @@ fun BoxScope.TrackPanel(player: Player, onFindSubtitles: () -> Unit, onDismiss: 
         item { PanelOption("Find subtitles online", false, supporting = "Search, download, and use without leaving playback", onClick = onFindSubtitles) }
         item { PanelOption("Off", subtitles.none { it.selected }) { player.turnSubtitlesOff() } }
         items(subtitles) { option -> PanelOption(option.label, option.selected) { player.select(option) } }
+        item { PanelHeading("Credits") }
+        item {
+            ListItem(
+                headlineContent = { Text("Credits and auto-skip") },
+                supportingContent = { Text(creditsSummary) },
+                colors = PanelRowColors,
+                modifier = Modifier.clickable(onClick = onCredits),
+            )
+        }
     }
 }
 

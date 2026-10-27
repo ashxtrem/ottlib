@@ -1,7 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlaybackSource, SubtitleSource } from '@ottlib/shared';
 import type { HlsEngine } from '../../utils/browserCaps';
+import { CueOverlay, type CueClearance } from './CueOverlay';
+import { useActiveCues } from '../../hooks/useActiveCues';
+import { usePictureLayout } from '../../hooks/usePictureLayout';
 import { isRealVideoEnd, type EndGuard } from '../../utils/playbackEnd';
+import type { PictureModeId } from '../../utils/pictureModes';
 
 interface VideoSurfaceProps {
   source: PlaybackSource;
@@ -16,6 +20,10 @@ interface VideoSurfaceProps {
   textTracks: SubtitleSource[];
   /** Tells a false `ended` (mid-file on an hls source, e.g. iPad Safari after the server session is gone) from a real one. */
   endGuard: EndGuard;
+  /** How the picture is fitted to the player box (Fit when absent). */
+  pictureMode?: PictureModeId;
+  /** Lifts the subtitle lines above the credits button and up next's card while they show. */
+  cueClearance?: CueClearance;
 }
 
 type HlsInstance = { destroy(): void };
@@ -47,8 +55,13 @@ async function attachHlsJs(video: HTMLVideoElement, url: string, startSec: numbe
   return hls;
 }
 
-export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks, endGuard }: VideoSurfaceProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPlaybackError, textTracks, endGuard, pictureMode = 'Fit', cueClearance }: VideoSurfaceProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+  const setVideoRef = useCallback((element: HTMLVideoElement | null) => { videoRef.current = element; setVideoEl(element); }, []);
+  const cueLines = useActiveCues(videoEl);
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const layout = usePictureLayout(box, videoRef, source.pictureArea, pictureMode);
   const errorRef = useRef(onPlaybackError); errorRef.current = onPlaybackError;
   const startRef = useRef(startMs); startRef.current = startMs;
   const guardRef = useRef(endGuard); guardRef.current = endGuard;
@@ -102,8 +115,9 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
     };
   }, [source.kind, source.streamUrl, hlsEngine]);
 
-  return <video
-    ref={videoRef}
+  // The video is placed by hand in an overflow-hidden box (see pictureGeometry); until its size is known it just fits.
+  return <div ref={setBox} className="absolute inset-0 overflow-hidden bg-black"><video
+    ref={setVideoRef}
     playsInline
     autoPlay
     onError={(event) => {
@@ -111,7 +125,8 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
       if (source.kind !== 'direct' && hlsEngine === 'hlsjs') return;
       if (event.currentTarget.error && event.currentTarget.getAttribute('src')) onPlaybackError('media');
     }}
-    className="h-full w-full bg-black object-contain"
+    className={layout ? 'absolute max-w-none bg-black object-fill' : 'h-full w-full bg-black object-contain'}
+    style={layout ? { left: layout.left, top: layout.top, width: layout.width, height: layout.height } : undefined}
   >
     {textTracks.map((subtitle, index) => <track
       key={subtitle.url}
@@ -120,5 +135,5 @@ export function VideoSurface({ source, hlsEngine, startMs, onVideoElement, onPla
       srcLang={subtitle.language ?? undefined}
       label={subtitle.title ?? subtitle.language ?? `Subtitles ${index + 1}`}
     />)}
-  </video>;
+  </video><CueOverlay lines={cueLines} clearance={cueClearance} /></div>;
 }

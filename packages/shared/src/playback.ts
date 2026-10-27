@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { creditsSchema } from './credits.js';
 
 /** Bumped when a change to the endpoints native clients use is not backwards compatible. */
 export const apiVersion = 1;
@@ -70,7 +71,13 @@ export const playbackSourceSchema = z.object({
   burnInSubtitles: z.array(burnInSubtitleSchema).optional(),
   burnSubtitleOrder: z.number().int().nonnegative().optional(),
   /** Detected picture area; null when unknown or when burned-in subtitles sit in the bars. */
-  pictureArea: pictureAreaSchema.nullable().optional()
+  pictureArea: pictureAreaSchema.nullable().optional(),
+  /** Where the end credits start; null when no mark, chapter or sibling episode tells. */
+  credits: creditsSchema.nullable(),
+  /** Whether this profile skips the credits of this title (its override, else its default for the media type). */
+  autoSkipCredits: z.boolean(),
+  /** Server-relative frame-preview URL; it always carries a query string, so the client appends `&t=<ms>`. */
+  framePreviewUrl: z.string()
 });
 
 const commaList = z
