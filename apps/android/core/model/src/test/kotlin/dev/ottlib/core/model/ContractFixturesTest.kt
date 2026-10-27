@@ -32,6 +32,7 @@ class ContractFixturesTest {
         "shelf-detail" to ShelfDetail.serializer(),
         "playback-source" to PlaybackSource.serializer(),
         "playback-source-hls" to PlaybackSource.serializer(),
+        "auto-skip-defaults" to AutoSkipDefaults.serializer(),
         "progress-result" to PlaybackProgressResult.serializer(),
         "scan-status-idle" to ScanStatus.serializer(),
         "scan-status-running" to ScanStatus.serializer(),
@@ -112,12 +113,23 @@ class ContractFixturesTest {
         assertEquals(2, source.burnSubtitleOrder)
         assertEquals("PGS", source.burnInSubtitles.single().codec)
         assertEquals(null, source.pictureArea)
+        assertEquals(Credits(startMs = 6_780_000, source = "chapter"), source.credits)
     }
 
     @Test
     fun directPlaybackSourceCarriesThePictureAsFractions() {
         val source = strict.decodeFromString(PlaybackSource.serializer(), File(fixtures, "playback-source.json").readText())
         assertEquals(PictureArea(x = 0f, y = 0.125f, width = 1f, height = 0.75f), source.pictureArea)
+    }
+
+    @Test
+    fun playbackSourceCarriesCreditsAndFramePreview() {
+        val source = strict.decodeFromString(PlaybackSource.serializer(), File(fixtures, "playback-source.json").readText())
+        assertEquals(null, source.credits)
+        assertFalse(source.autoSkipCredits)
+        assertEquals("/api/movies/1/frame?", source.framePreviewUrl)
+        val defaults = strict.decodeFromString(AutoSkipDefaults.serializer(), File(fixtures, "auto-skip-defaults.json").readText())
+        assertEquals(AutoSkipDefaults(movie = true, tv = true), defaults)
     }
 
     @Test

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 export * from './torrent.js';
 export * from './playback.js';
+export * from './credits.js';
 export * from './auth.js';
 export * from './hiddenTitles.js';
 export * from './profiles.js';

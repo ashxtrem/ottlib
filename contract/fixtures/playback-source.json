@@ -19,5 +19,8 @@
     "y": 0.125,
     "width": 1,
     "height": 0.75
-  }
+  },
+  "credits": null,
+  "autoSkipCredits": false,
+  "framePreviewUrl": "/api/movies/1/frame?"
 }

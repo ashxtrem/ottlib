@@ -11,6 +11,7 @@ import type { LocalPlaybackHandoff } from '../providers/playback/PlaybackHandoff
 import { SubtitleLibraryService, downloadedSubtitleOrder } from './subtitles/subtitleLibraryService.js';
 import type { PlaybackPlanner } from './playbackPlanner.js';
 import type { EmbeddedSubtitleService } from './embeddedSubtitleService.js';
+import type { CreditsResolver } from './credits/creditsResolver.js';
 
 export interface SubtitleFile { path: string; mimeType: string }
 
@@ -24,7 +25,7 @@ export class MovieUnavailableError extends Error {
 export class PlaybackService {
   private readonly playlist = new LanPlaylist();
   /** [streamQuery] adds the per-movie key external players need when an access PIN is set ('' otherwise). */
-  public constructor(private readonly movies: MovieRepository, private readonly streamQuery: (id: number) => string = () => '', private readonly subtitleLibrary?: SubtitleLibraryService, private readonly local: LocalPlaybackHandoff = new LocalLaunch(), private readonly planner?: PlaybackPlanner, private readonly embedded?: EmbeddedSubtitleService) {}
+  public constructor(private readonly movies: MovieRepository, private readonly streamQuery: (id: number) => string = () => '', private readonly subtitleLibrary?: SubtitleLibraryService, private readonly local: LocalPlaybackHandoff = new LocalLaunch(), private readonly planner?: PlaybackPlanner, private readonly embedded?: EmbeddedSubtitleService, private readonly creditsResolver?: CreditsResolver) {}
 
   public async movieFile(id: number): Promise<PlaybackMovie> {
     const movie = this.movies.playbackMovie(id);
@@ -54,7 +55,10 @@ export class PlaybackService {
     const direct: PlaybackSource = {
       kind: 'direct', streamUrl: `/api/stream/${id}${query}`, mimeType: mimeTypes[extname(file.filename).slice(1).toLowerCase()] ?? 'application/octet-stream',
       durationMs: movie?.mediaInfo?.durationMs ?? null, resumePositionMs: movie?.resumePositionMs ?? null, subtitles: [...subtitles, ...extracted, ...downloaded.map(record => this.subtitleLibrary!.source(record))],
-      pictureArea: plan?.burnSubtitleOrder != null ? null : this.pictureFractions(id, movie?.mediaInfo?.width, movie?.mediaInfo?.height)
+      pictureArea: plan?.burnSubtitleOrder != null ? null : this.pictureFractions(id, movie?.mediaInfo?.width, movie?.mediaInfo?.height),
+      credits: this.creditsResolver?.credits(id) ?? null, autoSkipCredits: this.creditsResolver?.autoSkip(id, profileId) ?? false,
+      // Always with a query string (the stream key, or a bare '?'), so the client only appends `&t=<ms>`.
+      framePreviewUrl: `/api/movies/${id}/frame${query || '?'}`
     };
     if (!plan) return direct;
     const { hls, ...details } = plan;
