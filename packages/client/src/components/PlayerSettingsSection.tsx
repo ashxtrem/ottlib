@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { AutoSkipDefaults } from '@ottlib/shared';
 import { useAutoSkipDefaults } from '../hooks/useAutoSkipDefaults';
+import { PictureDefaultRow } from './PictureDefaultRow';
 
 interface ToggleRowProps {
   id: string;
@@ -45,5 +46,5 @@ export function PlayerSettingsView({ defaults, saving, error, onChange, children
 /** Settings → Player: loads and saves the current profile's defaults. */
 export function PlayerSettingsSection() {
   const { defaults, update } = useAutoSkipDefaults();
-  return <PlayerSettingsView defaults={defaults.data} saving={update.isPending} error={update.error?.message ?? defaults.error?.message} onChange={(next) => update.mutate(next)} />;
+  return <PlayerSettingsView defaults={defaults.data} saving={update.isPending} error={update.error?.message ?? defaults.error?.message} onChange={(next) => update.mutate(next)}><PictureDefaultRow /></PlayerSettingsView>;
 }

@@ -2,6 +2,7 @@ import { BackIcon } from '../icons';
 import { focusRing } from '../interactionStyles';
 import { SeekBar } from './SeekBar';
 import { MoreMenu, type MoreMenuProps } from './MoreMenu';
+import { PictureMenu, type PictureMenuProps } from './PictureMenu';
 import { TrackMenu } from './TrackMenu';
 import { AudioGlyph, BackTenGlyph, ExitFullscreenGlyph, ForwardTenGlyph, FullscreenGlyph, MutedGlyph, PauseGlyph, PlayGlyph, SubtitlesGlyph, VolumeGlyph } from './playerIcons';
 import type { VideoState } from '../../hooks/useVideoState';
@@ -9,7 +10,7 @@ import { formatClock } from '../../utils/playerTime';
 import { SEEK_STEP_SECONDS } from '../../utils/playerShortcuts';
 import type { SubtitleChoice, TrackMenuItem } from '../../utils/trackMenuItems';
 
-export type PlayerMenu = 'audio' | 'subtitles' | 'more' | null;
+export type PlayerMenu = 'audio' | 'subtitles' | 'picture' | 'more' | null;
 
 interface PlayerControlsProps {
   state: VideoState;
@@ -30,6 +31,8 @@ interface PlayerControlsProps {
   onMenu: (menu: PlayerMenu) => void;
   /** The More menu (credits mark, auto-skip); absent: no More button. */
   more?: Omit<MoreMenuProps, 'open' | 'onOpenChange' | 'buttonClassName'>;
+  /** The Picture menu (fit, zoom, stretch…); absent: no Picture button. */
+  picture?: Omit<PictureMenuProps, 'open' | 'onOpenChange' | 'buttonClassName'>;
 }
 
 /** Bigger touch targets at phone width, compact from `md:` up. */
@@ -59,6 +62,7 @@ export function PlayerControls(props: PlayerControlsProps) {
         <span className="flex-1" />
         {props.subtitleItems.length > 1 && <TrackMenu label="Subtitles" icon={<SubtitlesGlyph />} items={props.subtitleItems} open={menu === 'subtitles'} onOpenChange={(open) => onMenu(open ? 'subtitles' : null)} onSelect={(item) => props.onSelectSubtitle(item.choice)} buttonClassName={iconButton} />}
         {props.audioItems.length > 1 && <TrackMenu label="Audio" icon={<AudioGlyph />} items={props.audioItems} open={menu === 'audio'} onOpenChange={(open) => onMenu(open ? 'audio' : null)} onSelect={(item) => props.onSelectAudio(item.order)} buttonClassName={iconButton} />}
+        {props.picture && <PictureMenu {...props.picture} open={menu === 'picture'} onOpenChange={(open) => onMenu(open ? 'picture' : null)} buttonClassName={iconButton} />}
         {props.more && <MoreMenu {...props.more} open={menu === 'more'} onOpenChange={(open) => onMenu(open ? 'more' : null)} buttonClassName={iconButton} />}
         <button type="button" onClick={props.onToggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} title={fullscreen ? 'Exit fullscreen (f)' : 'Fullscreen (f)'} className={`${iconButton} ${focusRing}`}>{fullscreen ? <ExitFullscreenGlyph /> : <FullscreenGlyph />}</button>
       </div>
