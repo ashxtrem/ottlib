@@ -39,6 +39,9 @@ interface CreditsDbRow {
 /** A title's own credits data: the mark, the chapter start (null until read or when there is none), and what series learning compares. */
 export interface CreditsRow { id: number; markMs: number | null; chapterMs: number | null; durationMs: number | null; mediaType: 'movie' | 'tv' | null; showKey: string | null }
 
+/** A probed file waiting for the chapter pass; size and mtime say which version of the file it was read from. */
+export interface CreditsPendingRow { id: number; path: string; durationMs: number; size: number; mtimeMs: number }
+
 /** Matched, available titles with just the fields recommendations compare. */
 export interface RecommendationPoolRow {
   id: number; title: string; year: number | null; genres: string[]; cast: string[]; rating: number | null; mediaType: 'movie' | 'tv' | null;
@@ -237,16 +240,19 @@ export class MovieRepository {
         picture_x = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_x END,
         picture_y = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_y END,
         picture_width = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_width END,
-        picture_height = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_height END`).run(movie);
+        picture_height = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.picture_height END,
+        credits_status = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN 'pending' ELSE movies.credits_status END,
+        credits_chapter_ms = CASE WHEN movies.size <> excluded.size OR movies.mtime_ms <> excluded.mtime_ms THEN NULL ELSE movies.credits_chapter_ms END`).run(movie);
       const row = this.db.prepare('SELECT id FROM movies WHERE canonical_path = ?').get(movie.path) as { id: number };
       if (existing && changed) this.resetForRematch(row.id);
       return { id: row.id, inserted: !existing, needsMatch: changed || existing?.metadata_status === 'error', needsProbe: changed || existing?.media_probe_status === 'pending' };
     })();
   }
 
+  /** Resets the probe. duration_ms stays until the next probe writes it (or it fails), so applyMediaInfo can see whether the duration changed. */
   public clearMediaInfo(id: number): void {
     this.db.prepare(`UPDATE movies SET media_probe_status = 'pending', media_probe_error = NULL, media_probed_at = NULL,
-      container_format = NULL, duration_ms = NULL, video_width = NULL, video_height = NULL, video_codec = NULL,
+      container_format = NULL, video_width = NULL, video_height = NULL, video_codec = NULL,
       video_profile = NULL, video_bit_rate = NULL, hdr_format = NULL,
       picture_status = 'pending', picture_x = NULL, picture_y = NULL, picture_width = NULL, picture_height = NULL WHERE id = ?`).run(id);
   }
@@ -282,9 +288,22 @@ export class MovieRepository {
     return { x: row.picture_x, y: row.picture_y, width: row.picture_width, height: row.picture_height };
   }
 
-  /** Stores the chapter pass's answer (null: no credit chapter) and marks the file as read. */
-  public applyCreditsChapter(id: number, ms: number | null): void {
-    this.db.prepare("UPDATE movies SET credits_chapter_ms = ?, credits_status = 'done' WHERE id = ?").run(ms, id);
+  /** Probed, available files whose chapters have not been read yet, by id after `afterId` (a cursor, so rows left pending are not refetched). */
+  public pendingCredits(limit: number, afterId = 0): CreditsPendingRow[] {
+    const rows = this.db.prepare(`SELECT id, canonical_path, duration_ms, size, mtime_ms FROM movies
+      WHERE credits_status = 'pending' AND missing = 0 AND canonical_path <> '' AND media_probe_status = 'completed' AND duration_ms > 0 AND id > ? ORDER BY id LIMIT ?`)
+      .all(afterId, limit) as Array<{ id: number; canonical_path: string; duration_ms: number; size: number; mtime_ms: number }>;
+    return rows.map((row) => ({ id: row.id, path: row.canonical_path, durationMs: row.duration_ms, size: row.size, mtimeMs: row.mtime_ms }));
+  }
+
+  /** Stores the chapter pass's answer (null: no credit chapter) and marks the file as read. With `expected`, dropped if the file changed or was reset meanwhile. */
+  public applyCreditsChapter(id: number, ms: number | null, expected?: { size: number; mtimeMs: number }): void {
+    if (!expected) {
+      this.db.prepare("UPDATE movies SET credits_chapter_ms = ?, credits_status = 'done' WHERE id = ?").run(ms, id);
+      return;
+    }
+    this.db.prepare("UPDATE movies SET credits_chapter_ms = ?, credits_status = 'done' WHERE id = ? AND size = ? AND mtime_ms = ? AND credits_status = 'pending'")
+      .run(ms, id, expected.size, expected.mtimeMs);
   }
 
   /** Sets or clears (null) the user's "credits start here" mark. */
@@ -312,12 +331,14 @@ export class MovieRepository {
 
   public applyMediaInfo(id: number, mediaInfo: ProbedMediaInfo): void {
     this.db.prepare(`UPDATE movies SET media_probe_status = 'completed', media_probe_error = NULL, media_probed_at = CURRENT_TIMESTAMP,
+      credits_status = CASE WHEN duration_ms IS NOT NULL AND duration_ms IS NOT @durationMs THEN 'pending' ELSE credits_status END,
+      credits_chapter_ms = CASE WHEN duration_ms IS NOT NULL AND duration_ms IS NOT @durationMs THEN NULL ELSE credits_chapter_ms END,
       container_format = @container, duration_ms = @durationMs, video_width = @width, video_height = @height,
       video_codec = @videoCodec, video_profile = @videoProfile, video_bit_rate = @videoBitRate, hdr_format = @hdrFormat WHERE id = @id`).run({ ...mediaInfo, id });
   }
 
   public markMediaProbeFailed(id: number, error: string): void {
-    this.db.prepare("UPDATE movies SET media_probe_status = 'failed', media_probe_error = ?, media_probed_at = CURRENT_TIMESTAMP WHERE id = ?").run(error.slice(0, 500), id);
+    this.db.prepare("UPDATE movies SET media_probe_status = 'failed', media_probe_error = ?, media_probed_at = CURRENT_TIMESTAMP, duration_ms = NULL WHERE id = ?").run(error.slice(0, 500), id);
   }
 
   public markMissingNotSeen(folderId: number, seenAt: string): void {
