@@ -88,7 +88,8 @@ class PlayerViewModel(
     val nextWarning = warning.asStateFlow()
     private val completion = MutableStateFlow<String?>(null)
     val completionError = completion.asStateFlow()
-    private val countdown = AutoPlayCountdown(viewModelScope, autoPlayStreak)
+    // A countdown that started at the credits marks the title watched as it fires (before the screen moves on), not at the credits start.
+    private val countdown = AutoPlayCountdown(viewModelScope, autoPlayStreak) { if (!ended) finishEarly() }
     val autoPlay: StateFlow<AutoPlayState> = countdown.state
     private var autoPlaySeconds = 0
     private val saving = Mutex()
@@ -110,6 +111,10 @@ class PlayerViewModel(
             val active = session ?: error("Playback is no longer active")
             rememberTracks(active.useSubtitle(source) { api.resolve(it) ?: error("No server selected") })
         })
+
+    /** The skip pill, the early up-next countdown and the Credits panel. */
+    val credits = CreditsController(viewModelScope, countdown, upcoming = { next.value?.id }, autoPlaySeconds = { autoPlaySeconds },
+        saveMark = { api.setCreditsMark(movieId, it) }, saveAutoSkip = { api.setAutoSkip(movieId, it) })
 
     fun findSubtitles() = subtitles.open(movie)
 
@@ -136,6 +141,7 @@ class PlayerViewModel(
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) {
                 ended = true
+                credits.finish()
                 state.value = PlayerUiState.Ended
                 saveCompletion()
                 startAutoPlay()
@@ -167,6 +173,7 @@ class PlayerViewModel(
                 autoPlaySeconds = settings.autoPlayNextSeconds
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
                 area.value = source.pictureArea
+                credits.load(source.credits, source.autoSkipCredits)
                 val skipBackMs = settings.skipBackSeconds * 1_000L
                 val skipForwardMs = settings.skipForwardSeconds * 1_000L
                 // Read preferences before creating a decoder: cancellation during a suspended read must not leak a player.
@@ -181,6 +188,7 @@ class PlayerViewModel(
                 exo.setMediaItem(source.toMediaItem(movieId, loaded.title) { api.resolve(it)!! }, if (fromStart) 0 else source.resumePositionMs ?: 0)
                 exo.prepare()
                 exo.playWhenReady = true
+                credits.follow { player?.let { it.currentPosition to it.isPlaying } }
                 state.value = PlayerUiState.Ready(exo, loaded.title, PlayerControls(skipBackMs, skipForwardMs, showPictureHint = !settings.pictureHintShown))
             } catch (error: CancellationException) {
                 throw error
@@ -224,6 +232,19 @@ class PlayerViewModel(
     }
 
     fun cancelAutoPlay() = countdown.cancel()
+
+    /** "Skip credits": marks the title watched now; answers the title to play next, or null to leave the player. */
+    fun skipCredits(): Long? {
+        finishEarly()
+        return next.value?.id
+    }
+
+    /** Before the end (skip pressed, or the early countdown fired): progress saves stop so they can't undo the completion. */
+    private fun finishEarly() {
+        ended = true
+        credits.finish()
+        saveCompletion()
+    }
 
     /**
      * The app left the foreground (Home, input switch): pause so nothing plays to an empty room. The progress reporter
@@ -324,6 +345,7 @@ class PlayerViewModel(
     /** Call before navigating away; Navigation may retain the old ViewModel through its exit animation. */
     fun releasePlayback() {
         countdown.cancel()
+        credits.stop()
         subtitles.cancel()
         startup?.cancel()
         fallback?.cancel()

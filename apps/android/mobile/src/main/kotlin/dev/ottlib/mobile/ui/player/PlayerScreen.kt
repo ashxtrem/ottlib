@@ -19,6 +19,7 @@ import dev.ottlib.core.presentation.openInExternalPlayer
 import dev.ottlib.core.presentation.player.AutoPlayState
 import dev.ottlib.core.presentation.player.PlayerUiState
 import dev.ottlib.core.presentation.player.PlayerViewModel
+import dev.ottlib.core.presentation.player.message
 import dev.ottlib.mobile.ui.components.ErrorMessage
 import dev.ottlib.mobile.ui.components.LoadingMessage
 
@@ -84,6 +85,14 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                     onPlayElsewhere = openExternally,
                     subtitles = viewModel.subtitles,
                     onFindSubtitles = viewModel::findSubtitles,
+                    credits = viewModel.credits,
+                    upNext = nextMovie?.let { autoPlay.message(it) },
+                    onSkipCredits = {
+                        // Marks the title watched, then plays the next title or leaves the player.
+                        val nextId = viewModel.skipCredits()
+                        viewModel.releasePlayback()
+                        if (nextId != null) onNext(nextId) else onExit()
+                    },
                 )
             }
         }

@@ -54,6 +54,7 @@ fun SettingsScreen(onOpenHidden: () -> Unit, onChangeServer: () -> Unit, onSwitc
     val playback by viewModel.playback.collectAsStateWithLifecycle()
     val languages by viewModel.languageOptions.collectAsStateWithLifecycle()
     val deviceId by viewModel.deviceId.collectAsStateWithLifecycle()
+    val autoSkip by viewModel.autoSkipDefaults.collectAsStateWithLifecycle()
     var dialog by rememberSaveable { mutableStateOf<SettingsDialog?>(null) }
     val hiddenCount by remember { container.hiddenTitles.titles.map { it.size } }.collectAsStateWithLifecycle(initialValue = 0)
 
@@ -93,6 +94,10 @@ fun SettingsScreen(onOpenHidden: () -> Unit, onChangeServer: () -> Unit, onSwitc
                 Setting("Skip forward", "${playback.skipForwardSeconds} seconds  ·  double-tap the right of the video") { dialog = SettingsDialog.SkipForward }
                 Setting("Default picture", "${playback.defaultPictureMode.label}  ·  ${playback.defaultPictureMode.description}") { dialog = SettingsDialog.Picture }
                 Setting("Auto-play next", autoPlaySummary(playback.autoPlayNextSeconds)) { dialog = SettingsDialog.AutoPlay }
+                autoSkip?.let { defaults ->
+                    SwitchSetting("Skip credits in movies", defaults.movie) { viewModel.setAutoSkipDefaults(defaults.copy(movie = it)) }
+                    SwitchSetting("Skip credits in series", defaults.tv) { viewModel.setAutoSkipDefaults(defaults.copy(tv = it)) }
+                }
                 Text(
                     "During playback: swipe up or down on the left for brightness and on the right for volume, swipe sideways to seek, " +
                         "and pinch to fill the screen. The picture button has every picture option.",
@@ -136,6 +141,17 @@ private fun Setting(title: String, value: String, trailing: String? = null, onCl
         supportingContent = { Text(value) },
         trailingContent = trailing?.let { { Text(it, color = OttlibColors.Accent) } },
         modifier = Modifier.clickable(onClick = onClick),
+    )
+}
+
+/** The profile's auto-skip default; the player's Credits row overrides it per movie or series. */
+@Composable
+private fun SwitchSetting(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    ListItem(
+        headlineContent = { Text(title) },
+        supportingContent = { Text(if (checked) "Up next starts when the credits do" else "A Skip credits button shows during the credits") },
+        trailingContent = { Switch(checked = checked, onCheckedChange = onChange) },
+        modifier = Modifier.clickable { onChange(!checked) },
     )
 }
 

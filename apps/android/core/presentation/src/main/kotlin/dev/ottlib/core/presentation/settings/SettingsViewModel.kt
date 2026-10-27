@@ -6,6 +6,7 @@ import dev.ottlib.core.data.ConnectionManager
 import dev.ottlib.core.data.DeviceIdentity
 import dev.ottlib.core.data.PlaybackPreferences
 import dev.ottlib.core.data.PlaybackSettings
+import dev.ottlib.core.model.AutoSkipDefaults
 import dev.ottlib.core.model.PictureMode
 import dev.ottlib.core.model.ServerInfo
 import dev.ottlib.core.network.OttlibApi
@@ -31,9 +32,13 @@ class SettingsViewModel(
     val languageOptions: StateFlow<List<String>> = languages.asStateFlow()
     private val device = MutableStateFlow<String?>(null)
     val deviceId: StateFlow<String?> = device.asStateFlow()
+    private val skipDefaults = MutableStateFlow<AutoSkipDefaults?>(null)
+    /** The profile's auto-skip-credits defaults (server-side, per profile); null until loaded or when the server can't say. */
+    val autoSkipDefaults: StateFlow<AutoSkipDefaults?> = skipDefaults.asStateFlow()
 
     init {
         viewModelScope.launch { device.value = deviceIdentity.deviceId() }
+        viewModelScope.launch { runCatching { api.autoSkipDefaults() }.onSuccess { skipDefaults.value = it } }
         viewModelScope.launch {
             runCatching { api.filterOptions().audioLanguages }.onSuccess { library -> languages.value = (library + commonLanguages).distinct() }
         }
@@ -46,6 +51,16 @@ class SettingsViewModel(
     fun setDefaultPictureMode(mode: PictureMode) { viewModelScope.launch { preferences.setDefaultPictureMode(mode) } }
     fun setLanguagesFollowLastChoice(enabled: Boolean) { viewModelScope.launch { preferences.setLanguagesFollowLastChoice(enabled) } }
     fun setAutoPlayNextSeconds(seconds: Int) { viewModelScope.launch { preferences.setAutoPlayNextSeconds(seconds) } }
+
+    fun setAutoSkipDefaults(defaults: AutoSkipDefaults) {
+        val before = skipDefaults.value
+        skipDefaults.value = defaults
+        viewModelScope.launch {
+            runCatching { api.setAutoSkipDefaults(defaults) }
+                .onSuccess { skipDefaults.value = it }
+                .onFailure { skipDefaults.value = before }
+        }
+    }
 
     fun changeServer(onDone: () -> Unit) {
         viewModelScope.launch {
