@@ -38,6 +38,8 @@ import androidx.tv.material3.Button
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ottlib.core.presentation.player.CreditsController
 import dev.ottlib.core.presentation.player.SubtitleSearchController
@@ -94,7 +96,7 @@ fun PlayerSurface(
 
     val seeker = remember(player, controls) {
         val scrub = ScrubController(ExoScrubTarget(player), frameUrl = { frameUrl(it) }, onFrame = { frame = it })
-        RemoteSeeker(player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs), scrub) { hint = it }
+        RemoteSeeker(player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs), scrub, onHint = { hint = it }, onScrubbing = credits::scrubbing)
     }
     val remoteKeys = remember(player, seeker) {
         RemoteKeys(player, seeker) {
@@ -106,6 +108,8 @@ fun PlayerSurface(
         }
     }
     DisposableEffect(seeker) { onDispose { seeker.release() } }
+    // A scrub cut short by the screen leaving the foreground must not leave the player scrubbing.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { seeker.stopScrubbing() }
 
     InterceptKeys { event ->
         val view = playerView ?: return@InterceptKeys false

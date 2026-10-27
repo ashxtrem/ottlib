@@ -45,6 +45,42 @@ class CreditsControllerTest {
     }
 
     @Test
+    fun scrubbingIntoTheCreditsChangesNothingUntilRelease() = runTest {
+        val (controller, countdown) = setup(autoSkip = true).let { it.controller to it.countdown }
+        controller.onPosition(60_000, isPlaying = true)
+        controller.scrubbing(true)
+        controller.onPosition(95_000, isPlaying = true)
+        runCurrent()
+        assertFalse(controller.state.value.showSkip)
+        assertFalse(controller.state.value.counting)
+        assertEquals(AutoPlayState.Off, countdown.state.value)
+
+        controller.scrubbing(false)
+        controller.onPosition(95_000, isPlaying = true)
+        runCurrent()
+        assertEquals(AutoPlayState.Counting(10), countdown.state.value)
+        assertTrue(controller.state.value.counting)
+    }
+
+    @Test
+    fun releasingAScrubInTheCreditsShowsThePillFromTheSampledPlayhead() = runTest {
+        val (controller, _) = setup(autoSkip = false).let { it.controller to it.countdown }
+        var at = 60_000L
+        controller.follow(intervalMs = 500) { at to true }
+        runCurrent()
+        controller.scrubbing(true)
+        at = 95_000
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertFalse(controller.state.value.showSkip)
+
+        controller.scrubbing(false)
+        runCurrent()
+        assertTrue(controller.state.value.showSkip)
+        controller.stop()
+    }
+
+    @Test
     fun autoSkipWithANextTitleStartsTheCountdownAtTheCreditsAndWatchCreditsCancelsIt() = runTest {
         val (controller, countdown) = setup(autoSkip = true).let { it.controller to it.countdown }
         controller.onPosition(90_000, isPlaying = true)
