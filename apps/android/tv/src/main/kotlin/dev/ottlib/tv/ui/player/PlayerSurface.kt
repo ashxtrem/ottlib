@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -30,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -72,7 +70,7 @@ fun PlayerSurface(
     /** The up-next countdown's message while it runs during playback (it started at the credits). */
     upNext: String?,
     onSkipCredits: () -> Unit,
-    /** A preview frame URL near a position on "Play via server"; null on direct play, where scrubbing moves the video. */
+    /** A preview frame URL near a position (direct play and "Play via server"); null only from an older server without frames. */
     framePreview: (Long) -> String?,
 ) {
     var playerView by remember { mutableStateOf<PlayerView?>(null) }
@@ -86,7 +84,8 @@ fun PlayerSurface(
     val creditsState by credits.state.collectAsStateWithLifecycle()
     var pillFocused by remember { mutableStateOf(false) }
     val anyPanelOpen = panelOpen || subtitlesOpen || creditsOpen
-    val pillVisible = (creditsState.showSkip || (creditsState.counting && upNext != null)) && !anyPanelOpen
+    var scrubState by remember { mutableStateOf<ScrubState?>(null) }
+    val pillVisible = (creditsState.showSkip || (creditsState.counting && upNext != null)) && !anyPanelOpen && scrubState == null
     val subtitleState by subtitles.uiState.collectAsStateWithLifecycle()
     var hint by remember { mutableStateOf<SeekHint?>(null) }
     var showPictureHint by remember { mutableStateOf(controls.showPictureHint) }
@@ -96,7 +95,29 @@ fun PlayerSurface(
 
     val seeker = remember(player, controls) {
         val scrub = ScrubController(ExoScrubTarget(player), frameUrl = { frameUrl(it) }, onFrame = { frame = it })
-        RemoteSeeker(player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs), scrub, onHint = { hint = it }, onScrubbing = credits::scrubbing)
+        RemoteSeeker(
+            player, SeekAccumulator(controls.skipBackMs, controls.skipForwardMs), scrub,
+            hasFrames = { frameUrl(0) != null },
+            onHint = { hint = it },
+            onScrubState = { scrubState = it },
+            onScrubbing = { active ->
+                credits.scrubbing(active)
+                // Pausing would bring the controls up over the scrub bar.
+                playerView?.controllerAutoShow = !active
+                if (active) {
+                    hint = null
+                    playerView?.hideController()
+                }
+            },
+            onClosed = { fromTimeline ->
+                frame = null
+                // Opened from the timeline: the controls come back with focus where it was.
+                if (fromTimeline) playerView?.run {
+                    showController()
+                    post { findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.requestFocus() }
+                }
+            },
+        )
     }
     val remoteKeys = remember(player, seeker) {
         RemoteKeys(player, seeker) {
@@ -108,11 +129,13 @@ fun PlayerSurface(
         }
     }
     DisposableEffect(seeker) { onDispose { seeker.release() } }
-    // A scrub cut short by the screen leaving the foreground must not leave the player scrubbing.
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { seeker.stopScrubbing() }
+    // The app leaving the foreground mid-scrub cancels it: the target was never confirmed.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { seeker.stop() }
 
     InterceptKeys { event ->
         val view = playerView ?: return@InterceptKeys false
+        // An open scrub takes every key (OK must not press a focused credits pill, Back must not leave the player).
+        if (seeker.scrubOpen) return@InterceptKeys remoteKeys.handle(event, view, enabled = keysEnabled && !anyPanelOpen)
         if (pillFocused && !controlsVisible && keysEnabled && !anyPanelOpen) {
             // OK presses the pill; D-pad directions fall through to the player (seek, or show the controls with focus on them).
             if (event.keyCode !in PILL_PASS_THROUGH_KEYS) return@InterceptKeys false
@@ -131,7 +154,9 @@ fun PlayerSurface(
         pillWasVisible = pillVisible
     }
     // The pill is hidden under a panel, so its countdown must not run (and navigate away) unseen.
-    LaunchedEffect(anyPanelOpen) { credits.hold(anyPanelOpen) }
+    // So is it under the scrub bar.
+    val holdCredits = anyPanelOpen || scrubState != null
+    LaunchedEffect(holdCredits) { credits.hold(holdCredits) }
     LaunchedEffect(picture, pictureMode, pictureArea) {
         picture?.setPictureArea(pictureArea)
         picture?.apply(pictureMode)
@@ -151,8 +176,6 @@ fun PlayerSurface(
                     setShowPreviousButton(false)
                     keepScreenOn = true
                     isFocusable = true
-                    // The seek bar moves by the same step as the → key when it has focus.
-                    findViewById<DefaultTimeBar>(androidx.media3.ui.R.id.exo_progress)?.setKeyTimeIncrement(controls.skipForwardMs)
                     setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility -> controlsVisible = visibility == View.VISIBLE })
                     playerView = this
                     picture = PictureModeController(this, player)
@@ -209,12 +232,10 @@ fun PlayerSurface(
                 playerView?.post { subtitleFocus.tryRequestFocus() }
             }, modifier = Modifier.align(Alignment.CenterEnd))
         }
+        // Not focusable, like the seek hint: the PlayerView keeps focus and RemoteKeys drives the scrub.
+        scrubState?.takeIf { !anyPanelOpen }?.let { ScrubBar(it, frame, Modifier.align(Alignment.BottomCenter)) }
         hint?.let { current ->
-            // Not focusable: the seek hint (and its preview frame on "Play via server") never takes focus.
-            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                frame?.let { FramePreview(it) }
-                OverlayText(current.text, Modifier)
-            }
+            OverlayText(current.text, Modifier.align(Alignment.Center))
             LaunchedEffect(current.id) {
                 delay(HINT_VISIBLE_MS)
                 hint = null

@@ -44,7 +44,7 @@ Both live in the same player code (`tv/ui/player/*`, `core/player/*`), so they s
 | Hold → / ← | Steps are added every 250 ms, **timed by how long the key is held**, not by key-repeat events (remotes repeat ~20×/s, which would be 200s per second). Step grows 10s → 30s (after 1s) → 60s (after 3s) |
 | Release after hold | Seeks immediately |
 | Media ⏩ / ⏪ keys | Same as holding → / ← |
-| Controls visible, seek bar focused | Seek bar moves by the forward step (`DefaultTimeBar.setKeyTimeIncrement`) |
+| Controls visible, seek bar focused | ~~Seek bar moves by the forward step (`DefaultTimeBar.setKeyTimeIncrement`)~~ Superseded by `plans/tv-seek-preview-plan.md`: ←/→ open the scrub bar (and a hold opens it with the controls hidden) |
 
 Hint text shows direction, total and destination, e.g. `+1:20  →  42:10`. Targets are clamped to `[0, duration − 1s]`.
 
@@ -59,7 +59,7 @@ Hint text shows direction, total and destination, e.g. `+1:20  →  42:10`. Targ
 Skip steps are read from `PlaybackPreferences` when the player is created, and applied to:
 - `SeekAccumulator` base steps
 - `ExoPlayer.Builder.setSeekBackIncrementMs / setSeekForwardIncrementMs` — PlayerView's ⏪/⏩ buttons show the number automatically
-- the controls' `DefaultTimeBar` key increment
+- ~~the controls' `DefaultTimeBar` key increment~~ (superseded by `plans/tv-seek-preview-plan.md`: the timeline's ←/→ open the scrub bar)
 
 ## Part 2 — Picture modes
 
