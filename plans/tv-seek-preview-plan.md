@@ -154,3 +154,12 @@ plus a device check cover it.
 
 ## 11. Progress log
 - 2026-10-29: plan written and approved.
+- 2026-10-29: built by /plan-runner.
+  - Plan check found that direct play's `start()` never set `frameTemplate`, so T1 sets it there as well as in `playViaServer()`.
+  - T1: `ScrubSession` (10 tests), plus `SeekAccumulator.drain()`, which keeps the hold state.
+  - T2: RemoteSeeker has skip and scrub modes. Also changed: RemoteKeys scrub routing, `ScrubBar.kt` and the PlayerSurface wiring.
+    File sizes: PlayerSurface 286, RemoteSeeker 182, RemoteKeys 101, ScrubBar 71 lines.
+    Beyond the spec: with no frames (an older server), Back seeks back to the base, because the video moved live.
+  - Gate fix: an OK release after an idle jump no longer toggles pause.
+  - Checks: web 761 tests pass. Android unit tests and the `:tv` and `:mobile` compiles pass.
+  - Still to do: a by-hand TV check (tap, hold, timeline, OK, idle, Back, background).
