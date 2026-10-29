@@ -103,7 +103,7 @@ class PlayerViewModel(
     private var fallback: Job? = null
     /** The server's remux/transcode session behind the current HLS source; stopped on release or a new source. */
     private var serverSession: String? = null
-    /** The server session's frame preview template; scrubbing shows its frames instead of seeking. */
+    /** The playback source's frame preview template (direct play and server session alike); scrubbing shows its frames instead of seeking. */
     @Volatile private var frameTemplate: String? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
@@ -124,7 +124,7 @@ class PlayerViewModel(
     val streamUrl: String? get() = api.resolve("/api/stream/$movieId")
     val title: String get() = movie?.title ?: ""
 
-    /** A preview frame near [positionMs] while playing via the server, else null (direct play scrubs the real video). */
+    /** A preview frame near [positionMs] on direct play and via the server alike, else null (the source offers no frames: scrubbing moves the video). */
     fun framePreviewUrl(positionMs: Long): String? = frameTemplate?.let { api.resolve(framePreviewPath(it, positionMs)) }
 
     private val listener = object : Player.Listener {
@@ -177,6 +177,7 @@ class PlayerViewModel(
                 autoPlaySeconds = settings.autoPlayNextSeconds
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
                 area.value = source.pictureArea
+                frameTemplate = source.framePreviewUrl
                 credits.load(source.credits, source.autoSkipCredits)
                 val skipBackMs = settings.skipBackSeconds * 1_000L
                 val skipForwardMs = settings.skipForwardSeconds * 1_000L
@@ -312,7 +313,7 @@ class PlayerViewModel(
                 }
             serverSession?.let(::stopServerSession)
             serverSession = source.sessionUrl
-            frameTemplate = source.framePreviewUrl.takeIf { source.sessionUrl != null }
+            frameTemplate = source.framePreviewUrl
             area.value = source.pictureArea
             active.setMediaItem(item, request.startMs ?: 0)
             active.prepare()

@@ -20,11 +20,11 @@ fun interface ScrubScheduler {
  * Scrubbing "via time" for a drag (phone seek bar) or a held key (TV remote): [begin], [scrubTo] on every change,
  * [end] on release.
  *
- * - Direct play ([frameUrl] answers null): the real video moves. Seeks use fast seeking and come at most once per
- *   [intervalMs]; the last position asked for is applied when the interval is up.
- * - A server session ([frameUrl] answers a URL): every seek would restart the server's transcode, so nothing seeks
- *   until [end]. [onFrame] gets a preview frame URL instead, at most once per [intervalMs] and only when the 2 s
- *   step changes. The screen keeps the last frame shown until the next one lands.
+ * - No frames ([frameUrl] answers null: the source offers none): the real video moves. Seeks use fast seeking and
+ *   come at most once per [intervalMs]; the last position asked for is applied when the interval is up.
+ * - Frames ([frameUrl] answers a URL, on direct play and on a server session alike): nothing seeks until [end]
+ *   (on a server session every seek would restart the transcode). [onFrame] gets a preview frame URL instead, at most
+ *   once per [intervalMs] and only when the 2 s step changes. The screen keeps the last frame shown until the next one lands.
  * - [end] turns fast seeking off (restoring the default seek parameters), clears the frame and seeks exactly once.
  */
 class ScrubController(
