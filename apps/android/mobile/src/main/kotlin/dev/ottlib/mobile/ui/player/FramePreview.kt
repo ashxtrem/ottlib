@@ -24,7 +24,7 @@ private val FRAME_WIDTH = 160.dp
 private val FRAME_HEIGHT = 90.dp
 
 /**
- * The scrub preview frame for "Play via server", centred over the slider thumb at [fraction] and kept inside the
+ * The scrub preview frame (direct play and "Play via server"), centred over the slider thumb at [fraction] and kept inside the
  * bar's width (so it works at every width class). Draws above its own bounds: give it `matchParentSize()` over the slider.
  */
 @Composable

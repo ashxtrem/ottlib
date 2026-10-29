@@ -97,6 +97,22 @@ class SeekAccumulatorTest {
     }
 
     @Test
+    fun drainReturnsAndClearsTheOffsetButKeepsTheHold() {
+        val seek = accumulator()
+        seek.press(SeekDirection.Forward, 0)
+        seek.hold(SeekDirection.Forward, 0, 500)
+        assertEquals(20_000, seek.drain())
+        assertEquals(0, seek.pendingOffsetMs)
+        // Still holding: no commit, and later steps keep adding (500 ms was the first hold step, 750 the next).
+        assertFalse(seek.readyToCommit(now = 5_000))
+        seek.hold(SeekDirection.Forward, 0, 750)
+        assertEquals(10_000, seek.drain())
+        // Releasing ends the hold; nothing is pending, so no seek is due.
+        assertFalse(seek.release(now = 800))
+        assertEquals(0, seek.drain())
+    }
+
+    @Test
     fun aHeldLargeStepIsNotShrunkByAcceleration() {
         val seek = SeekAccumulator(backStepMs = 10_000, forwardStepMs = 60_000)
         seek.press(SeekDirection.Forward, 0)

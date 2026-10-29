@@ -54,9 +54,9 @@ class PlayerActions(
     val onSkip: (SeekDirection) -> Unit,
     val onSeekTo: (Long) -> Unit,
     val onScrubbing: (Boolean) -> Unit,
-    /** Every drag step: moves the video (direct play) or asks for a preview frame (server session). */
+    /** Every drag step: asks for a preview frame (direct play and server session alike), or moves the video when the source has no frames. */
     val onScrubTo: (Long) -> Unit,
-    /** The preview frame to show above the thumb while scrubbing a server session. */
+    /** The preview frame to show above the thumb while scrubbing. */
     val scrubFrame: String?,
     val onTracks: () -> Unit,
     val onPicture: () -> Unit,
@@ -110,8 +110,8 @@ fun TransportControls(snapshot: PlaybackSnapshot, skipBackMs: Long, skipForwardM
 }
 
 /**
- * Position, a draggable seek bar and the duration. Dragging scrubs live (the video moves, or a server session shows
- * a preview frame above the thumb); release seeks exactly once.
+ * Position, a draggable seek bar and the duration. Dragging scrubs live (a preview frame shows above the thumb, or the
+ * video moves when the source has no frames); release seeks exactly once.
  */
 @Composable
 fun SeekBar(snapshot: PlaybackSnapshot, actions: PlayerActions, modifier: Modifier = Modifier) {

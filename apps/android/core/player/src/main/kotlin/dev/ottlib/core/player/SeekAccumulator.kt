@@ -67,6 +67,13 @@ class SeekAccumulator(
         holdStartedAt = null
     }
 
+    /**
+     * Returns the pending offset and clears it, but keeps the hold going (unlike [take]), so [release] still ends the
+     * hold and later hold steps keep counting. [release] still clears the hold, but answers false when nothing is
+     * pending (it only reports a seek that is due). For a scrub that applies each delta to its head as it arrives.
+     */
+    fun drain(): Long = offsetMs.also { offsetMs = 0 }
+
     private fun step(direction: SeekDirection) = if (direction == SeekDirection.Back) backStepMs else forwardStepMs
 
     private fun holdStep(direction: SeekDirection, heldMs: Long): Long = when {
