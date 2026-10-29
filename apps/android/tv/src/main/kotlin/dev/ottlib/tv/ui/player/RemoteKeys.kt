@@ -15,7 +15,7 @@ import dev.ottlib.core.player.SeekDirection
  * While a scrub is open it takes every key (see [handleScrub]).
  */
 class RemoteKeys(private val player: Player, private val seeker: RemoteSeeker, private val openPictureOptions: () -> Unit) {
-    /** Set once a held OK has opened picture options; the rest of that press is swallowed. */
+    /** Set once a held OK has opened picture options, or an OK press began in a scrub; the rest of that press is swallowed. */
     private var okLongPressed = false
 
     fun handle(event: KeyEvent, view: PlayerView, enabled: Boolean): Boolean {
@@ -55,7 +55,8 @@ class RemoteKeys(private val player: Player, private val seeker: RemoteSeeker, p
         when (event.keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_REWIND -> seeker.onKey(SeekDirection.Back, event)
             KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> seeker.onKey(SeekDirection.Forward, event)
-            in OK_KEYS -> if (up) seeker.commit()
+            // Mark the press so its release is swallowed even if the idle jump closes the scrub first.
+            in OK_KEYS -> if (up) { okLongPressed = false; seeker.commit() } else okLongPressed = true
             // Both halves are consumed, so Back never reaches the activity (it must not leave the player).
             KeyEvent.KEYCODE_BACK -> if (up) seeker.cancel()
         }
