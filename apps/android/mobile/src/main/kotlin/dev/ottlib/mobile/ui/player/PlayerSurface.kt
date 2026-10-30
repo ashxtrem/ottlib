@@ -80,7 +80,7 @@ fun PlayerSurface(
     /** The up-next countdown's message while it runs during playback (it started at the credits). */
     upNext: String?,
     onSkipCredits: () -> Unit,
-    /** A preview frame URL near a position on "Play via server"; null on direct play, where scrubbing moves the video. */
+    /** A preview frame URL near a position, on direct play and "Play via server" alike; null when the source offers none, where scrubbing moves the video. */
     framePreview: (Long) -> String?,
 ) {
     val context = LocalContext.current

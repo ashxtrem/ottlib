@@ -18,15 +18,16 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 
 /**
- * The scrub preview frame for "Play via server". The last frame that loaded stays underneath while the next one
- * loads, so a slow or superseded (204) request never blanks the preview. Not focusable.
+ * The scrub bar's preview frame from the server, on direct play and "Play via server" alike. The last frame that
+ * loaded stays underneath while the next one loads, so a slow or superseded (204) request never blanks the preview;
+ * a black box shows until the first one lands ([url] null). Not focusable.
  */
 @Composable
-fun FramePreview(url: String, modifier: Modifier = Modifier) {
+fun FramePreview(url: String?, modifier: Modifier = Modifier) {
     var shown by remember { mutableStateOf<String?>(null) }
-    Box(modifier.width(320.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)).background(Color.Black)) {
+    Box(modifier.width(FRAME_PREVIEW_WIDTH).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)).background(Color.Black)) {
         shown?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.matchParentSize()) }
-        if (url != shown) {
+        if (url != null && url != shown) {
             AsyncImage(
                 model = url,
                 contentDescription = "Preview frame",
@@ -37,3 +38,5 @@ fun FramePreview(url: String, modifier: Modifier = Modifier) {
         }
     }
 }
+
+val FRAME_PREVIEW_WIDTH = 320.dp
