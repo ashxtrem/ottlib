@@ -17,9 +17,9 @@ function setup() {
   const db = createDatabase(directory);
   db.prepare('INSERT INTO folders (path) VALUES (?)').run('E:/Movies');
   const movies = new MovieRepository(db);
-  const add = (title: string, probe: { height: number; codec: string } | null) => {
+  const add = (title: string, probe: { height: number; codec: string; width?: number } | null) => {
     const { id } = movies.upsertScanned({ folderId: 1, path: `E:/Movies/${title}.mkv`, filename: `${title}.mkv`, title, year: 2020, size: 1, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
-    if (probe) movies.applyMediaInfo(id, { container: 'MKV', durationMs: 7_000_000, width: 1920, height: probe.height, videoCodec: probe.codec, videoProfile: null, videoBitRate: null, hdrFormat: null });
+    if (probe) movies.applyMediaInfo(id, { container: 'MKV', durationMs: 7_000_000, width: probe.width ?? 1920, height: probe.height, videoCodec: probe.codec, videoProfile: null, videoBitRate: null, hdrFormat: null });
     return id;
   };
   return { db, add, upgrades: new MovieUpgradeRepository(db) };
@@ -30,9 +30,10 @@ describe('MovieUpgradeRepository', () => {
     const { db, add, upgrades } = setup();
     try {
       add('Zulu Good', { height: 1080, codec: 'HEVC' });
-      add('Beta Small', { height: 480, codec: 'H.264' });
+      add('Beta Small', { height: 480, codec: 'H.264', width: 640 });
+      add('Scope Wide', { height: 800, codec: 'HEVC', width: 1920 });
       add('Alpha Xvid', { height: 1080, codec: 'MPEG-4' });
-      add('Gamma Both', { height: 576, codec: 'MPEG-2' });
+      add('Gamma Both', { height: 576, codec: 'MPEG-2', width: 720 });
       const gone = add('Delta Gone', { height: 480, codec: 'MPEG-4' });
       add('Unprobed', null);
       db.prepare('UPDATE movies SET missing = 1 WHERE id = ?').run(gone);
@@ -46,8 +47,8 @@ describe('MovieUpgradeRepository', () => {
   it('applies only the codec reason without a preferred resolution, and honours the limit', () => {
     const { db, add, upgrades } = setup();
     try {
-      add('A Small', { height: 480, codec: 'H.264' });
-      add('B Wmv', { height: 480, codec: 'WMV3' });
+      add('A Small', { height: 480, codec: 'H.264', width: 640 });
+      add('B Wmv', { height: 480, codec: 'WMV3', width: 640 });
       add('C Vc1', { height: 1080, codec: 'VC1' });
       expect(upgrades.listCandidates(1, { minimumHeight: null, oldCodecs: oldVideoCodecs, limit: 200 }).map((item) => [item.movie.title, item.reason]))
         .toEqual([['B Wmv', 'codec'], ['C Vc1', 'codec']]);
