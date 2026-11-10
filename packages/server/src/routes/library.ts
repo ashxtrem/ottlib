@@ -12,16 +12,19 @@ function minRating(value: string | undefined): number | undefined {
   if (value === undefined || value === '') return undefined;
   const rating = Number(value); return Number.isFinite(rating) && rating >= 0 && rating <= 10 ? rating : undefined;
 }
+function collectionId(value: string | undefined): number | undefined {
+  const parsed = Number(value); return value !== undefined && Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
 function limit(value: string | undefined): number {
   const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : 48;
 }
 
 export function registerLibraryRoutes(app: FastifyInstance, movies: MovieRepository, progress: PlaybackProgressService, matcher: MetadataMatchService, library: LibraryService, deletion: LibraryDeletionService): void {
   app.get('/api/movies', async (request) => {
-    const query = request.query as { search?: string; watched?: string; availability?: string; mediaType?: string; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: string; needsReview?: string; cursor?: string; limit?: string };
+    const query = request.query as { search?: string; watched?: string; availability?: string; mediaType?: string; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: string; needsReview?: string; collection?: string; cursor?: string; limit?: string };
     const availability = query.availability === 'available' || query.availability === 'unavailable' ? query.availability : undefined;
     const mediaType = query.mediaType === 'movie' || query.mediaType === 'tv' ? query.mediaType : undefined;
-    return library.listSummaries(requireProfile(request), { search: query.search, watched: query.watched === undefined ? undefined : query.watched === 'true', availability, mediaType, sort: query.sort, genre: query.genre, actor: query.actor, quality: query.quality, audioLanguage: query.audioLanguage, minRating: minRating(query.minRating), needsReview: query.needsReview === 'true', cursor: query.cursor, limit: limit(query.limit) });
+    return library.listSummaries(requireProfile(request), { search: query.search, watched: query.watched === undefined ? undefined : query.watched === 'true', availability, mediaType, sort: query.sort, genre: query.genre, actor: query.actor, quality: query.quality, audioLanguage: query.audioLanguage, minRating: minRating(query.minRating), needsReview: query.needsReview === 'true', collection: collectionId(query.collection), cursor: query.cursor, limit: limit(query.limit) });
   });
   app.get('/api/movies/filter-options', async () => movies.listFilterOptions());
   app.get('/api/movies/backfill-auto-accept', async () => ({ eligible: matcher.countAutoAcceptableSuggestions() }));

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { formatResolution, type MatchCandidate, type MediaInfo, type Movie, type MovieListItem, type MovieListPage } from '@ottlib/shared';
+import { formatResolution, type MatchCandidate, type MovieFilterOptions, type MediaInfo, type Movie, type MovieListItem, type MovieListPage } from '@ottlib/shared';
 import { extrasOf, freshOf, libraryFirstAddedSql } from './movieExtrasMapping.js';
 
 interface MovieRow {
@@ -56,8 +56,9 @@ export type ProbedMediaInfo = Omit<MediaInfo, 'tracks'>;
 export interface PlaybackMovie { id: number; path: string; folderPath: string; filename: string; missing: boolean }
 export interface TorrentMovieMatch { id: number; missing: boolean }
 export interface MetadataTarget { id: number; title: string; year: number | null; rawFilename: string; metadataSource: string | null; providerId: string | null; mediaType: 'movie' | 'tv' | null; imdbId: string | null }
-export interface MovieListQuery { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; mediaType?: 'movie' | 'tv'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; cursor?: string; limit?: number }
-export interface MovieFilterOptions { genres: string[]; actors: string[]; resolutions: string[]; audioLanguages: string[] }
+export interface MovieListQuery { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; mediaType?: 'movie' | 'tv'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; collection?: number; cursor?: string; limit?: number }
+/** A title the library owns in a collection; `providerId` is the provider's id for it (used to tell which collection parts are missing). */
+export interface CollectionTitleRow { id: number; providerId: string | null; source: string | null }
 
 type MovieSort = 'title' | 'year' | 'added' | 'quality';
 type MovieListCursor =
@@ -116,8 +117,17 @@ export class MovieRepository {
       genres: uniqueSorted(rows.flatMap((row) => JSON.parse(row.genres_json) as string[])),
       actors: uniqueSorted(rows.flatMap((row) => JSON.parse(row.cast_json) as string[])),
       resolutions: uniqueSorted(mediaRows.flatMap((row) => formatResolution(row.video_height) ?? [])).sort((left, right) => this.resolutionRank(right) - this.resolutionRank(left)),
-      audioLanguages: uniqueSorted(trackRows.map((row) => row.language))
+      audioLanguages: uniqueSorted(trackRows.map((row) => row.language)),
+      collections: this.db.prepare(`SELECT collection_id AS id, MAX(collection_name) AS name, COUNT(*) AS count FROM movies
+        WHERE missing = 0 AND collection_id IS NOT NULL GROUP BY collection_id HAVING COUNT(*) >= 2 ORDER BY MAX(collection_name) COLLATE NOCASE, collection_id`).all() as MovieFilterOptions['collections']
     };
+  }
+
+  /** Titles the library has in a collection, oldest first; copies marked missing are left out. */
+  public listCollectionTitles(collectionId: number): CollectionTitleRow[] {
+    const rows = this.db.prepare(`SELECT id, provider_id, metadata_source FROM movies WHERE collection_id = ? AND missing = 0
+      ORDER BY COALESCE(metadata_year, parsed_year) IS NULL, COALESCE(metadata_year, parsed_year), COALESCE(title_override, metadata_title, parsed_title) COLLATE NOCASE, id`).all(collectionId) as Array<{ id: number; provider_id: string | null; metadata_source: string | null }>;
+    return rows.map((row) => ({ id: row.id, providerId: row.provider_id, source: row.metadata_source }));
   }
 
   public get(id: number, profileId?: number): Movie | undefined {
@@ -460,6 +470,7 @@ export class MovieRepository {
     if (query.audioLanguage?.trim()) { clauses.push("EXISTS (SELECT 1 FROM media_tracks mt WHERE mt.movie_id = m.id AND mt.track_type = 'audio' AND LOWER(COALESCE(mt.language, '')) = ?)"); values.push(query.audioLanguage.trim().toLowerCase()); }
     if (query.minRating !== undefined) { clauses.push('m.rating >= ?'); values.push(query.minRating); }
     if (query.needsReview) clauses.push("m.metadata_status = 'suggested'");
+    if (query.collection !== undefined) { clauses.push('m.collection_id = ?'); values.push(query.collection); }
     return { clauses, values };
   }
 

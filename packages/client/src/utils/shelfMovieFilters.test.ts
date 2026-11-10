@@ -26,7 +26,7 @@ const movies: Movie[] = [
 
 describe('shelf movie filters', () => {
   it('derives filter options from the titles in the shelf', () => {
-    expect(shelfMovieFilterOptions(movies)).toEqual({ genres: ['Action', 'Drama'], actors: ['Asha Patel', 'Morgan Lee'], resolutions: ['4K', '1080p'], audioLanguages: ['eng', 'jpn'] });
+    expect(shelfMovieFilterOptions(movies)).toEqual({ genres: ['Action', 'Drama'], actors: ['Asha Patel', 'Morgan Lee'], resolutions: ['4K', '1080p'], audioLanguages: ['eng', 'jpn'], collections: [] });
   });
 
   it('filters shelf titles and keeps the poster card fields', () => {

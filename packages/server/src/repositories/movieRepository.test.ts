@@ -75,7 +75,7 @@ describe('MovieRepository filters', () => {
       expect(repository.list(undefined, { search: 'https://www.imdb.com/title/tt1234567/' })).toHaveLength(1);
       expect(repository.list(undefined, { mediaType: 'movie' })).toHaveLength(1);
       expect(repository.list(undefined, { mediaType: 'tv' })).toHaveLength(1);
-      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: [], audioLanguages: [] });
+      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: [], audioLanguages: [], collections: [] });
     } finally {
       close();
     }
@@ -200,7 +200,7 @@ describe('MovieRepository filters', () => {
       expect(repository.list(undefined, { quality: '1080p' })).toHaveLength(0);
       expect(repository.list(undefined, { audioLanguage: 'hin' })).toHaveLength(1);
       expect(repository.list(undefined, { audioLanguage: 'eng' })).toHaveLength(0);
-      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: ['4K'], audioLanguages: ['hin'] });
+      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: ['4K'], audioLanguages: ['hin'], collections: [] });
     } finally {
       close();
     }
