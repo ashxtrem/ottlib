@@ -56,7 +56,7 @@ export function BackupSettingsSection() {
   const { list, create, remove, restore } = useBackups();
   const isLocalClient = useIsLocalClient();
   if (!settings.data) return null;
-  const actionError = [create.error && create.error.message, remove.error && remove.error.message, restore.error && restoreErrorMessage(restore.error), update.error?.message].find(Boolean) || undefined;
+  const actionError = [create.error && create.error.message, remove.error && remove.error.message, restore.error && restoreErrorMessage(restore.error)].find(Boolean) || undefined;
   const busyName = remove.isPending ? remove.variables : restore.isPending ? restore.variables : undefined;
   return <BackupSectionView
     enabled={settings.data.backupEnabled}

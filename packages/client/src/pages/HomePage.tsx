@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ErrorState } from '../components/ErrorState';
 import { HomeAttentionCard } from '../components/HomeAttentionCard';
-import { HomeHero }from '../components/HomeHero';
+import { HomeHero } from '../components/HomeHero';
 import { HomeRowSection } from '../components/HomeRowSection';
 import { DelayedSkeleton, SkeletonPosterGrid } from '../components/Skeleton';
 import { getLibraryRestoreScrollPosition } from '../hooks/useBackToLibrary';
