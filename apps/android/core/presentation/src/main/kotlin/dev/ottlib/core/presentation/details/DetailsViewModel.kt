@@ -102,7 +102,7 @@ class DetailsViewModel(
             val fresh = try { LoadState.Loaded(api.movie(movieId)) } catch (error: CancellationException) { throw error } catch (error: Exception) { LoadState.Failed(error.userMessage()) }
             if (fresh is LoadState.Loaded || state.value !is LoadState.Loaded) state.value = fresh
             if (fresh is LoadState.Loaded) {
-                loadCollection(fresh.value.collection != null)
+                launch { loadCollection(fresh.value.collection != null) }
                 otherCopies.value = try { api.duplicates(movieId).size } catch (error: CancellationException) { throw error } catch (_: Exception) { 0 }
                 next.value = try { sequence.next(fresh.value) }
                 catch (error: CancellationException) { throw error }

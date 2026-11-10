@@ -57,6 +57,7 @@ class HomeHeroTest {
             block(viewModel)
         } finally {
             store.clear()
+            testScheduler.advanceUntilIdle()
             server.shutdown()
             Dispatchers.resetMain()
         }
