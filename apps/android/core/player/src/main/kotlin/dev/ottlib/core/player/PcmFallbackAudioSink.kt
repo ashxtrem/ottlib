@@ -40,5 +40,9 @@ class PcmFallbackAudioSink(sink: AudioSink, private val state: PassthroughState)
     private fun refuses(format: Format) = state.broken && isEncoded(format)
 }
 
+/** True when this error (or one it wraps) is a passthrough output that failed to open. */
+fun Throwable.isPassthroughInitFailure(): Boolean =
+    generateSequence(this) { it.cause }.any { it is AudioSink.InitializationException && isEncoded(it.format) }
+
 /** True for compressed audio handed to the output as is; false for decoded PCM. */
 internal fun isEncoded(format: Format): Boolean = format.sampleMimeType != null && format.sampleMimeType != MimeTypes.AUDIO_RAW

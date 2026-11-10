@@ -23,6 +23,7 @@ import dev.ottlib.core.player.PlaybackSession
 import dev.ottlib.core.player.TrackMemory
 import dev.ottlib.core.player.hasOnlyUnsupportedAudio
 import dev.ottlib.core.player.hasOnlyUnsupportedVideo
+import dev.ottlib.core.player.isPassthroughInitFailure
 import dev.ottlib.core.player.toMediaItem
 import dev.ottlib.core.player.withSubtitlesFrom
 import dev.ottlib.core.presentation.ContinueWatchingEntry
@@ -132,7 +133,7 @@ class PlayerViewModel(
         override fun onPlayerError(error: PlaybackException) {
             // The device claimed it could pass DTS/TrueHD through but couldn't open that output: the sink now refuses
             // passthrough, so preparing again decodes the audio (FFmpeg) and keeps direct play, once per title.
-            if (shouldRetryAsPcm(error.errorCode, playerFactory.passthrough.broken, retriedAsPcm)) {
+            if (shouldRetryAsPcm(error.isPassthroughInitFailure(), playerFactory.passthrough.broken, retriedAsPcm)) {
                 retriedAsPcm = true
                 player?.prepare()
                 return
@@ -389,8 +390,8 @@ class PlayerViewModel(
 }
 
 /** A failed audio output, after the sink has given up on passthrough, gets one silent re-prepare before the viewer sees an error. */
-internal fun shouldRetryAsPcm(errorCode: Int, passthroughBroken: Boolean, alreadyRetried: Boolean): Boolean =
-    errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED && passthroughBroken && !alreadyRetried
+internal fun shouldRetryAsPcm(passthroughFailed: Boolean, passthroughBroken: Boolean, alreadyRetried: Boolean): Boolean =
+    passthroughFailed && passthroughBroken && !alreadyRetried
 
 private fun playbackErrorMessage(error: PlaybackException): String = when (error.errorCode) {
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->

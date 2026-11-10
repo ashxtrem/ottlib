@@ -41,7 +41,7 @@ class PcmFallbackAudioSinkTest {
         val state = PassthroughState()
         val sink = PcmFallbackAudioSink(device(failWith = dts), state)
         try { sink.handleBuffer(ByteBuffer.allocate(4), 0, 1); fail("expected the init failure to be rethrown") }
-        catch (_: AudioSink.InitializationException) {}
+        catch (error: AudioSink.InitializationException) { assertTrue(RuntimeException("renderer", error).isPassthroughInitFailure()) }
         assertTrue(state.broken)
         assertFalse(sink.supportsFormat(dts))
         assertEquals(AudioSink.SINK_FORMAT_UNSUPPORTED, sink.getFormatSupport(dts))
@@ -53,7 +53,7 @@ class PcmFallbackAudioSinkTest {
     @Test fun `a failed PCM output does not give up on passthrough`() {
         val state = PassthroughState()
         val sink = PcmFallbackAudioSink(device(failWith = pcm), state)
-        try { sink.handleBuffer(ByteBuffer.allocate(4), 0, 1) } catch (_: AudioSink.InitializationException) {}
+        try { sink.handleBuffer(ByteBuffer.allocate(4), 0, 1) } catch (error: AudioSink.InitializationException) { assertFalse(error.isPassthroughInitFailure()) }
         assertFalse(state.broken)
         assertTrue(sink.supportsFormat(dts))
     }
