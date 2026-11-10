@@ -20,17 +20,20 @@ import { MetadataRefreshDialog } from '../components/MetadataRefreshDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
 import { SkeletonPosterGrid } from '../components/Skeleton';
 import { useHiddenTitles } from '../hooks/useHiddenTitles';
+import { useRecentSearches } from '../hooks/useRecentSearches';
+import { librarySearchInputId } from '../components/LibrarySearchInput';
 
 export function LibraryPage() {
   const { state: locationState } = useLocation();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [refreshDialogOpen, setRefreshDialogOpen] = useState(false);
   const [toolbarTarget, setToolbarTarget] = useState<HTMLElement | null>(null);
-  const { search, watched, availability, mediaType, sort, genre, actor, quality, audioLanguage, minRating, needsReview, setSearch, setWatched, setAvailability, setMediaType, setSort, setGenre, setActor, setQuality, setAudioLanguage, setMinRating, setNeedsReview, clearFilters, commitFilters } = useLibraryViewState();
+  const { search, watched, availability, mediaType, sort, genre, collection, actor, quality, audioLanguage, minRating, needsReview, setSearch, setWatched, setAvailability, setMediaType, setSort, setGenre, setCollection, setActor, setQuality, setAudioLanguage, setMinRating, setNeedsReview, clearFilters, commitFilters } = useLibraryViewState();
   const hiddenTitles = useHiddenTitles();
+  const recentSearches = useRecentSearches(search);
   const debouncedSearch = useDebouncedValue(search);
   const querySearch = debouncedSearch;
-  const movies = useMovies({ search: querySearch, watched, availability, mediaType, sort, genre, actor, quality, audioLanguage, minRating, needsReview }); const libraryTitleCount = useLibraryTitleCount(); const unavailableMovies = useUnavailableMovieCount(); const suggestedMovieCount = useSuggestedMovieCount(); const availableSuggestedMovieCount = useAvailableSuggestedMovieCount(); const autoAcceptBackfill = useAutoAcceptBackfill(); const metadataRefresh = useMetadataRefresh(); const filterOptions = useMovieFilterOptions(); const scan = useStartScan(); const scanStatus = useScanStatus(); const scanHistory = useScanHistory(); const folders = useFolders(); const settings = useSettings(); const { show } = useToast(); const loadMore = useRef<HTMLDivElement>(null);
+  const movies = useMovies({ search: querySearch, watched, availability, mediaType, sort, genre, collection, actor, quality, audioLanguage, minRating, needsReview }); const libraryTitleCount = useLibraryTitleCount(); const unavailableMovies = useUnavailableMovieCount(); const suggestedMovieCount = useSuggestedMovieCount(); const availableSuggestedMovieCount = useAvailableSuggestedMovieCount(); const autoAcceptBackfill = useAutoAcceptBackfill(); const metadataRefresh = useMetadataRefresh(); const filterOptions = useMovieFilterOptions(); const scan = useStartScan(); const scanStatus = useScanStatus(); const scanHistory = useScanHistory(); const folders = useFolders(); const settings = useSettings(); const { show } = useToast(); const loadMore = useRef<HTMLDivElement>(null);
   const startScan = () => scan.mutate(undefined, { onSuccess: () => { void scanHistory.refetch(); show('Library scan started.', 'success'); }, onError: (error) => show(error.message, 'error') });
   const restoreScrollPosition = getLibraryRestoreScrollPosition(locationState);
   useLibraryScrollRestoration(movies.isSuccess, restoreScrollPosition);
@@ -40,13 +43,13 @@ export function LibraryPage() {
   useInfiniteScroll(loadMore, { enabled: Boolean(movies.hasNextPage), loading: movies.isFetchingNextPage, onLoadMore: () => { void movies.fetchNextPage(); } });
   useEffect(() => { if (scanStatus.data?.status !== 'running') { void scanHistory.refetch(); void libraryTitleCount.refetch(); void unavailableMovies.refetch(); } }, [libraryTitleCount.refetch, scanHistory.refetch, scanStatus.data?.status, unavailableMovies.refetch]);
   useEffect(() => { setToolbarTarget(document.getElementById('library-toolbar')); }, []);
-  const filterValues = { search, availability, mediaType, genre, actor, quality, audioLanguage, minRating, watched, sort, needsReview };
+  const filterValues = { search, availability, mediaType, genre, collection, actor, quality, audioLanguage, minRating, watched, sort, needsReview };
   const filterSignature = JSON.stringify({ ...filterValues, search: querySearch });
   const filtersActive = countActiveFilters(filterValues) > 0;
   const hasRemainingReviews = (availableSuggestedMovieCount.data ?? 0) > 0;
   const acceptedMatchCount = autoAcceptBackfill.runStatus.data?.status === 'completed' && hasRemainingReviews ? autoAcceptBackfill.runStatus.data.titlesAdded : undefined;
   const matchingTitleCount = filtersActive ? movies.data?.total : undefined;
-  const toolbar = <div className="min-w-0"><LibraryFilters values={filterValues} options={filterOptions.data} onSearchChange={setSearch} onAvailabilityChange={setAvailability} onMediaTypeChange={setMediaType} onGenreChange={setGenre} onActorChange={setActor} onQualityChange={setQuality} onAudioLanguageChange={setAudioLanguage} onMinRatingChange={setMinRating} onWatchedChange={setWatched} onSortChange={setSort} onNeedsReviewChange={setNeedsReview} onClearFilters={clearFilters} onCommitFilters={commitFilters} idPrefix="library" trailingContent={<LibraryOverview titleCount={libraryTitleCount.data} unavailableCount={unavailableMovies.data} matchingTitleCount={matchingTitleCount} acceptedMatchCount={acceptedMatchCount} className="mb-0" />} /></div>;
+  const toolbar = <div className="min-w-0"><LibraryFilters values={filterValues} options={filterOptions.data} onSearchChange={setSearch} onAvailabilityChange={setAvailability} onMediaTypeChange={setMediaType} onGenreChange={setGenre} onCollectionChange={setCollection} onActorChange={setActor} onQualityChange={setQuality} onAudioLanguageChange={setAudioLanguage} onMinRatingChange={setMinRating} onWatchedChange={setWatched} onSortChange={setSort} onNeedsReviewChange={setNeedsReview} onClearFilters={clearFilters} onCommitFilters={commitFilters} idPrefix="library" searchInputId={librarySearchInputId} recentSearches={recentSearches.recents} onRecentSearchRemove={recentSearches.forget} onSearchCommit={recentSearches.remember} trailingContent={<LibraryOverview titleCount={libraryTitleCount.data} unavailableCount={unavailableMovies.data} matchingTitleCount={matchingTitleCount} acceptedMatchCount={acceptedMatchCount} className="mb-0" />} /></div>;
   return <section>
     {toolbarTarget && createPortal(toolbar, toolbarTarget)}
     {hiddenTitles.hidden.length > 0 && <p className="mb-4 text-sm text-muted">{hiddenTitles.hidden.length} hidden on this device · <Link to="/hidden" className="text-accent hover:underline">Manage hidden titles</Link></p>}

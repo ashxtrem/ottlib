@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatMediaLanguage, type MovieFilterOptions } from '@ottlib/shared';
+import { LibrarySearchInput } from './LibrarySearchInput';
 import { Modal } from './Modal';
 import { focusRing, pressable } from './interactionStyles';
 
@@ -8,6 +9,8 @@ export interface LibraryFilterValues {
   availability: 'available' | 'unavailable' | undefined;
   mediaType?: 'movie' | 'tv';
   genre: string;
+  /** A collection id as text; absent on shelf pages. */
+  collection?: string;
   actor: string;
   quality: string;
   audioLanguage: string;
@@ -24,6 +27,7 @@ interface LibraryFiltersProps {
   onAvailabilityChange: (value: 'available' | 'unavailable' | undefined) => void;
   onMediaTypeChange?: (value: 'movie' | 'tv' | undefined) => void;
   onGenreChange: (value: string) => void;
+  onCollectionChange?: (value: string) => void;
   onActorChange: (value: string) => void;
   onQualityChange: (value: string) => void;
   onAudioLanguageChange: (value: string) => void;
@@ -31,6 +35,12 @@ interface LibraryFiltersProps {
   onWatchedChange: (value: boolean | undefined) => void;
   onSortChange: (value: string) => void;
   onNeedsReviewChange?: (value: boolean) => void;
+  /** Recent searches shown under the empty, focused search box (library page only). */
+  recentSearches?: string[];
+  onRecentSearchRemove?: (term: string) => void;
+  onSearchCommit?: (term: string) => void;
+  /** The DOM id of the search box, so a keyboard shortcut can focus it. */
+  searchInputId?: string;
   onClearFilters: () => void;
   onCommitFilters?: (replace: boolean) => void;
   idPrefix: string;
@@ -48,13 +58,14 @@ interface ActiveFilter {
 const librarySortOptions = [{ value: 'title', label: 'Title' }, { value: 'year', label: 'Year' }, { value: 'added', label: 'Date added' }, { value: 'quality', label: 'Resolution' }];
 
 export function countActiveFilters(values: LibraryFilterValues): number {
-  return Number(Boolean(values.search.trim())) + Number(values.availability !== undefined) + Number(Boolean(values.mediaType)) + Number(Boolean(values.genre)) + Number(Boolean(values.actor)) + Number(Boolean(values.quality)) + Number(Boolean(values.audioLanguage)) + Number(values.minRating !== undefined) + Number(values.watched !== undefined) + Number(Boolean(values.needsReview));
+  return Number(Boolean(values.search.trim())) + Number(values.availability !== undefined) + Number(Boolean(values.mediaType)) + Number(Boolean(values.genre)) + Number(Boolean(values.collection)) + Number(Boolean(values.actor)) + Number(Boolean(values.quality)) + Number(Boolean(values.audioLanguage)) + Number(values.minRating !== undefined) + Number(values.watched !== undefined) + Number(Boolean(values.needsReview));
 }
 
-function FilterFields({ values, options, onAvailabilityChange, onMediaTypeChange, onGenreChange, onActorChange, onQualityChange, onAudioLanguageChange, onMinRatingChange, onWatchedChange, onSortChange, onNeedsReviewChange, idPrefix, sortOptions = librarySortOptions }: Omit<LibraryFiltersProps, 'onSearchChange' | 'onClearFilters' | 'searchLabel' | 'searchPlaceholder'>) {
+function FilterFields({ values, options, onAvailabilityChange, onMediaTypeChange, onGenreChange, onCollectionChange, onActorChange, onQualityChange, onAudioLanguageChange, onMinRatingChange, onWatchedChange, onSortChange, onNeedsReviewChange, idPrefix, sortOptions = librarySortOptions }: Omit<LibraryFiltersProps, 'onSearchChange' | 'onClearFilters' | 'searchLabel' | 'searchPlaceholder' | 'recentSearches' | 'onRecentSearchRemove' | 'onSearchCommit' | 'searchInputId'>) {
   const actorListId = `${idPrefix}-actors`;
   return <div className="grid gap-3 sm:grid-cols-2">
     <label className="block text-sm">Genre<select value={values.genre} onChange={(event) => onGenreChange(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">All genres</option>{options?.genres.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+    {onCollectionChange && Boolean(options?.collections.length) && <label className="block text-sm">Collection<select value={values.collection ?? ''} onChange={(event) => onCollectionChange(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">All collections</option>{options?.collections.map((value) => <option key={value.id} value={String(value.id)}>{value.name} ({value.count})</option>)}</select></label>}
     <label className="block text-sm">Actor<input value={values.actor} onChange={(event) => onActorChange(event.target.value)} list={actorListId} placeholder="Any actor" className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2" /></label>
     <datalist id={actorListId}>{options?.actors.map((value) => <option key={value} value={value} />)}</datalist>
     <label className="block text-sm">Quality<select value={values.quality} onChange={(event) => onQualityChange(event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">Any quality</option>{options?.resolutions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -68,12 +79,13 @@ function FilterFields({ values, options, onAvailabilityChange, onMediaTypeChange
   </div>;
 }
 
-function ActiveFilterChips({ values, onSearchChange, onAvailabilityChange, onMediaTypeChange, onGenreChange, onActorChange, onQualityChange, onAudioLanguageChange, onMinRatingChange, onWatchedChange, onNeedsReviewChange, trailingContent }: Pick<LibraryFiltersProps, 'values' | 'onSearchChange' | 'onAvailabilityChange' | 'onMediaTypeChange' | 'onGenreChange' | 'onActorChange' | 'onQualityChange' | 'onAudioLanguageChange' | 'onMinRatingChange' | 'onWatchedChange' | 'onNeedsReviewChange' | 'trailingContent'>) {
+function ActiveFilterChips({ values, options, onSearchChange, onAvailabilityChange, onMediaTypeChange, onGenreChange, onCollectionChange, onActorChange, onQualityChange, onAudioLanguageChange, onMinRatingChange, onWatchedChange, onNeedsReviewChange, trailingContent }: Pick<LibraryFiltersProps, 'values' | 'options' | 'onSearchChange' | 'onAvailabilityChange' | 'onMediaTypeChange' | 'onGenreChange' | 'onCollectionChange' | 'onActorChange' | 'onQualityChange' | 'onAudioLanguageChange' | 'onMinRatingChange' | 'onWatchedChange' | 'onNeedsReviewChange' | 'trailingContent'>) {
   const filters: ActiveFilter[] = [
     values.search.trim() ? { label: `Search: ${values.search.trim()}`, remove: () => onSearchChange('') } : null,
     values.availability ? { label: `Availability: ${values.availability === 'available' ? 'Available' : 'Unavailable'}`, remove: () => onAvailabilityChange(undefined) } : null,
     values.mediaType && onMediaTypeChange ? { label: `Type: ${values.mediaType === 'movie' ? 'Movies' : 'TV'}`, remove: () => onMediaTypeChange(undefined) } : null,
     values.genre ? { label: `Genre: ${values.genre}`, remove: () => onGenreChange('') } : null,
+    values.collection && onCollectionChange ? { label: `Collection: ${options?.collections.find((value) => String(value.id) === values.collection)?.name ?? values.collection}`, remove: () => onCollectionChange('') } : null,
     values.actor ? { label: `Actor: ${values.actor}`, remove: () => onActorChange('') } : null,
     values.quality ? { label: `Quality: ${values.quality}`, remove: () => onQualityChange('') } : null,
     values.audioLanguage ? { label: `Audio: ${formatMediaLanguage(values.audioLanguage)}`, remove: () => onAudioLanguageChange('') } : null,
@@ -91,8 +103,8 @@ export function LibraryFilters(props: LibraryFiltersProps) {
   const searchLabel = props.searchLabel ?? 'Search library';
   const searchPlaceholder = props.searchPlaceholder ?? 'Search title or IMDb ID';
   const filterFields = <FilterFields {...props} idPrefix={props.idPrefix} />;
-  return <div className="min-w-0 flex-1">
-    <div className="flex gap-2"><input value={props.values.search} onChange={(event) => props.onSearchChange(event.target.value)} placeholder={searchPlaceholder} aria-label={searchLabel} className={`min-w-0 flex-1 rounded-lg border border-border bg-field px-4 py-2 ${focusRing}`} /><button type="button" onClick={() => setOpen(true)} aria-expanded={open} aria-haspopup="dialog" className={`shrink-0 rounded-lg border border-border-strong px-3 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis hover:bg-surface-raised ${focusRing} ${pressable}`}>Filters{activeCount > 0 && <span key={activeCount} className="ml-2 animate-pop-in rounded-full bg-accent px-1.5 py-0.5 text-xs tabular-nums text-accent-foreground">{activeCount}</span>}</button></div>
+  return <div className="relative min-w-0 flex-1">
+    <div className="flex gap-2"><LibrarySearchInput id={props.searchInputId} value={props.values.search} label={searchLabel} placeholder={searchPlaceholder} onChange={props.onSearchChange} recentSearches={props.recentSearches} onRecentSearchRemove={props.onRecentSearchRemove} onCommit={props.onSearchCommit} /><button type="button" onClick={() => setOpen(true)} aria-expanded={open} aria-haspopup="dialog" className={`shrink-0 rounded-lg border border-border-strong px-3 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis hover:bg-surface-raised ${focusRing} ${pressable}`}>Filters{activeCount > 0 && <span key={activeCount} className="ml-2 animate-pop-in rounded-full bg-accent px-1.5 py-0.5 text-xs tabular-nums text-accent-foreground">{activeCount}</span>}</button></div>
     <ActiveFilterChips {...props} />
     <Modal open={open} title="Filters" onClose={() => setOpen(false)} maxWidthClassName="max-w-[32rem]" footer={<><button type="button" onClick={props.onClearFilters} disabled={!activeCount} className={`mr-auto rounded-lg px-4 py-2 text-sm text-muted transition-[background-color,transform,color] duration-fast ease-emphasis hover:bg-surface-raised hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 ${focusRing} ${pressable}`}>Clear all</button><button type="button" onClick={() => { props.onCommitFilters?.(false); setOpen(false); }} className={`rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-[background-color,transform] duration-fast ease-emphasis hover:bg-accent-hover ${focusRing} ${pressable}`}>Done</button></>}><div className="min-h-0 flex-1 overflow-y-auto p-5">{filterFields}</div></Modal>
   </div>;
