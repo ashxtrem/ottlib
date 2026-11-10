@@ -30,7 +30,7 @@ copyFileSync('config/config.example.json', join(stage, 'config', 'config.example
 for (const pkg of ['shared', 'server', 'client']) mkdirSync(join(stage, 'packages', pkg), { recursive: true });
 for (const pkg of ['shared', 'server', 'client']) copyFileSync(`packages/${pkg}/package.json`, join(stage, 'packages', pkg, 'package.json'));
 for (const dist of ['shared', 'server', 'client']) cpSync(`packages/${dist}/dist`, join(stage, 'packages', dist, 'dist'), { recursive: true });
-for (const launcher of ['start.bat', 'start.sh', 'start.command']) {
+for (const launcher of ['start.bat', 'start.sh', 'start.command', 'doctor.bat', 'doctor.sh']) {
   copyFileSync(join('scripts', 'bundle', launcher), join(stage, launcher));
   chmodSync(join(stage, launcher), 0o755);
 }

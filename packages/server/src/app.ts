@@ -95,6 +95,12 @@ import { BackupRepository } from './repositories/backupRepository.js';
 import { BackupScheduler } from './services/backupScheduler.js';
 import { BackupService } from './services/backupService.js';
 import { registerBackupRoutes } from './routes/backups.js';
+import { HealthService } from './services/health/healthService.js';
+import { healthChecks } from './services/health/healthChecks.js';
+import { LatestRelease } from './services/health/latestRelease.js';
+import { checkTmdbKey } from './services/settingsService.js';
+import { readAppVersion } from './config/appVersion.js';
+import { registerHealthRoutes } from './routes/health.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -134,6 +140,8 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary, undefined, planner, embeddedSubtitles, creditsResolver);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
+  const appVersion = readAppVersion(); const latestRelease = new LatestRelease();
+  const health = new HealthService(() => healthChecks({ appDataPath, folders: () => folders.list().map((folder) => folder.path), locateFfmpeg: locate, tmdbKey: () => settings.get().tmdbApiKey, testTmdbKey: checkTmdbKey, torrentSearchEnabled: () => settings.get().torrentSearchEnabled, testQbittorrent: () => torrentConnection.test(), backups, update: { version: () => appVersion, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() } }));
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
@@ -145,6 +153,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
   registerBackupRoutes(app, backups);
+  registerHealthRoutes(app, health);
   app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
   registerMediaStatic(app, appDataPath);
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');

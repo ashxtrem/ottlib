@@ -29,7 +29,8 @@ export const defaultSettings = {
   scheduleEnabled: false,
   scheduleCron: '0 3 * * *',
   transcodeEncoder: 'auto' as const,
-  backupEnabled: true
+  backupEnabled: true,
+  updateCheckEnabled: true
 };
 
 export const mimeTypes: Record<string, string> = {

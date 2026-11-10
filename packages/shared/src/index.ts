@@ -6,6 +6,7 @@ export * from './auth.js';
 export * from './hiddenTitles.js';
 export * from './profiles.js';
 export * from './backups.js';
+export * from './health.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -184,7 +185,9 @@ export const settingsSchema = z.object({
   scheduleCron: z.string(),
   transcodeEncoder: transcodeEncoderSchema,
   /** Daily database backup at 04:00; on by default. */
-  backupEnabled: z.boolean()
+  backupEnabled: z.boolean(),
+  /** Once a day, ask GitHub whether a newer release is out (health check `update`); on by default. */
+  updateCheckEnabled: z.boolean()
 });
 
 export const updateSettingsSchema = settingsSchema.partial();
