@@ -88,7 +88,7 @@ export function MovieDetailPage() {
   return <section className="space-y-6">
     <button type="button" onClick={backToLibrary} className="text-sm text-accent hover:underline">← {backToLibraryLabel}</button>
     <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-      {item.backdropUrl && <div className="h-56 overflow-hidden md:h-80"><img ref={backdrop} src={item.backdropUrl} alt="" className="h-full w-full object-cover opacity-60" /></div>}
+      {item.backdropUrl && <div className="h-56 overflow-hidden md:h-80"><img ref={backdrop} src={item.backdropUrl} alt="" className="h-full w-full object-cover opacity-60" style={{ viewTransitionName: 'title-backdrop' }} /></div>}
       <div className="grid gap-6 p-5 md:grid-cols-[220px_minmax(0,1fr)] md:p-8 xl:grid-cols-[220px_minmax(0,1fr)_260px]">
         <div className="aspect-[2/3] overflow-hidden rounded-xl bg-surface-raised">
           {item.posterUrl ? <PosterImage src={item.posterUrl} alt={`${item.title} poster`} loading="lazy" decoding="async" className="h-full w-full object-cover" style={{ viewTransitionName: 'poster' }} /> : <NoArtworkCard title={item.title} year={item.year} status={item.metadataStatus} />}
