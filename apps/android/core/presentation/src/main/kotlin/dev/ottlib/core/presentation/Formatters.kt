@@ -2,7 +2,10 @@ package dev.ottlib.core.presentation
 
 import dev.ottlib.core.model.MediaTrack
 import dev.ottlib.core.model.Movie
+import dev.ottlib.core.model.OutsideRating
 import dev.ottlib.core.player.languageName
+import java.util.Locale
+import kotlin.math.roundToInt
 
 /** `1:02:03` or `42:10`. */
 fun formatPosition(ms: Long): String {
@@ -56,6 +59,16 @@ fun Movie.metaLine(): String = listOfNotNull(
     resolutionLabel(mediaInfo?.height),
     mediaInfo?.hdrFormat,
 ).joinToString("  ·  ")
+
+/** `IMDb 8.8  ·  RT 87%  ·  MC 74`. Sources the app does not know are skipped. */
+fun List<OutsideRating>.ratingsLine(): String = mapNotNull { rating ->
+    when (rating.source) {
+        "imdb" -> "IMDb ${"%.1f".format(Locale.US, rating.value)}"
+        "rottenTomatoes" -> "RT ${rating.value.roundToInt()}%"
+        "metacritic" -> "MC ${rating.value.roundToInt()}"
+        else -> null
+    }
+}.joinToString("  ·  ")
 
 fun MediaTrack.describe(): String = listOfNotNull(
     language?.let(::languageName) ?: "Unknown",
