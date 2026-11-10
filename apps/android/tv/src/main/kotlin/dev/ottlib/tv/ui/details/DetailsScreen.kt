@@ -204,7 +204,7 @@ private fun MovieDetails(movie: Movie, viewModel: DetailsViewModel, actions: Det
         // The saved card's row (cast, collection, recommendations) may compose a few frames later: retry before Play.
         var restored = false
         if (restoreKey != null) repeat(10) {
-            if (!restored) { withFrameNanos { }; restored = runCatching { restore.requestFocus() }.isSuccess }
+            if (!restored) { withFrameNanos { }; restored = runCatching { restore.requestFocus() }.getOrDefault(false) }
         }
         if (!restored) primary.tryRequestFocus()
     }

@@ -71,7 +71,11 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit, onPlay: (Long) -> Unit, onSwitchProf
                     val queueFrom = { row: HomeRow -> container.playbackSequence.select(if (row.key == "continue") emptyList() else row.items.map { it.id }, shelf = row.key.removePrefix("shelf-").toLongOrNull()) }
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                         hero?.let { featured ->
-                            val heroRow = current.value.firstOrNull { row -> row.items.any { it.id == featured.item.id } }
+                            // The row the hero was picked from (Continue, else Unwatched), else any row holding it.
+                            val holds = { row: HomeRow -> row.items.any { it.id == featured.item.id } }
+                            val heroRow = current.value.firstOrNull { it.key == "continue" && holds(it) }
+                                ?: current.value.firstOrNull { it.key == "unwatched" && holds(it) }
+                                ?: current.value.firstOrNull(holds)
                             item(key = "hero") {
                                 HomeHero(
                                     featured,

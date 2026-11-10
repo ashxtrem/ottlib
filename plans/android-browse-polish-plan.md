@@ -161,3 +161,12 @@ Final check for the run: `./gradlew test :tv:assembleDebug :mobile:assembleDebug
 
 ## 9. Progress log
 - 2026-11-10: plan written and approved.
+- 2026-11-10: built by /plan-runner in 6 tasks (A1–A6), each reviewed; checker and gate passed.
+  - The server's "next" (next episode, shelf next) still comes before the queue, as in the plain library. A filtered queue
+    holds only its titles but does not override that.
+  - The bottom bar or rail is hidden on every pushed route already, so the filtered library has none, like Details.
+  - The collection filter id is `movies.collection_id`, the same id `GET /api/movies/:id/collection` returns.
+  - Recent searches are not saved while the profile is unknown or being picked.
+  - The cover keeps its image across the server-session swap; only the first-frame flag resets.
+  - Checks: web build and all web suites pass; Android unit tests pass; `:tv` and `:mobile` compile. Focus paths, the hero
+    layouts and PiP were not tried on a device.
