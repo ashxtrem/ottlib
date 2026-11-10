@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import type { ScheduleValidationResult, Settings, UpdateSettings } from '@ottlib/shared';
 import { SettingRepository } from '../repositories/settingRepository.js';
+import { BackupScheduler } from './backupScheduler.js';
 import { SchedulerService } from './schedulerService.js';
 import { TmdbProvider } from '../providers/metadata/tmdbProvider.js';
 
@@ -10,7 +11,7 @@ function maskSubtitleSecrets(value: Settings): Settings {
   const masked = { ...value }; for (const key of subtitleSecrets) masked[key] = key === 'opensubtitlesPassword' && value[key] ? '••••' : mask(value[key]); return masked;
 }
 export class SettingsService {
-  public constructor(private readonly settings: SettingRepository, private readonly scheduler: SchedulerService) {}
+  public constructor(private readonly settings: SettingRepository, private readonly scheduler: SchedulerService, private readonly backupScheduler?: BackupScheduler) {}
   public get(): Settings { const value = this.settings.get(); return maskSubtitleSecrets({ ...value, tmdbApiKey: mask(value.tmdbApiKey), omdbApiKey: mask(value.omdbApiKey), qbittorrentPassword: mask(value.qbittorrentPassword) }); }
   public update(update: UpdateSettings): Settings {
     const safe = { ...update };
@@ -19,7 +20,7 @@ export class SettingsService {
     if (safe.omdbApiKey?.startsWith('••••')) delete safe.omdbApiKey;
     if (safe.qbittorrentPassword?.startsWith('••••')) delete safe.qbittorrentPassword;
     if (safe.scheduleCron !== undefined && !this.validateSchedule(safe.scheduleCron).valid) throw new Error('Schedule must be a valid cron expression');
-    const result = this.settings.update(safe); this.scheduler.refresh();
+    const result = this.settings.update(safe); this.scheduler.refresh(); this.backupScheduler?.refresh();
     return maskSubtitleSecrets({ ...result, tmdbApiKey: mask(result.tmdbApiKey), omdbApiKey: mask(result.omdbApiKey), qbittorrentPassword: mask(result.qbittorrentPassword) });
   }
 

@@ -28,7 +28,8 @@ export const defaultSettings = {
   excludedFolders: [],
   scheduleEnabled: false,
   scheduleCron: '0 3 * * *',
-  transcodeEncoder: 'auto' as const
+  transcodeEncoder: 'auto' as const,
+  backupEnabled: true
 };
 
 export const mimeTypes: Record<string, string> = {

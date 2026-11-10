@@ -5,6 +5,7 @@ export * from './credits.js';
 export * from './auth.js';
 export * from './hiddenTitles.js';
 export * from './profiles.js';
+export * from './backups.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -181,7 +182,9 @@ export const settingsSchema = z.object({
   excludedFolders: z.array(z.string()),
   scheduleEnabled: z.boolean(),
   scheduleCron: z.string(),
-  transcodeEncoder: transcodeEncoderSchema
+  transcodeEncoder: transcodeEncoderSchema,
+  /** Daily database backup at 04:00; on by default. */
+  backupEnabled: z.boolean()
 });
 
 export const updateSettingsSchema = settingsSchema.partial();
