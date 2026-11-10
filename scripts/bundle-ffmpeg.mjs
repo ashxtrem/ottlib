@@ -11,12 +11,12 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 // A dated autobuild, never `latest`. To update: pick a newer tag, take the hashes from its checksums.sha256.
-export const FFMPEG_RELEASE = 'autobuild-2026-10-23-13-04';
-const FFMPEG_BUILD = 'ffmpeg-n9.0.2-35-g9a9b70bb8c';
+export const FFMPEG_RELEASE = 'autobuild-2026-11-10-12-39';
+const FFMPEG_BUILD = 'ffmpeg-n9.0.2-48-gd4070a14ce';
 const FFMPEG_ARCHIVES = {
-  'win32-x64': { file: `${FFMPEG_BUILD}-win64-gpl-9.0.zip`, sha256: 'bc5c5d45a5bb24bb8b7e83eb6ca8ed9373b85098fbdde1e2951a48f91d91b54a' },
-  'linux-x64': { file: `${FFMPEG_BUILD}-linux64-gpl-9.0.tar.xz`, sha256: '143e31ca53d65d95bde12cc861e331fd2275e48a6ca988e62c46e8f5b77b9811' },
-  'linux-arm64': { file: `${FFMPEG_BUILD}-linuxarm64-gpl-9.0.tar.xz`, sha256: '8786b3d169674680c248b2619d53c5b724322995dcf62824c4929afbf48bf8bd' },
+  'win32-x64': { file: `${FFMPEG_BUILD}-win64-gpl-9.0.zip`, sha256: 'e08cfa1d5ec52a4e405c55ddb6c91b42fb2a9dafe5bcecfcbffd6db3e9bdba0e' },
+  'linux-x64': { file: `${FFMPEG_BUILD}-linux64-gpl-9.0.tar.xz`, sha256: '8206a48ce342b5075d0e0293e468a61198a55b3ef479bec3f7e83b04a18667d4' },
+  'linux-arm64': { file: `${FFMPEG_BUILD}-linuxarm64-gpl-9.0.tar.xz`, sha256: '1da51cfc6e138620bf733937fea574313454f5b8b8de866dacc0e9ef9b6a0645' },
 };
 
 export const FFMPEG_NOTICE =
