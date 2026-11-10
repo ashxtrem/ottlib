@@ -32,7 +32,9 @@ describe('MovieExtrasRepository', () => {
   });
 
   it('lists matched titles still missing extras', () => {
-    const { extras } = subject();
+    const { db, extras } = subject();
+    expect(extras.idsMissingExtras()).toEqual([]);
+    db.prepare("UPDATE movies SET metadata_source = 'tmdb', provider_id = '1' WHERE id IN (1, 2)").run();
     expect(extras.idsMissingExtras()).toEqual([1, 2]);
     extras.applyExtras(2, { castMembers: [], logoFile: null, collection: null, trailerKey: null });
     expect(extras.idsMissingExtras()).toEqual([1]);

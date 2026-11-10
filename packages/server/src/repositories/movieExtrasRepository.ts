@@ -58,9 +58,12 @@ export class MovieExtrasRepository {
     };
   }
 
-  /** Matched, available titles whose extras were never fetched (a metadata refresh skips missing files). */
+  /**
+   * Matched, available titles whose extras were never fetched (a metadata refresh skips missing files). Only titles with a
+   * provider id: a refresh of one without would reset and re-search the match, which the backfill must never do.
+   */
   public idsMissingExtras(): number[] {
-    return (this.db.prepare("SELECT id FROM movies WHERE metadata_status = 'matched' AND missing = 0 AND extras_fetched_at IS NULL ORDER BY id").all() as Array<{ id: number }>).map((row) => row.id);
+    return (this.db.prepare("SELECT id FROM movies WHERE metadata_status = 'matched' AND missing = 0 AND extras_fetched_at IS NULL AND metadata_source IS NOT NULL AND provider_id IS NOT NULL ORDER BY id").all() as Array<{ id: number }>).map((row) => row.id);
   }
 
   /** True when the ratings were never asked, or were asked more than `days` ago. */
