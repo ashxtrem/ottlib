@@ -31,9 +31,25 @@ export function applyPendingRestore(appDataPath: string, now: Date = new Date())
   const live = join(appDataPath, 'library.sqlite');
   mkdirSync(dir, { recursive: true });
   const keptAs = join(dir, backupFileName('before-restore', now));
-  for (const suffix of SIDE_FILES) {
-    if (existsSync(live + suffix)) renameSync(live + suffix, keptAs + suffix);
+  // Stage the copy first so a failed copy never leaves the live database moved away.
+  const staged = `${live}.restoring`;
+  const moved: string[] = [];
+  try {
+    copyFileSync(source, staged);
+    for (const suffix of SIDE_FILES) {
+      if (existsSync(live + suffix)) {
+        renameSync(live + suffix, keptAs + suffix);
+        moved.push(suffix);
+      }
+    }
+    renameSync(staged, live);
+  } catch (error) {
+    for (const suffix of moved) {
+      if (!existsSync(live + suffix)) renameSync(keptAs + suffix, live + suffix);
+    }
+    rmSync(staged, { force: true });
+    console.error(`[restore] could not restore ${name}; the library database was left as it was`, error);
+    return null;
   }
-  copyFileSync(source, live);
   return name;
 }
