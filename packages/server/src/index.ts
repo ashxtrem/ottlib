@@ -1,10 +1,11 @@
 import { loadBootstrapConfig, resolveAppRoot } from './config/configStore.js';
 import { createDatabase } from './db/db.js';
+import { applyPendingRestore } from './db/restorePending.js';
 import { buildApp } from './app.js';
 import { DiscoveryService } from './services/discoveryService.js';
 import { ServerInfoService } from './services/serverInfoService.js';
 
-const config = await loadBootstrapConfig(resolveAppRoot()); const db = createDatabase(config.absoluteAppDataPath); const app = buildApp(db, config.absoluteAppDataPath, config.port);
+const config = await loadBootstrapConfig(resolveAppRoot()); applyPendingRestore(config.absoluteAppDataPath); const db = createDatabase(config.absoluteAppDataPath, { backupBeforeMigrate: true }); const app = buildApp(db, config.absoluteAppDataPath, config.port);
 await app.hlsSessions.start();
 await app.listen({ host: '0.0.0.0', port: config.port });
 void app.pictureArea.runPending(); // background and never rejects; a scan started meanwhile joins this pass
