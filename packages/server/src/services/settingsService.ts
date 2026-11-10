@@ -43,12 +43,17 @@ export class SettingsService {
     const savedKey = this.settings.get().tmdbApiKey;
     const key = input?.startsWith('••••') || !input?.trim() ? savedKey : input.trim();
     if (!key) throw new Error('Enter a TMDb API key before testing it');
-    try {
-      await new TmdbProvider(key).searchCandidates('Inception', 2010, 1);
-      return { valid: true };
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : 'Request failed';
-      throw new Error(`TMDb key test failed: ${reason}`);
-    }
+    await checkTmdbKey(key);
+    return { valid: true };
+  }
+}
+
+/** One TMDb search with `key`; throws `TMDb key test failed: …` when TMDb refuses it. Also used by the `tmdb-key` health check. */
+export async function checkTmdbKey(key: string): Promise<void> {
+  try {
+    await new TmdbProvider(key).searchCandidates('Inception', 2010, 1);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Request failed';
+    throw new Error(`TMDb key test failed: ${reason}`);
   }
 }
