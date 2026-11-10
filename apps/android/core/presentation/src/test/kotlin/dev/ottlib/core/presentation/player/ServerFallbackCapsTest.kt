@@ -16,6 +16,14 @@ class ServerFallbackCapsTest {
     }
 
     @Test
+    fun aFailedAudioOutputKeepsTheVideoAndSwapsOnlyTheAudio() {
+        assertEquals(
+            PlaybackRequest(video = listOf("h264", "hevc", "av1", "vp9"), audio = listOf("aac"), hdr = true, startMs = 7_000),
+            serverFallbackRequest(PlaybackProblem.Error("no audio output", audioOutput = true), 7_000),
+        )
+    }
+
+    @Test
     fun unsupportedVideoAndErrorsAskForH264AndAac() {
         val transcode = PlaybackRequest(video = listOf("h264"), audio = listOf("aac"), hdr = false, maxHeight = 1080, startMs = 5_000)
         assertEquals(transcode, serverFallbackRequest(PlaybackProblem.UnsupportedVideo("no AV1"), 5_000))

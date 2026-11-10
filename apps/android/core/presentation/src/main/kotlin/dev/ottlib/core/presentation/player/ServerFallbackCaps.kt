@@ -6,16 +6,20 @@ import dev.ottlib.core.model.PlaybackSource
 /**
  * What "Play via server" asks the server for after [problem], starting at [startMs]; null when it isn't offered.
  * No container is listed, so the answer is never the same direct file again.
- * - Unsupported audio: the video already decodes here (every codec the server names, HDR as it is) with AAC audio,
- *   so the server only repackages the video (a cheap remux).
- * - Unsupported video or a playback error: H.264 up to 1080p with AAC, which every Android device decodes (a transcode).
+ * - Unsupported audio or a failed audio output: the video already decodes here (every codec the server names, HDR as
+ *   it is) with AAC audio, so the server only repackages the video (a cheap remux).
+ * - Unsupported video or any other playback error: H.264 up to 1080p with AAC, which every Android device decodes (a transcode).
  */
 fun serverFallbackRequest(problem: PlaybackProblem, startMs: Long): PlaybackRequest? = when (problem) {
-    is PlaybackProblem.UnsupportedAudio -> PlaybackRequest(video = REMUX_VIDEO, audio = SAFE_AUDIO, hdr = true, startMs = startMs)
-    is PlaybackProblem.UnsupportedVideo, is PlaybackProblem.Error ->
-        PlaybackRequest(video = SAFE_VIDEO, audio = SAFE_AUDIO, hdr = false, maxHeight = TRANSCODE_MAX_HEIGHT, startMs = startMs)
+    is PlaybackProblem.UnsupportedAudio -> remux(startMs)
+    is PlaybackProblem.Error -> if (problem.audioOutput) remux(startMs) else transcode(startMs)
+    is PlaybackProblem.UnsupportedVideo -> transcode(startMs)
     is PlaybackProblem.ServerUnavailable -> null
 }
+
+private fun remux(startMs: Long) = PlaybackRequest(video = REMUX_VIDEO, audio = SAFE_AUDIO, hdr = true, startMs = startMs)
+private fun transcode(startMs: Long) =
+    PlaybackRequest(video = SAFE_VIDEO, audio = SAFE_AUDIO, hdr = false, maxHeight = TRANSCODE_MAX_HEIGHT, startMs = startMs)
 
 /** Whether the problem dialog offers "Play via server". */
 val PlaybackProblem.offersServerFallback: Boolean get() = serverFallbackRequest(this, 0) != null

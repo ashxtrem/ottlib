@@ -55,7 +55,8 @@ sealed interface PlaybackProblem {
     val message: String
     data class UnsupportedAudio(override val message: String) : PlaybackProblem
     data class UnsupportedVideo(override val message: String) : PlaybackProblem
-    data class Error(override val message: String) : PlaybackProblem
+    /** [audioOutput]: the audio output failed, so the video itself decodes here and "Play via server" only swaps the audio. */
+    data class Error(override val message: String, val audioOutput: Boolean = false) : PlaybackProblem
     /** "Play via server" was refused ([message] says why); the dialog keeps [original]'s other choices. */
     data class ServerUnavailable(override val message: String, val original: PlaybackProblem) : PlaybackProblem
 }
@@ -138,7 +139,7 @@ class PlayerViewModel(
                 player?.prepare()
                 return
             }
-            currentProblem.value = PlaybackProblem.Error(playbackErrorMessage(error))
+            currentProblem.value = PlaybackProblem.Error(playbackErrorMessage(error), audioOutput = isAudioOutputError(error.errorCode))
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -393,7 +394,13 @@ class PlayerViewModel(
 internal fun shouldRetryAsPcm(passthroughFailed: Boolean, passthroughBroken: Boolean, alreadyRetried: Boolean): Boolean =
     passthroughFailed && passthroughBroken && !alreadyRetried
 
+/** The audio output (not a decoder or the network) failed. */
+internal fun isAudioOutputError(errorCode: Int): Boolean =
+    errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED || errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED
+
 private fun playbackErrorMessage(error: PlaybackException): String = when (error.errorCode) {
+    PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED, PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED ->
+        "This device couldn't play the audio in this file."
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
         "Lost connection to the Ottlib server."
     PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS, PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
