@@ -10,6 +10,8 @@ import dev.ottlib.core.data.PlaybackPreferences
 import dev.ottlib.core.data.ProfileAccess
 import dev.ottlib.core.data.ProfileSession
 import dev.ottlib.core.data.ProfileSessionStore
+import dev.ottlib.core.data.RecentSearchScope
+import dev.ottlib.core.data.RecentSearchStore
 import dev.ottlib.core.data.ServerAccess
 import dev.ottlib.core.data.ServerStore
 import dev.ottlib.core.data.TrackChoiceStore
@@ -29,6 +31,8 @@ import dev.ottlib.core.presentation.update.InstalledApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -46,6 +50,7 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
     val pictureModes = PictureModeStore(context)
     val trackChoices = TrackChoiceStore(context)
     val hiddenTitles = HiddenTitleStore(context)
+    val recentSearches = RecentSearchStore(context)
     val authTokens = AuthTokenStore(context)
     val profileTokens = ProfileSessionStore(context)
 
@@ -70,6 +75,10 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
         { connection.activeServer.value },
         { appScope.launch { continueWatching.clear() } },
     )
+
+    /** Recent searches are kept per server address and profile; follows both. Null while no server is active. */
+    val recentSearchScope: Flow<String?> = combine(connection.activeServer, profileSession.state) { server, profile -> RecentSearchScope.of(server, profile) }
+
     val playbackSequence = PlaybackSequence(api)
     val autoPlayStreak = AutoPlayStreak()
     val discovery = ServerDiscovery(context)
