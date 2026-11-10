@@ -1,5 +1,6 @@
 package dev.ottlib.tv.navigation
 
+import android.net.Uri
 import dev.ottlib.tv.ui.components.TopDestination
 
 object Routes {
@@ -13,8 +14,13 @@ object Routes {
     const val COMPARE = "compare/{id}"
     const val DETAILS = "details/{id}"
     const val PLAYER = "player/{id}?fromStart={fromStart}"
+    /** The library for one actor or one collection, pushed from Details (not a top tab). [NO_COLLECTION] means no collection. */
+    const val FILTERED = "filtered?actor={actor}&collection={collection}&title={title}"
+    const val NO_COLLECTION = -1L
 
     fun connect(autoConnect: Boolean) = "connect?auto=$autoConnect"
+    fun filteredByActor(name: String) = "filtered?actor=${Uri.encode(name)}&title=${Uri.encode(name)}"
+    fun filteredByCollection(id: Long, name: String) = "filtered?collection=$id&title=${Uri.encode(name)}"
     fun details(id: Long) = "details/$id"
     fun compare(id: Long) = "compare/$id"
     fun player(id: Long, fromStart: Boolean) = "player/$id?fromStart=$fromStart"
