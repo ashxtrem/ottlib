@@ -1,11 +1,9 @@
 import type Database from 'better-sqlite3';
-import type { OutsideRating } from '../providers/metadata/RatingsProvider.js';
+import type { CastMember, OutsideRating } from '@ottlib/shared';
 
-/** A cast member as stored: photoUrl is a server-relative /media/people/ path, or null without a photo. */
-export interface StoredCastMember { name: string; photoUrl: string | null }
-
+/** Stored cast members carry photoUrl as a server-relative /media/people/ path, or null without a photo. */
 export interface TitleExtras {
-  castMembers: StoredCastMember[];
+  castMembers: CastMember[];
   logoFile: string | null;
   collection: { id: number; name: string } | null;
   trailerKey: string | null;
@@ -51,7 +49,7 @@ export class MovieExtrasRepository {
       FROM movies WHERE id = ?`).get(id) as Record<string, any> | undefined;
     if (!row) return undefined;
     return {
-      castMembers: parseList<StoredCastMember>(row.cast_members_json), logoFile: row.logo_file ?? null,
+      castMembers: parseList<CastMember>(row.cast_members_json), logoFile: row.logo_file ?? null,
       collection: row.collection_id === null || row.collection_id === undefined ? null : { id: row.collection_id, name: row.collection_name ?? '' },
       trailerKey: row.trailer_key ?? null, ratings: parseList<OutsideRating>(row.ratings_json),
       ratingsFetchedAt: row.ratings_fetched_at ?? null, extrasFetchedAt: row.extras_fetched_at ?? null

@@ -109,6 +109,7 @@ import { checkTmdbKey } from './services/settingsService.js';
 import { readAppVersion } from './config/appVersion.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { startTitleExtrasBackfill } from './services/titleExtrasBackfill.js';
+import { createMetadataProviders } from './providers/metadata/metadataProviders.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -176,7 +177,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   }
   scheduler.refresh(); backupScheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop()); app.addHook('onClose', () => backupScheduler.stop());
   app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions); app.decorate('pictureArea', pictureArea); app.decorate('credits', credits);
-  app.decorate('startTitleExtrasBackfill', () => startTitleExtrasBackfill({ idsMissingExtras: () => movieExtras.idsMissingExtras(), startSelectedRefresh: (ids) => metadata.startSelectedMetadataRefresh(ids), log: (message) => app.log.info(message) }));
+  app.decorate('startTitleExtrasBackfill', () => startTitleExtrasBackfill({ hasMetadataProvider: () => createMetadataProviders(settings.get()).length > 0, idsMissingExtras: () => movieExtras.idsMissingExtras(), startSelectedRefresh: (ids) => metadata.startSelectedMetadataRefresh(ids), log: (message) => app.log.info(message) }));
   app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }

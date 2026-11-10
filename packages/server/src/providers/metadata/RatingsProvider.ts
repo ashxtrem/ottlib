@@ -1,5 +1,4 @@
-export type OutsideRatingSource = 'imdb' | 'rottenTomatoes' | 'metacritic';
-export interface OutsideRating { source: OutsideRatingSource; value: number; max: number }
+import type { OutsideRating } from '@ottlib/shared';
 
 export interface RatingsProvider {
   name: string;

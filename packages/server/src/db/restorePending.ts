@@ -1,9 +1,21 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { BACKUP_NAME_PATTERN, backupFileName, backupsDir } from './backupFile.js';
 
 export const RESTORE_MARKER = 'restore-pending.json';
 const SIDE_FILES = ['', '-wal', '-shm'];
+
+/** Folds the wal into the main file so it is one self-contained database. False when the database cannot be opened (e.g. corrupt). */
+function checkpoint(path: string): boolean {
+  try {
+    const db = new Database(path, { fileMustExist: true });
+    try { db.pragma('schema_version'); db.pragma('wal_checkpoint(TRUNCATE)'); } finally { db.close(); }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function pendingName(marker: string): string | null {
   try {
@@ -15,8 +27,9 @@ function pendingName(marker: string): string | null {
 }
 
 /**
- * Runs before the database opens. When `restore-pending.json` names a backup, the live database (with its -wal and -shm)
- * is kept as `backups/before-restore-<stamp>.sqlite` and the chosen backup is copied in its place. The marker is always
+ * Runs before the database opens. When `restore-pending.json` names a backup, the live database is checkpointed and kept
+ * as the single file `backups/before-restore-<stamp>.sqlite` (its -wal and -shm are removed; a database that cannot be
+ * opened is moved aside with whatever side files remain), and the chosen backup is copied in its place. The marker is always
  * deleted; a missing or invalid backup leaves the database alone. Returns the restored backup's name, or null.
  */
 export function applyPendingRestore(appDataPath: string, now: Date = new Date()): string | null {
@@ -36,12 +49,14 @@ export function applyPendingRestore(appDataPath: string, now: Date = new Date())
   const moved: string[] = [];
   try {
     copyFileSync(source, staged);
-    for (const suffix of SIDE_FILES) {
+    const folded = existsSync(live) && checkpoint(live);
+    for (const suffix of folded ? [''] : SIDE_FILES) {
       if (existsSync(live + suffix)) {
         renameSync(live + suffix, keptAs + suffix);
         moved.push(suffix);
       }
     }
+    if (folded) for (const suffix of SIDE_FILES.slice(1)) rmSync(live + suffix, { force: true });
     renameSync(staged, live);
   } catch (error) {
     for (const suffix of moved) {

@@ -1,11 +1,12 @@
-import type { CastMemberMetadata, EpisodeMetadata, MediaType, MetadataCandidate, MetadataProvider, MovieMetadata, TitleCollection } from './MetadataProvider.js';
+import type { CastMember } from '@ottlib/shared';
+import type { EpisodeMetadata, MediaType, MetadataCandidate, MetadataProvider, MovieMetadata, TitleCollection } from './MetadataProvider.js';
 import { externalRequestTimeoutMs } from '../../config/defaults.js';
 
 const imageBase = 'https://image.tmdb.org/t/p';
 const castMemberLimit = 8;
 
 /** The first billed cast that have a photo. */
-function castMembers(cast: any[] | undefined): CastMemberMetadata[] {
+function castMembers(cast: any[] | undefined): CastMember[] {
   return (cast ?? []).filter((person) => person?.profile_path && person.name).slice(0, castMemberLimit).map((person) => ({ name: person.name, photoUrl: `${imageBase}/w185${person.profile_path}` }));
 }
 

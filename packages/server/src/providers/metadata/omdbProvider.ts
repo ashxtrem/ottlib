@@ -1,8 +1,9 @@
+import type { OutsideRating } from '@ottlib/shared';
 import type { EpisodeMetadata, MediaType, MetadataCandidate, MetadataProvider, MovieMetadata } from './MetadataProvider.js';
-import { RatingsLimitReachedError, type OutsideRating, type OutsideRatingSource, type RatingsProvider } from './RatingsProvider.js';
+import { RatingsLimitReachedError, type RatingsProvider } from './RatingsProvider.js';
 import { externalRequestTimeoutMs } from '../../config/defaults.js';
 
-const ratingSources: Record<string, OutsideRatingSource> = { 'Internet Movie Database': 'imdb', 'Rotten Tomatoes': 'rottenTomatoes', Metacritic: 'metacritic' };
+const ratingSources: Record<string, OutsideRating['source']> = { 'Internet Movie Database': 'imdb', 'Rotten Tomatoes': 'rottenTomatoes', Metacritic: 'metacritic' };
 
 /** OMDb writes ratings as "8.8/10", "87%" or "74/100". */
 export function parseOmdbRating(entry: { Source?: string; Value?: string }): OutsideRating | null {

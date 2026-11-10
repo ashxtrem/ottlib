@@ -1,4 +1,6 @@
 export interface TitleExtrasBackfillDeps {
+  /** False when no metadata provider is configured: a refresh could not fetch anything. */
+  hasMetadataProvider: () => boolean;
   idsMissingExtras: () => number[];
   /** The metadata refresh for just these ids; null when a metadata run is already active (it never joins that run). */
   startSelectedRefresh: (ids: number[]) => unknown | null;
@@ -11,6 +13,7 @@ export interface TitleExtrasBackfillDeps {
  */
 export function startTitleExtrasBackfill(deps: TitleExtrasBackfillDeps): boolean {
   try {
+    if (!deps.hasMetadataProvider()) { deps.log?.('Title extras backfill skipped: no metadata provider is configured.'); return false; }
     const ids = deps.idsMissingExtras();
     if (!ids.length) return false;
     if (deps.startSelectedRefresh(ids) === null) { deps.log?.('Title extras backfill skipped: a metadata run is already active.'); return false; }

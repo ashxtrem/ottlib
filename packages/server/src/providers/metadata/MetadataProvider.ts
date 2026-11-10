@@ -1,4 +1,4 @@
-import type { OutsideRating } from './RatingsProvider.js';
+import type { CastMember, OutsideRating } from '@ottlib/shared';
 
 export type MediaType = 'movie' | 'tv';
 export interface MetadataCandidate { id: string; title: string; year: number | null; score: number; mediaType: MediaType; season?: number; episode?: number }
@@ -6,10 +6,9 @@ export interface MovieMetadata {
   providerId: string; title: string; year: number | null; overview: string | null; posterUrl: string | null; backdropUrl: string | null;
   genres: string[]; cast: string[]; rating: number | null; runtime: number | null; imdbId: string | null;
   /** Remote photo urls; only providers with person images fill these. */
-  castMembers?: CastMemberMetadata[]; logoUrl?: string | null; collection?: { id: number; name: string } | null; trailerKey?: string | null;
+  castMembers?: CastMember[]; logoUrl?: string | null; collection?: { id: number; name: string } | null; trailerKey?: string | null;
   ratings?: OutsideRating[];
 }
-export interface CastMemberMetadata { name: string; photoUrl: string | null }
 export interface CollectionPart { id: string; title: string; year: number | null; posterUrl: string | null }
 export interface TitleCollection { id: number; name: string; parts: CollectionPart[] }
 export interface EpisodeMetadata { title: string; overview: string | null; stillUrl: string | null; rating: number | null }

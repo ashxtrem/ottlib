@@ -1,8 +1,9 @@
 import { basename, extname } from 'node:path';
+import type { CastMember } from '@ottlib/shared';
 import type { MovieMetadata } from '../providers/metadata/MetadataProvider.js';
 import { RatingsLimitReachedError } from '../providers/metadata/RatingsProvider.js';
 import { createRatingsProviders } from '../providers/metadata/ratingsProviders.js';
-import type { MovieExtrasRepository, StoredCastMember } from '../repositories/movieExtrasRepository.js';
+import type { MovieExtrasRepository } from '../repositories/movieExtrasRepository.js';
 import type { SettingRepository } from '../repositories/settingRepository.js';
 import type { PosterCacheService } from './posterCacheService.js';
 
@@ -44,13 +45,13 @@ export class TitleExtrasService {
   }
 
   /** New cast wins; with none, the stored cast stays; a photo that failed to download keeps the stored photo of the same person. */
-  private mergeCast(fresh: StoredCastMember[], stored: StoredCastMember[]): StoredCastMember[] {
+  private mergeCast(fresh: CastMember[], stored: CastMember[]): CastMember[] {
     if (!fresh.length) return stored;
     const photos = new Map(stored.flatMap((member) => member.photoUrl ? [[member.name, member.photoUrl] as const] : []));
     return fresh.map((member) => member.photoUrl ? member : { name: member.name, photoUrl: photos.get(member.name) ?? null });
   }
 
-  private cacheCast(providerName: string, show: MovieMetadata): Promise<StoredCastMember[]> {
+  private cacheCast(providerName: string, show: MovieMetadata): Promise<CastMember[]> {
     return Promise.all((show.castMembers ?? []).map(async (member) => {
       const file = await this.cacheFile(member.photoUrl, 'people', `${providerName}-person`);
       return { name: member.name, photoUrl: file ? `/media/people/${file}` : null };
