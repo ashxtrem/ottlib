@@ -11,6 +11,7 @@ import { buildApp, type AppOverrides } from '../app.js';
 import { SessionBusyError, type HlsSessionOpener } from '../services/hls/sessionOpener.js';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
+import { MovieExtrasRepository } from '../repositories/movieExtrasRepository.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
 import { ScanRunRepository } from '../repositories/scanRunRepository.js';
 
@@ -35,6 +36,10 @@ function fixture(overrides: AppOverrides = {}) {
   movies.upsertScanned({ folderId: 1, path: otherPath, filename: 'Home.Video.mp4', title: 'Home Video', year: null, size: 10, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
   movies.applyMetadata(1, { source: 'tmdb', providerId: '329865', mediaType: 'movie', title: 'Arrival', year: 2016, overview: 'A linguist is recruited to talk to visitors.', posterFile: 'arrival.jpg', backdropFile: 'arrival-backdrop.jpg', genres: ['Drama', 'Science Fiction'], cast: ['Amy Adams', 'Jeremy Renner'], rating: 7.6, runtime: 116, imdbId: 'tt2543164' });
   movies.markUnmatched(2);
+  const extras = new MovieExtrasRepository(db);
+  extras.applyExtras(1, { castMembers: [{ name: 'Amy Adams', photoUrl: '/media/people/tmdb-person-amy.jpg' }, { name: 'Jeremy Renner', photoUrl: null }], logoFile: 'tmdb-logo-arrival.png', collection: { id: 1234, name: 'Arrival Collection' }, trailerKey: 'tNZfcqGEmnQ' });
+  extras.applyRatings(1, [{ source: 'imdb', value: 7.9, max: 10 }, { source: 'rottenTomatoes', value: 94, max: 100 }, { source: 'metacritic', value: 81, max: 100 }]);
+  db.prepare("UPDATE movies SET added_at = datetime('now', '-30 days') WHERE id = 1").run(); // the first import; the unwatched Home Video added after it is 'new'
   movies.applyMediaInfo(1, { container: 'MKV', durationMs: 6_960_000, width: 3840, height: 2160, videoCodec: 'HEVC', videoProfile: 'Main 10', videoBitRate: 40_000_000, hdrFormat: 'HDR10' });
   movies.applyPictureArea(1, { x: 0, y: 270, width: 3840, height: 1620 }, 'done');
   new MediaTrackRepository(db).replaceForMovie(1, [

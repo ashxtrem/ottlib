@@ -19,6 +19,8 @@ data class MovieListItem(
     val shelves: List<ShelfMembership>,
     val nextUp: String? = null,
     val showKey: String? = null,
+    /** "new" for a recent, unwatched title that did not come with the first import; null otherwise. */
+    val fresh: String? = null,
 )
 
 @Serializable

@@ -36,7 +36,7 @@ describe('health routes', () => {
     const { app, db, dir } = fixture();
     new FolderRepository(db).create(join(dir, 'missing-movies'));
     const report = await get(app, '/api/health');
-    expect(report.checks.map((check) => check.id)).toEqual(['library-folders', 'disk-space', 'ffmpeg', 'tmdb-key', 'backups', 'update']);
+    expect(report.checks.map((check) => check.id)).toEqual(['library-folders', 'disk-space', 'ffmpeg', 'tmdb-key', 'backups', 'title-extras', 'update']);
     const byId = Object.fromEntries(report.checks.map((check) => [check.id, check]));
     expect(byId['library-folders']).toMatchObject({ state: 'fail' });
     expect(byId['library-folders'].message).toContain('missing-movies');

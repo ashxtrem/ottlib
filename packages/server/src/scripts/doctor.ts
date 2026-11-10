@@ -6,6 +6,7 @@ import { QbittorrentSearch } from '../providers/torrent/qbittorrentSearch.js';
 import { FfmpegLocator } from '../providers/transcode/ffmpegLocator.js';
 import { BackupRepository } from '../repositories/backupRepository.js';
 import { FolderRepository } from '../repositories/folderRepository.js';
+import { MovieExtrasRepository } from '../repositories/movieExtrasRepository.js';
 import { SettingRepository } from '../repositories/settingRepository.js';
 import { BackupService } from '../services/backupService.js';
 import { doctorReport } from '../services/health/doctorReport.js';
@@ -24,6 +25,7 @@ const config = await loadBootstrapConfig(resolveAppRoot());
 const db = createDatabase(config.absoluteAppDataPath);
 try {
   const settings = new SettingRepository(db); const folders = new FolderRepository(db);
+  const extras = new MovieExtrasRepository(db);
   const ffmpeg = new FfmpegLocator(); const latestRelease = new LatestRelease(); const version = readAppVersion();
   const qbittorrent = new QbittorrentClient(() => settings.get()); const torrentConnection = new TorrentConnectionService(qbittorrent, new QbittorrentSearch(qbittorrent));
   const health = new HealthService(() => healthChecks({
@@ -35,6 +37,7 @@ try {
     torrentSearchEnabled: () => settings.get().torrentSearchEnabled,
     testQbittorrent: () => torrentConnection.test(),
     backups: new BackupService(new BackupRepository(db), config.absoluteAppDataPath),
+    idsMissingExtras: () => extras.idsMissingExtras(),
     update: { version: () => version, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() }
   }));
   const { lines, exitCode } = doctorReport(await health.run(true));

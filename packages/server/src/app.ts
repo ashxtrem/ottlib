@@ -102,6 +102,7 @@ import { LatestRelease } from './services/health/latestRelease.js';
 import { checkTmdbKey } from './services/settingsService.js';
 import { readAppVersion } from './config/appVersion.js';
 import { registerHealthRoutes } from './routes/health.js';
+import { startTitleExtrasBackfill } from './services/titleExtrasBackfill.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -111,6 +112,8 @@ declare module 'fastify' {
     pictureArea: PictureAreaService;
     /** The credits chapter pass; index.ts starts it at server start and each scan starts it again. */
     credits: CreditsService;
+    /** Starts a metadata refresh for matched titles without extras, unless a metadata run is active; index.ts calls it once after listening. */
+    startTitleExtrasBackfill: () => boolean;
   }
 }
 
@@ -125,7 +128,8 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     try { done(null, JSON.parse(text)); } catch (error) { done(error as Error); }
   });
   const movies = new MovieRepository(db); const folders = new FolderRepository(db); const settings = new SettingRepository(db); const watches = new WatchStateRepository(db); const runs = new ScanRunRepository(db); const shelfRecords = new ShelfRepository(db); const shelfMovies = new ShelfMovieRepository(db); const mediaTracks = new MediaTrackRepository(db); runs.failAbandonedRuns();
-  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs, new MovieExtrasRepository(db));
+  const movieExtras = new MovieExtrasRepository(db);
+  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs, movieExtras, (message) => app.log.warn(message));
   const ffmpeg = overrides.ffmpeg ?? new FfmpegLocator(); const locate = () => ffmpeg.locate();
   const pictureArea = new PictureAreaService(movies, locate, undefined, (message) => app.log.warn(message));
   const credits = new CreditsService(movies, undefined, (message) => app.log.warn(message));
@@ -142,7 +146,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
   const appVersion = readAppVersion(); const latestRelease = new LatestRelease();
-  const health = new HealthService(() => healthChecks({ appDataPath, folders: () => folders.list().map((folder) => folder.path), locateFfmpeg: locate, tmdbKey: () => settings.get().tmdbApiKey, testTmdbKey: checkTmdbKey, torrentSearchEnabled: () => settings.get().torrentSearchEnabled, testQbittorrent: () => torrentConnection.test(), backups, update: { version: () => appVersion, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() } }));
+  const health = new HealthService(() => healthChecks({ appDataPath, folders: () => folders.list().map((folder) => folder.path), locateFfmpeg: locate, tmdbKey: () => settings.get().tmdbApiKey, testTmdbKey: checkTmdbKey, torrentSearchEnabled: () => settings.get().torrentSearchEnabled, testQbittorrent: () => torrentConnection.test(), backups, idsMissingExtras: () => movieExtras.idsMissingExtras(), update: { version: () => appVersion, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() } }));
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
@@ -164,6 +168,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   }
   scheduler.refresh(); backupScheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop()); app.addHook('onClose', () => backupScheduler.stop());
   app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions); app.decorate('pictureArea', pictureArea); app.decorate('credits', credits);
+  app.decorate('startTitleExtrasBackfill', () => startTitleExtrasBackfill({ idsMissingExtras: () => movieExtras.idsMissingExtras(), startSelectedRefresh: (ids) => metadata.startSelectedMetadataRefresh(ids), log: (message) => app.log.info(message) }));
   app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }
