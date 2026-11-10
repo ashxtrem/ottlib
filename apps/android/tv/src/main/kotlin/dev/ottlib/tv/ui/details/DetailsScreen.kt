@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -200,7 +201,11 @@ private fun MovieDetails(movie: Movie, viewModel: DetailsViewModel, actions: Det
     }
     // First entry focuses Play; returning puts focus back on the card that had it (Play when that card is gone).
     LaunchedEffect(movie.id) {
-        val restored = restoreKey != null && runCatching { restore.requestFocus() }.isSuccess
+        // The saved card's row (cast, collection, recommendations) may compose a few frames later: retry before Play.
+        var restored = false
+        if (restoreKey != null) repeat(10) {
+            if (!restored) { withFrameNanos { }; restored = runCatching { restore.requestFocus() }.isSuccess }
+        }
         if (!restored) primary.tryRequestFocus()
     }
     if (metadataOpen) {
