@@ -28,6 +28,8 @@ data class LibraryFilters(
     val watched: Boolean? = null,
     val genre: String? = null,
     val mediaType: String? = null,
+    val actor: String? = null,
+    val collectionId: Long? = null,
 )
 
 data class LibraryUiState(
@@ -41,8 +43,13 @@ data class LibraryUiState(
 )
 
 /** The full library as a filterable, cursor-paged grid (same query parameters as the web library). */
-class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys: Flow<Set<String>> = flowOf(emptySet())) : ViewModel() {
-    private val state = MutableStateFlow(LibraryUiState())
+class LibraryViewModel(
+    private val api: OttlibApi,
+    sync: LibrarySync,
+    hiddenKeys: Flow<Set<String>> = flowOf(emptySet()),
+    private val preset: LibraryPreset? = null,
+) : ViewModel() {
+    private val state = MutableStateFlow(LibraryUiState(filters = preset?.applyTo(LibraryFilters()) ?: LibraryFilters()))
     /** [state] minus titles hidden on this device; paging still follows the unfiltered [state]. */
     val uiState: StateFlow<LibraryUiState> = combine(state, hiddenKeys) { current, hidden -> current.copy(items = current.items.withoutHidden(hidden)) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, state.value)
@@ -83,8 +90,9 @@ class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys
     }
 
     fun setFilters(filters: LibraryFilters) {
-        if (filters == state.value.filters) return
-        state.update { it.copy(filters = filters) }
+        val applied = preset?.applyTo(filters) ?: filters
+        if (applied == state.value.filters) return
+        state.update { it.copy(filters = applied) }
         lastFocusedId = null
         reload()
     }
@@ -107,7 +115,7 @@ class LibraryViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys
         val filters = state.value.filters
         page = viewModelScope.launch {
             try {
-                val result = api.movies(MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort, limit = PAGE_SIZE, cursor = cursor))
+                val result = api.movies(MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort, limit = PAGE_SIZE, cursor = cursor, actor = filters.actor, collection = filters.collectionId))
                 val change = api.watchChange.value
                 val posters = result.items.map { item ->
                     item.toPosterItem(api::resolve).let { poster ->
