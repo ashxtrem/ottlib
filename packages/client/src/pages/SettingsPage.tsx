@@ -22,6 +22,7 @@ import { useAuthStatus } from '../hooks/useAccessPin';
 import { SubtitleSettingsSection } from '../components/SubtitleSettingsSection';
 import { PlayerSettingsSection } from '../components/PlayerSettingsSection';
 import { TranscodeSettingsSection } from '../components/settings/TranscodeSettingsSection';
+import { torrentPreferencesUpdate } from '../utils/torrentPreferences';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -124,6 +125,7 @@ export function SettingsPage() {
           qbittorrentUsername: String(values.get('qbittorrentUsername') ?? '').trim(),
           qbittorrentCategory: String(values.get('qbittorrentCategory') ?? '').trim(),
           qbittorrentSavePath: String(values.get('qbittorrentSavePath') ?? '').trim(),
+          ...torrentPreferencesUpdate(values),
         });
         const tmdbApiKey = values.get('tmdbApiKey'); if (typeof tmdbApiKey === 'string') Object.assign(update, { tmdbApiKey });
         const omdbApiKey = values.get('omdbApiKey'); if (typeof omdbApiKey === 'string') Object.assign(update, { omdbApiKey });

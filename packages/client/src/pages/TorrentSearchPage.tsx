@@ -30,7 +30,7 @@ function TorrentSearch() {
   const unavailable = connection.data?.status === 'not-configured' || connection.data?.status === 'plugins-missing';
   const state = search.state.data;
   return <section className="space-y-6">
-    <div><h1 className="text-2xl font-bold">Torrent search</h1><p className="mt-1 text-sm text-muted">Search qBittorrent’s enabled movie plugins, then hand a chosen release back to qBittorrent.</p></div>
+    <div><h1 className="text-2xl font-bold">Torrent search</h1><p className="mt-1 text-sm text-muted">Search qBittorrent’s enabled movie plugins, then hand a chosen release back to qBittorrent.</p><Link to="/torrents/upgrades" className="mt-2 inline-block text-sm text-accent hover:underline">Find library titles to upgrade</Link></div>
     <ActiveTorrentDownloads downloads={downloads.data} loading={downloads.isFetching} />
     {unavailable && <section className="rounded-xl border border-warning-border bg-warning-soft p-5"><h2 className="font-semibold text-warning">{connection.data?.status === 'not-configured' ? 'Set up qBittorrent first' : 'qBittorrent Search needs plugins'}</h2><p className="mt-2 text-sm text-muted">{connection.data?.message}</p><Link to="/settings" className="mt-3 inline-flex rounded-lg border border-warning-border px-4 py-2 text-sm font-medium text-warning hover:bg-warning-border/15">Open Settings</Link></section>}
     <TorrentSearchBar query={query} year={year} searching={search.start.isPending || state?.status === 'running'} onQueryChange={setQuery} onYearChange={setYear} onSearch={submit} />
