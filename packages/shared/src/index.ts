@@ -81,6 +81,16 @@ export const mediaInfoSchema = z.object({
   pictureHeight: z.number().int().nullable().optional()
 });
 
+export const castMemberSchema = z.object({ name: z.string(), photoUrl: z.string().nullable() });
+export const outsideRatingSchema = z.object({
+  source: z.enum(['imdb', 'rottenTomatoes', 'metacritic']),
+  value: z.number(),
+  max: z.number()
+});
+export const collectionRefSchema = z.object({ id: z.number().int(), name: z.string() });
+/** 'new': added recently, unwatched, and not part of the first library import. */
+export const freshMarkSchema = z.enum(['new']).nullable();
+
 export const movieSchema = z.object({
   id: z.number().int(),
   title: z.string(),
@@ -108,7 +118,16 @@ export const movieSchema = z.object({
   resumePositionMs: z.number().int().nonnegative().nullable(),
   missing: z.boolean(),
   addedAt: z.string(),
-  shelves: z.array(shelfMembershipSchema)
+  shelves: z.array(shelfMembershipSchema),
+  /** Cast with photos (server-relative /media/people/ paths); `cast` keeps the plain names. */
+  castMembers: z.array(castMemberSchema),
+  /** Title logo, a server-relative /media/logos/ path. */
+  logoUrl: z.string().nullable(),
+  ratings: z.array(outsideRatingSchema),
+  collection: collectionRefSchema.nullable(),
+  /** YouTube key of the trailer. */
+  trailerKey: z.string().nullable(),
+  fresh: freshMarkSchema
 });
 
 export const movieListItemSchema = z.object({
@@ -125,7 +144,8 @@ export const movieListItemSchema = z.object({
   durationMs: z.number().int().nullable(),
   missing: z.boolean(),
   metadataStatus: z.enum(['pending', 'suggested', 'matched', 'unmatched', 'error']),
-  shelves: z.array(shelfMembershipSchema)
+  shelves: z.array(shelfMembershipSchema),
+  fresh: freshMarkSchema
 });
 
 /** A title to watch next, with a short human-readable reason shown under its poster. */
@@ -256,6 +276,10 @@ export type MovieListItem = z.infer<typeof movieListItemSchema>;
 export type MovieListPage = z.infer<typeof movieListPageSchema>;
 export type Recommendation = z.infer<typeof recommendationSchema>;
 export type MediaInfo = z.infer<typeof mediaInfoSchema>;
+export type CastMember = z.infer<typeof castMemberSchema>;
+export type OutsideRating = z.infer<typeof outsideRatingSchema>;
+export type CollectionRef = z.infer<typeof collectionRefSchema>;
+export type FreshMark = z.infer<typeof freshMarkSchema>;
 export type MediaTrack = z.infer<typeof mediaTrackSchema>;
 export type ShelfMembership = z.infer<typeof shelfMembershipSchema>;
 export type Folder = z.infer<typeof folderSchema>;

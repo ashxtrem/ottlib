@@ -13,6 +13,7 @@
     "durationMs": null,
     "missing": false,
     "metadataStatus": "matched",
-    "shelves": []
+    "shelves": [],
+    "fresh": "new"
   }
 ]

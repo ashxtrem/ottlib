@@ -34,8 +34,8 @@ function detectSeasonEpisode(filename: string): AcceptOptions | null {
 export class MetadataMatchService {
   private readonly titleExtras?: TitleExtrasService;
 
-  public constructor(private readonly movies: MovieRepository, private readonly settings: SettingRepository, private readonly cache: PosterCacheService, private readonly runs?: ScanRunRepository, extras?: MovieExtrasRepository) {
-    if (extras) this.titleExtras = new TitleExtrasService(extras, cache, settings);
+  public constructor(private readonly movies: MovieRepository, private readonly settings: SettingRepository, private readonly cache: PosterCacheService, private readonly runs?: ScanRunRepository, extras?: MovieExtrasRepository, log?: (message: string) => void) {
+    if (extras) this.titleExtras = new TitleExtrasService(extras, cache, settings, log);
   }
 
   public async suggest(movieId: number, searchTitle?: string, options: SuggestOptions = {}): Promise<void> {
@@ -329,8 +329,10 @@ export class MetadataMatchService {
     const [posterFile, backdropFile] = await Promise.all([
       this.cache.cache(posterUrl, 'posters', prefix, refreshArtwork), this.cache.cache(show.backdropUrl, 'backdrops', prefix, refreshArtwork)
     ]);
+    const before = this.movies.metadataTarget(movieId);
+    const sameTitle = Boolean(before) && ((before?.metadataSource === provider.name && before?.providerId === show.providerId) || (Boolean(before?.imdbId) && before?.imdbId === show.imdbId));
     this.movies.applyMetadata(movieId, { source: provider.name, providerId: show.providerId, mediaType, season: mediaType === 'tv' ? options.season ?? null : null, episode: mediaType === 'tv' ? options.episode ?? null : null, title, year: show.year, overview, posterFile, backdropFile, genres: show.genres, cast: show.cast, rating, runtime: show.runtime, imdbId: show.imdbId });
-    await this.titleExtras?.save(movieId, provider.name, show, ratingsRun);
+    await this.titleExtras?.save(movieId, provider.name, show, ratingsRun, sameTitle);
   }
 
   public async suggestFromImdb(movieId: number, rawInput: string): Promise<'ok' | 'invalid-id' | 'not-found'> {

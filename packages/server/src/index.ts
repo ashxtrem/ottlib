@@ -10,6 +10,7 @@ await app.hlsSessions.start();
 await app.listen({ host: '0.0.0.0', port: config.port });
 void app.pictureArea.runPending(); // background and never rejects; a scan started meanwhile joins this pass
 void app.credits.runPending(); // same for the credits chapter pass
+app.startTitleExtrasBackfill(); // once per start: a metadata refresh for matched titles without extras, unless a metadata run is active
 if (config.advertise) {
   const info = new ServerInfoService(config.port); const discovery = new DiscoveryService(app.log);
   discovery.start(info.name(), config.port, info.get().addresses);

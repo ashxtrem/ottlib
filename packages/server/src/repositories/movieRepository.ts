@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { formatResolution, type MatchCandidate, type MediaInfo, type Movie, type MovieListItem, type MovieListPage } from '@ottlib/shared';
+import { extrasOf, freshOf, libraryFirstAddedSql } from './movieExtrasMapping.js';
 
 interface MovieRow {
   id: number; canonical_path: string; folder_path: string; raw_filename: string; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null;
@@ -10,6 +11,8 @@ interface MovieRow {
   media_probe_status: string; container_format: string | null; duration_ms: number | null; video_width: number | null; video_height: number | null;
   video_codec: string | null; video_profile: string | null; video_bit_rate: number | null; hdr_format: string | null;
   picture_x: number | null; picture_y: number | null; picture_width: number | null; picture_height: number | null; picture_status: PictureStatus;
+  cast_members_json: string | null; logo_file: string | null; collection_id: number | null; collection_name: string | null; trailer_key: string | null; ratings_json: string | null;
+  library_first_added_at: string | null;
 }
 
 /** Where the real picture sits inside the video frame, in source pixels. */
@@ -22,7 +25,7 @@ interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
   resume_position_ms: number | null; duration_ms: number | null; metadata_media_type: string | null;
-  imdb_id: string | null; metadata_source: string | null; provider_id: string | null;
+  imdb_id: string | null; metadata_source: string | null; provider_id: string | null; library_first_added_at: string | null;
 }
 
 /** Every episode of a show shares this key, so a client can treat the show as one hideable title. */
@@ -426,13 +429,13 @@ export class MovieRepository {
   }
 
   private selectSql(): string {
-    return `SELECT m.*, f.path AS folder_path, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}
+    return `SELECT m.*, f.path AS folder_path, ${libraryFirstAddedSql}, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}
       JOIN folders f ON f.id = m.folder_id`;
   }
 
   private summarySelectSql(): string {
     return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}`;
+      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, ${libraryFirstAddedSql}, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}`;
   }
 
   /** Binds the profile id once (first `?`) and exposes it to both per-profile joins. */
@@ -540,7 +543,8 @@ export class MovieRepository {
       videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: [],
       pictureWidth: row.picture_status === 'done' ? row.picture_width : null, pictureHeight: row.picture_status === 'done' ? row.picture_height : null
     } : null,
-    watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, missing: Boolean(row.missing), addedAt: row.added_at, shelves: []
+    watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, missing: Boolean(row.missing), addedAt: row.added_at, shelves: [],
+    ...extrasOf(row), fresh: freshOf(row)
   });
 
   private mapListItem = (row: MovieListItemRow): MovieListItem => ({
@@ -549,6 +553,6 @@ export class MovieRepository {
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format, showKey: showKeyOf(row),
     watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, durationMs: row.duration_ms,
-    missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []
+    missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: [], fresh: freshOf(row)
   });
 }

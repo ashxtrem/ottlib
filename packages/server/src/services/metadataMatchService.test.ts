@@ -15,7 +15,7 @@ vi.mock('../providers/metadata/metadataProviders.js', () => ({ createMetadataPro
 vi.mock('../providers/metadata/ratingsProviders.js', () => ({ createRatingsProviders: vi.fn().mockReturnValue([]) }));
 
 function extrasRepo(ratingsDue = true) {
-  return { applyExtras: vi.fn(), applyRatings: vi.fn(), ratingsDue: vi.fn().mockReturnValue(ratingsDue) };
+  return { applyExtras: vi.fn(), applyRatings: vi.fn(), deferRatings: vi.fn(), extrasFor: vi.fn(), ratingsDue: vi.fn().mockReturnValue(ratingsDue) };
 }
 
 function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFilename = 'Example.2024.mkv', runs?: ScanRunRepository, extras?: ReturnType<typeof extrasRepo>) {
@@ -281,6 +281,7 @@ describe('MetadataMatchService automatic scan acceptance', () => {
     expect(movies.applyMetadata).toHaveBeenCalledOnce();
     expect(extras.applyExtras).toHaveBeenCalledOnce();
     expect(extras.applyRatings).not.toHaveBeenCalled();
+    expect(extras.deferRatings).toHaveBeenCalledWith(1, 30, 1);
 
     extras.ratingsDue.mockReturnValue(false);
     vi.mocked(ratings.getRatings).mockClear();

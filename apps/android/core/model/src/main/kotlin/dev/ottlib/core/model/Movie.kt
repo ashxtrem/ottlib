@@ -33,6 +33,16 @@ data class Movie(
     val missing: Boolean,
     val addedAt: String,
     val shelves: List<ShelfMembership>,
+    /** Cast with photos (server-relative paths); [cast] keeps the plain names. */
+    val castMembers: List<CastMember> = emptyList(),
+    /** Title logo, a server-relative path. */
+    val logoUrl: String? = null,
+    val ratings: List<OutsideRating> = emptyList(),
+    val collection: CollectionRef? = null,
+    /** YouTube key of the trailer. */
+    val trailerKey: String? = null,
+    /** "new" for a recent, unwatched title that did not come with the first import; null otherwise. */
+    val fresh: String? = null,
 )
 
 @Serializable

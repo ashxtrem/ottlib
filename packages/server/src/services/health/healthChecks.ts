@@ -6,6 +6,7 @@ import { diskSpaceCheck } from './checks/diskSpaceCheck.js';
 import { ffmpegCheck } from './checks/ffmpegCheck.js';
 import { libraryFoldersCheck } from './checks/libraryFoldersCheck.js';
 import { qbittorrentCheck } from './checks/qbittorrentCheck.js';
+import { titleExtrasCheck } from './checks/titleExtras.js';
 import { tmdbKeyCheck } from './checks/tmdbKeyCheck.js';
 import { updateCheck, type UpdateCheckDeps } from './checks/updateCheck.js';
 
@@ -18,6 +19,7 @@ export interface HealthCheckDeps {
   torrentSearchEnabled: () => boolean;
   testQbittorrent: () => Promise<TorrentConnectionStatus>;
   backups: BackupSource;
+  idsMissingExtras: () => number[];
   update: UpdateCheckDeps;
 }
 
@@ -33,6 +35,7 @@ export function healthChecks(deps: HealthCheckDeps): HealthCheck[] {
     tmdbKeyCheck(deps.tmdbKey, deps.testTmdbKey),
     ...(deps.torrentSearchEnabled() ? [qbittorrentCheck(deps.testQbittorrent)] : []),
     backupsCheck(deps.backups),
+    titleExtrasCheck(deps.idsMissingExtras),
     updateCheck(deps.update)
   ];
 }

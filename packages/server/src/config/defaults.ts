@@ -9,6 +9,8 @@ export const releaseQualityTagPatterns = {
 export const releaseTags = new RegExp(`${releaseQualityTagPatterns.resolution.source}|${releaseQualityTagPatterns.source.source}|${releaseQualityTagPatterns.codec.source}|\\b(?:aac|dts|atmos|truehd|dual[ .-]?audio|multi|proper|repack|extended|unrated|limited)\\b`, 'gi');
 export const episodeTags = /\b(?:s\d{1,2}\s?e\d{1,3}|\d{1,2}x\d{2,3}|season\s?\d{1,2}(?:\s?episode\s?\d{1,3})?|episode\s?\d{1,3})\b/gi;
 export const releaseYearUpperBoundOffset = 1;
+/** A title added within this many days (and unwatched) carries the "new" mark. */
+export const FRESH_DAYS = 14;
 export const defaultSettings = {
   tmdbApiKey: '',
   omdbApiKey: '',

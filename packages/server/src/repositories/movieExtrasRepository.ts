@@ -40,6 +40,12 @@ export class MovieExtrasRepository {
     this.db.prepare('UPDATE movies SET ratings_json = ?, ratings_fetched_at = ? WHERE id = ?').run(JSON.stringify(ratings), now.toISOString(), id);
   }
 
+  /** A ratings lookup failed: keeps any stored ratings and makes them due again after `retryDays` instead of on the next save. */
+  public deferRatings(id: number, refreshDays: number, retryDays: number, now = new Date()): void {
+    const stamp = new Date(now.getTime() - Math.max(refreshDays - retryDays, 0) * dayMs);
+    this.db.prepare('UPDATE movies SET ratings_fetched_at = ? WHERE id = ?').run(stamp.toISOString(), id);
+  }
+
   public extrasFor(id: number): StoredTitleExtras | undefined {
     const row = this.db.prepare(`SELECT cast_members_json, logo_file, collection_id, collection_name, trailer_key, ratings_json, ratings_fetched_at, extras_fetched_at
       FROM movies WHERE id = ?`).get(id) as Record<string, any> | undefined;
@@ -52,9 +58,9 @@ export class MovieExtrasRepository {
     };
   }
 
-  /** Matched titles whose extras were never fetched. */
+  /** Matched, available titles whose extras were never fetched (a metadata refresh skips missing files). */
   public idsMissingExtras(): number[] {
-    return (this.db.prepare("SELECT id FROM movies WHERE metadata_status = 'matched' AND extras_fetched_at IS NULL ORDER BY id").all() as Array<{ id: number }>).map((row) => row.id);
+    return (this.db.prepare("SELECT id FROM movies WHERE metadata_status = 'matched' AND missing = 0 AND extras_fetched_at IS NULL ORDER BY id").all() as Array<{ id: number }>).map((row) => row.id);
   }
 
   /** True when the ratings were never asked, or were asked more than `days` ago. */

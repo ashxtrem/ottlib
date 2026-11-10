@@ -138,4 +138,19 @@ class ContractFixturesTest {
         assertEquals(3840, movie.mediaInfo?.pictureWidth)
         assertEquals(1620, movie.mediaInfo?.pictureHeight)
     }
+
+    @Test
+    fun movieFixtureCarriesTheTitleExtras() {
+        val movie = strict.decodeFromString(Movie.serializer(), File(fixtures, "movie.json").readText())
+        assertEquals(listOf("Amy Adams", "Jeremy Renner"), movie.castMembers.map { it.name })
+        assertEquals("/media/people/tmdb-person-amy.jpg", movie.castMembers.first().photoUrl)
+        assertEquals(null, movie.castMembers.last().photoUrl)
+        assertEquals("/media/logos/tmdb-logo-arrival.png", movie.logoUrl)
+        assertEquals(listOf("imdb", "rottenTomatoes", "metacritic"), movie.ratings.map { it.source })
+        assertEquals(CollectionRef(1234, "Arrival Collection"), movie.collection)
+        assertEquals("tNZfcqGEmnQ", movie.trailerKey)
+        assertEquals(null, movie.fresh)
+        val unmatched = strict.decodeFromString(Movie.serializer(), File(fixtures, "movie-unmatched.json").readText())
+        assertEquals("new", unmatched.fresh)
+    }
 }
