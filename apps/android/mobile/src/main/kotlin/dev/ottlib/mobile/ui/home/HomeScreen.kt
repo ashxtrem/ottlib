@@ -76,8 +76,8 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit, onPlay: (Long) -> Unit, onSwitchProf
                                 HomeHero(
                                     featured,
                                     width,
-                                    onPlay = { heroRow?.let(queueFrom); onPlay(featured.item.id) },
-                                    onDetails = { heroRow?.let(queueFrom); onOpenMovie(featured.item.id) },
+                                    onPlay = { if (heroRow != null) queueFrom(heroRow) else container.playbackSequence.select(emptyList(), shelf = null); onPlay(featured.item.id) },
+                                    onDetails = { if (heroRow != null) queueFrom(heroRow) else container.playbackSequence.select(emptyList(), shelf = null); onOpenMovie(featured.item.id) },
                                 )
                             }
                         }
