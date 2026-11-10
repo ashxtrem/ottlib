@@ -17,6 +17,7 @@ import { PinGate } from './components/PinGate';
 import { ProfileGate } from './components/ProfileGate';
 import { ProfileMenu } from './components/ProfileMenu';
 import { useTorrentSearchEnabled } from './hooks/useTorrentSearchEnabled';
+import { useSearchShortcut } from './hooks/useSearchShortcut';
 
 const floatingButtonClassName = `inline-flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent-soft/50 transition-[background-color,transform] duration-fast ease-emphasis hover:scale-105 hover:bg-accent-hover ${focusRing} ${pressable}`;
 
@@ -49,6 +50,7 @@ export function App() {
 
 function HeaderLayout() {
   const { pathname } = useLocation();
+  useSearchShortcut();
   const scrollSentinel = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {

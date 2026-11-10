@@ -3,11 +3,11 @@ import type { ManualMatchCandidate, MatchCandidate, Movie, MovieFilterOptions, M
 import { api } from './apiClient';
 import { useToast } from './useToast';
 
-export interface MovieFilters { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; mediaType?: 'movie' | 'tv'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean }
+export interface MovieFilters { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; mediaType?: 'movie' | 'tv'; sort?: string; genre?: string; collection?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean }
 type MovieListData = InfiniteData<MovieListPage, string | undefined>;
 
 function movieParams(filters: MovieFilters, cursor?: string): URLSearchParams {
-  const params = new URLSearchParams(); if (filters.search) params.set('search', filters.search); if (filters.watched !== undefined) params.set('watched', String(filters.watched)); if (filters.availability) params.set('availability', filters.availability); if (filters.mediaType) params.set('mediaType', filters.mediaType); if (filters.sort) params.set('sort', filters.sort); if (filters.genre) params.set('genre', filters.genre); if (filters.actor) params.set('actor', filters.actor); if (filters.quality) params.set('quality', filters.quality); if (filters.audioLanguage) params.set('audioLanguage', filters.audioLanguage); if (filters.minRating !== undefined) params.set('minRating', String(filters.minRating)); if (filters.needsReview) params.set('needsReview', 'true'); if (cursor) params.set('cursor', cursor);
+  const params = new URLSearchParams(); if (filters.search) params.set('search', filters.search); if (filters.watched !== undefined) params.set('watched', String(filters.watched)); if (filters.availability) params.set('availability', filters.availability); if (filters.mediaType) params.set('mediaType', filters.mediaType); if (filters.sort) params.set('sort', filters.sort); if (filters.genre) params.set('genre', filters.genre); if (filters.collection) params.set('collection', filters.collection); if (filters.actor) params.set('actor', filters.actor); if (filters.quality) params.set('quality', filters.quality); if (filters.audioLanguage) params.set('audioLanguage', filters.audioLanguage); if (filters.minRating !== undefined) params.set('minRating', String(filters.minRating)); if (filters.needsReview) params.set('needsReview', 'true'); if (cursor) params.set('cursor', cursor);
   return params;
 }
 

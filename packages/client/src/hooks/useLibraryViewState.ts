@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-export interface LibraryViewState { search: string; watched: boolean | undefined; availability: 'available' | 'unavailable' | undefined; mediaType: 'movie' | 'tv' | undefined; sort: 'title' | 'year' | 'added' | 'quality'; genre: string; actor: string; quality: string; audioLanguage: string; minRating: number | undefined; needsReview: boolean }
+export interface LibraryViewState { search: string; watched: boolean | undefined; availability: 'available' | 'unavailable' | undefined; mediaType: 'movie' | 'tv' | undefined; sort: 'title' | 'year' | 'added' | 'quality'; genre: string; collection: string; actor: string; quality: string; audioLanguage: string; minRating: number | undefined; needsReview: boolean }
 
 const storageKey = 'movie-library-library-view';
-export const initialLibraryViewState: LibraryViewState = { search: '', watched: undefined, availability: 'available', mediaType: undefined, sort: 'title', genre: '', actor: '', quality: '', audioLanguage: '', minRating: undefined, needsReview: false };
+export const initialLibraryViewState: LibraryViewState = { search: '', watched: undefined, availability: 'available', mediaType: undefined, sort: 'title', genre: '', collection: '', actor: '', quality: '', audioLanguage: '', minRating: undefined, needsReview: false };
+
+/** A collection id in the URL: a positive whole number, as the server expects. */
+function isCollectionId(value: unknown): value is string {
+  return typeof value === 'string' && /^[1-9]\d*$/.test(value);
+}
 
 function readState(): LibraryViewState {
   try {
@@ -13,7 +18,7 @@ function readState(): LibraryViewState {
     return {
       search: typeof parsed.search === 'string' ? parsed.search : '', watched: typeof parsed.watched === 'boolean' ? parsed.watched : undefined, availability: parsed.availability === 'available' || parsed.availability === 'unavailable' ? parsed.availability : 'available', mediaType: parsed.mediaType === 'movie' || parsed.mediaType === 'tv' ? parsed.mediaType : undefined,
       sort: parsed.sort === 'year' || parsed.sort === 'added' || parsed.sort === 'quality' ? parsed.sort : 'title', genre: typeof parsed.genre === 'string' ? parsed.genre : '',
-      actor: typeof parsed.actor === 'string' ? parsed.actor : '', quality: typeof parsed.quality === 'string' ? parsed.quality : '', audioLanguage: typeof parsed.audioLanguage === 'string' ? parsed.audioLanguage : '', minRating: typeof parsed.minRating === 'number' && Number.isFinite(parsed.minRating) ? parsed.minRating : undefined,
+      collection: isCollectionId(parsed.collection) ? parsed.collection : '', actor: typeof parsed.actor === 'string' ? parsed.actor : '', quality: typeof parsed.quality === 'string' ? parsed.quality : '', audioLanguage: typeof parsed.audioLanguage === 'string' ? parsed.audioLanguage : '', minRating: typeof parsed.minRating === 'number' && Number.isFinite(parsed.minRating) ? parsed.minRating : undefined,
       needsReview: parsed.needsReview === true
     };
   } catch { return initialLibraryViewState; }
@@ -27,7 +32,7 @@ export function libraryStateFromSearchParams(params: URLSearchParams): LibraryVi
   const minRatingValue = params.get('minRating'); const minRating = minRatingValue === null || minRatingValue === '' ? undefined : Number(minRatingValue);
   const sort = params.get('sort'); const watched = params.get('watched'); const availability = params.get('availability'); const mediaType = params.get('mediaType');
   return {
-    search: params.get('search') ?? '', genre: params.get('genre') ?? '', actor: params.get('actor') ?? '', quality: params.get('quality') ?? '', audioLanguage: params.get('audioLanguage') ?? '',
+    search: params.get('search') ?? '', genre: params.get('genre') ?? '', collection: isCollectionId(params.get('collection')) ? params.get('collection') as string : '', actor: params.get('actor') ?? '', quality: params.get('quality') ?? '', audioLanguage: params.get('audioLanguage') ?? '',
     watched: watched === 'true' ? true : watched === 'false' ? false : undefined, availability: availability === 'available' || availability === 'unavailable' ? availability : availability === 'all' ? undefined : 'available', mediaType: mediaType === 'movie' || mediaType === 'tv' ? mediaType : undefined,
     sort: sort === 'year' || sort === 'added' || sort === 'quality' ? sort : 'title',
     minRating: minRating !== undefined && Number.isFinite(minRating) && minRating >= 0 && minRating <= 10 ? minRating : undefined,
@@ -37,7 +42,7 @@ export function libraryStateFromSearchParams(params: URLSearchParams): LibraryVi
 
 export function libraryStateToSearchParams(state: LibraryViewState): URLSearchParams {
   const params = new URLSearchParams();
-  if (state.search.trim()) params.set('search', state.search.trim()); if (state.genre) params.set('genre', state.genre); if (state.actor) params.set('actor', state.actor); if (state.quality) params.set('quality', state.quality); if (state.audioLanguage) params.set('audioLanguage', state.audioLanguage);
+  if (state.search.trim()) params.set('search', state.search.trim()); if (state.genre) params.set('genre', state.genre); if (state.collection) params.set('collection', state.collection); if (state.actor) params.set('actor', state.actor); if (state.quality) params.set('quality', state.quality); if (state.audioLanguage) params.set('audioLanguage', state.audioLanguage);
   if (state.watched !== undefined) params.set('watched', String(state.watched)); if (state.availability === 'unavailable') params.set('availability', 'unavailable'); if (state.availability === undefined) params.set('availability', 'all'); if (state.mediaType) params.set('mediaType', state.mediaType); if (state.sort !== 'title') params.set('sort', state.sort);
   if (state.minRating !== undefined) params.set('minRating', String(state.minRating)); if (state.needsReview) params.set('needsReview', 'true');
   return params;
@@ -60,7 +65,7 @@ export function useLibraryViewState() {
   useEffect(() => {
     if (!hasUrlState) return;
     saveState(urlState);
-  }, [hasUrlState, urlState.actor, urlState.audioLanguage, urlState.availability, urlState.genre, urlState.mediaType, urlState.minRating, urlState.needsReview, urlState.quality, urlState.search, urlState.sort, urlState.watched]);
+  }, [hasUrlState, urlState.actor, urlState.audioLanguage, urlState.availability, urlState.collection, urlState.genre, urlState.mediaType, urlState.minRating, urlState.needsReview, urlState.quality, urlState.search, urlState.sort, urlState.watched]);
 
   const update = (change: Partial<LibraryViewState>, replace = true) => {
     const next = { ...state, ...change };
@@ -77,6 +82,7 @@ export function useLibraryViewState() {
     setMediaType: (mediaType: 'movie' | 'tv' | undefined) => update({ mediaType }),
     setSort: (sort: string) => update({ sort: sort === 'year' || sort === 'added' || sort === 'quality' ? sort : 'title' }),
     setGenre: (genre: string) => update({ genre }),
+    setCollection: (collection: string) => update({ collection }),
     setActor: (actor: string) => update({ actor }),
     setQuality: (quality: string) => update({ quality }),
     setAudioLanguage: (audioLanguage: string) => update({ audioLanguage }),
