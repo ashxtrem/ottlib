@@ -6,10 +6,19 @@ import type { SettingRepository } from '../repositories/settingRepository.js';
 import { MetadataMatchService } from './metadataMatchService.js';
 import type { PosterCacheService } from './posterCacheService.js';
 import type { ScanRunRepository } from '../repositories/scanRunRepository.js';
+import type { MovieExtrasRepository } from '../repositories/movieExtrasRepository.js';
+import { createRatingsProviders } from '../providers/metadata/ratingsProviders.js';
+import { RatingsLimitReachedError, type RatingsProvider } from '../providers/metadata/RatingsProvider.js';
 
 vi.mock('../providers/metadata/metadataProviders.js', () => ({ createMetadataProviders: vi.fn() }));
 
-function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFilename = 'Example.2024.mkv', runs?: ScanRunRepository) {
+vi.mock('../providers/metadata/ratingsProviders.js', () => ({ createRatingsProviders: vi.fn().mockReturnValue([]) }));
+
+function extrasRepo(ratingsDue = true) {
+  return { applyExtras: vi.fn(), applyRatings: vi.fn(), deferRatings: vi.fn(), extrasFor: vi.fn(), ratingsDue: vi.fn().mockReturnValue(ratingsDue) };
+}
+
+function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFilename = 'Example.2024.mkv', runs?: ScanRunRepository, extras?: ReturnType<typeof extrasRepo>) {
   const provider: MetadataProvider = {
     name: 'tmdb',
     searchCandidates: vi.fn().mockResolvedValue([{ id: '42', title: 'Example', year: 2024, score, mediaType }]),
@@ -31,7 +40,8 @@ function createSubject(score: number, mediaType: 'movie' | 'tv' = 'movie', rawFi
   };
   const cache = { cache: vi.fn().mockResolvedValue(null) };
   vi.mocked(createMetadataProviders).mockReturnValue([provider]);
-  const service = new MetadataMatchService(movies as unknown as MovieRepository, { get: vi.fn() } as unknown as SettingRepository, cache as unknown as PosterCacheService, runs);
+  vi.mocked(createRatingsProviders).mockReturnValue([]);
+  const service = new MetadataMatchService(movies as unknown as MovieRepository, { get: vi.fn().mockReturnValue({}) } as unknown as SettingRepository, cache as unknown as PosterCacheService, runs, extras as unknown as MovieExtrasRepository);
   return { service, movies, provider, cache };
 }
 
@@ -216,5 +226,66 @@ describe('MetadataMatchService automatic scan acceptance', () => {
     expect(tmdb.getEpisodeDetails).toHaveBeenCalledWith('42', 1, 4);
     expect(movies.applyMetadata).toHaveBeenCalledWith(1, expect.objectContaining({ source: 'tmdb', mediaType: 'tv', title: 'Example · S1E4 · Our Lord' }));
     expect(runs.progress).toHaveBeenLastCalledWith(20, 1, 1, 1);
+  });
+
+  it('stops asking ratings for the rest of a run once the request limit is reached, and says so', async () => {
+    const run = { id: 24, kind: 'metadata-refresh' as const, status: 'running' as const, startedAt: 'a', finishedAt: null, filesFound: 0, filesProcessed: 0, titlesAdded: 0, errorSummary: null };
+    const runs = { active: vi.fn(), create: vi.fn().mockReturnValue(run), progress: vi.fn(), finish: vi.fn() } as unknown as ScanRunRepository;
+    const extras = extrasRepo();
+    const { service, movies, provider } = createSubject(0.9, 'movie', 'Example.mkv', runs, extras);
+    provider.getDetails = vi.fn().mockResolvedValue({ providerId: '42', title: 'Example', year: 2024, overview: null, posterUrl: null, backdropUrl: null, genres: [], cast: [], rating: null, runtime: null, imdbId: 'tt0000042' });
+    const ratings: RatingsProvider = { name: 'omdb', getRatings: vi.fn().mockRejectedValue(new RatingsLimitReachedError('OMDb', 'Request limit reached!')) };
+    vi.mocked(createRatingsProviders).mockReturnValue([ratings]);
+    // One worker per target would race; seven targets with four workers leave later titles after the limit is known.
+    movies.listMetadataRefreshTargets.mockReturnValue(Array.from({ length: 7 }, (_, index) => ({ id: index + 1, title: `T${index}`, year: 2024, rawFilename: 'Example.mkv', metadataSource: 'tmdb', providerId: '42', mediaType: 'movie' })));
+
+    service.startMetadataRefresh();
+
+    await vi.waitFor(() => expect(runs.finish).toHaveBeenCalledWith(24, 'completed', expect.stringContaining('Ratings skipped for the rest of this run: OMDb Request limit reached!')));
+    expect(extras.applyExtras).toHaveBeenCalledTimes(7);
+    expect(extras.applyRatings).not.toHaveBeenCalled();
+    expect(vi.mocked(ratings.getRatings).mock.calls.length).toBeLessThan(7);
+    expect(runs.progress).toHaveBeenLastCalledWith(24, 7, 7, 7);
+  });
+
+  it('saves a TMDb match with its cast photos, logo, collection, trailer and ratings', async () => {
+    const extras = extrasRepo();
+    const { service, provider, cache } = createSubject(0.9, 'movie', 'Example.mkv', undefined, extras);
+    const castMembers = Array.from({ length: 8 }, (_, index) => ({ name: `Actor ${index}`, photoUrl: `https://image.tmdb.org/t/p/w185/p${index}.jpg` }));
+    provider.getDetails = vi.fn().mockResolvedValue({ providerId: '42', title: 'Example', year: 2024, overview: null, posterUrl: null, backdropUrl: null, genres: [], cast: [], rating: null, runtime: null, imdbId: 'tt0000042',
+      castMembers, logoUrl: 'https://image.tmdb.org/t/p/w500/logo.png', collection: { id: 10, name: 'Saga' }, trailerKey: 'yt' });
+    cache.cache.mockImplementation(async (url: string | null, kind: string, key: string) => url ? `${key}${kind === 'logos' ? '.png' : '.jpg'}` : null);
+    const ratings: RatingsProvider = { name: 'omdb', getRatings: vi.fn().mockResolvedValue([{ source: 'imdb', value: 7.5, max: 10 }]) };
+    vi.mocked(createRatingsProviders).mockReturnValue([ratings]);
+
+    await expect(service.accept(1, 7)).resolves.toBe('ok');
+
+    expect(cache.cache).toHaveBeenCalledWith('https://image.tmdb.org/t/p/w185/p0.jpg', 'people', 'tmdb-person-p0', false);
+    expect(cache.cache).toHaveBeenCalledWith('https://image.tmdb.org/t/p/w500/logo.png', 'logos', 'tmdb-logo-logo', false);
+    const saved = extras.applyExtras.mock.calls[0][1];
+    expect(saved.castMembers).toHaveLength(8);
+    expect(saved.castMembers[0]).toEqual({ name: 'Actor 0', photoUrl: '/media/people/tmdb-person-p0.jpg' });
+    expect(saved).toEqual(expect.objectContaining({ logoFile: 'tmdb-logo-logo.png', collection: { id: 10, name: 'Saga' }, trailerKey: 'yt' }));
+    expect(extras.ratingsDue).toHaveBeenCalledWith(1, 30);
+    expect(extras.applyRatings).toHaveBeenCalledWith(1, [{ source: 'imdb', value: 7.5, max: 10 }]);
+  });
+
+  it('keeps the save when ratings fail, and does not ask again inside 30 days', async () => {
+    const extras = extrasRepo();
+    const { service, movies, provider } = createSubject(0.9, 'movie', 'Example.mkv', undefined, extras);
+    provider.getDetails = vi.fn().mockResolvedValue({ providerId: '42', title: 'Example', year: 2024, overview: null, posterUrl: null, backdropUrl: null, genres: [], cast: [], rating: null, runtime: null, imdbId: 'tt0000042' });
+    const ratings: RatingsProvider = { name: 'omdb', getRatings: vi.fn().mockRejectedValue(new Error('OMDb ratings lookup failed (500)')) };
+    vi.mocked(createRatingsProviders).mockReturnValue([ratings]);
+
+    await expect(service.accept(1, 7)).resolves.toBe('ok');
+    expect(movies.applyMetadata).toHaveBeenCalledOnce();
+    expect(extras.applyExtras).toHaveBeenCalledOnce();
+    expect(extras.applyRatings).not.toHaveBeenCalled();
+    expect(extras.deferRatings).toHaveBeenCalledWith(1, 30, 1);
+
+    extras.ratingsDue.mockReturnValue(false);
+    vi.mocked(ratings.getRatings).mockClear();
+    await expect(service.accept(1, 7)).resolves.toBe('ok');
+    expect(ratings.getRatings).not.toHaveBeenCalled();
   });
 });

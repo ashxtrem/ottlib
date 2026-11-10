@@ -14,6 +14,8 @@ function fixture() {
   writeFileSync(join(directory, 'posters', 'x.jpg'), 'poster-bytes'); writeFileSync(join(directory, 'posters', 'notes.txt'), 'secret notes');
   writeFileSync(join(directory, 'posters', 'UP.PNG'), 'upper'); writeFileSync(join(directory, 'posters', '.hidden.jpg'), 'hidden');
   writeFileSync(join(directory, 'backdrops', 'y.webp'), 'backdrop-bytes');
+  mkdirSync(join(directory, 'people'), { recursive: true }); mkdirSync(join(directory, 'logos'), { recursive: true });
+  writeFileSync(join(directory, 'people', 'x.jpg'), 'person-bytes'); writeFileSync(join(directory, 'logos', 'l.png'), 'logo-bytes');
   return { app: buildApp(db, directory, 0), db, directory };
 }
 
@@ -40,6 +42,9 @@ describe('/media static files', () => {
       expect(poster.statusCode).toBe(200); expect(poster.body).toBe('poster-bytes');
       expect((await app.inject({ method: 'GET', url: '/media/backdrops/y.webp' })).statusCode).toBe(200);
       expect((await app.inject({ method: 'GET', url: '/media/posters/UP.PNG' })).statusCode).toBe(200);
+      const person = await app.inject({ method: 'GET', url: '/media/people/x.jpg' });
+      expect(person.statusCode).toBe(200); expect(person.body).toBe('person-bytes');
+      expect((await app.inject({ method: 'GET', url: '/media/logos/l.png' })).statusCode).toBe(200);
       for (const url of ['/media/posters/notes.txt', '/media/posters/.hidden.jpg', '/media/posters/', '/media/posters', '/media/backdrops/x.jpg', '/media/', '/media/other/x.jpg']) expect((await app.inject({ method: 'GET', url })).statusCode, url).toBe(404);
     } finally { await app.close(); db.close(); }
   });

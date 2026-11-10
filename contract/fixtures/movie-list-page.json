@@ -14,7 +14,8 @@
       "durationMs": 6960000,
       "missing": false,
       "metadataStatus": "matched",
-      "shelves": []
+      "shelves": [],
+      "fresh": null
     }
   ],
   "nextCursor": "eyJzb3J0IjoidGl0bGUiLCJ0aXRsZSI6IkFycml2YWwiLCJpZCI6MX0",

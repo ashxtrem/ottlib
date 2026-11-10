@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SettingRepository } from '../repositories/settingRepository.js';
+import type { BackupScheduler } from './backupScheduler.js';
 import type { SchedulerService } from './schedulerService.js';
 import { SettingsService } from './settingsService.js';
 import { defaultSettings } from '../config/defaults.js';
@@ -57,4 +58,13 @@ it('masks subtitle credentials and keeps existing credentials when masks are sub
   expect(repository.update).toHaveBeenCalledWith({});
   service.update({ subdlApiKey: '' });
   expect(repository.update).toHaveBeenLastCalledWith({ subdlApiKey: '' });
+});
+
+it('refreshes both schedulers when settings are saved', () => {
+  const repository = { get: vi.fn(() => defaultSettings), update: vi.fn(update => ({ ...defaultSettings, ...update })) };
+  const scheduler = { refresh: vi.fn() }; const backupScheduler = { refresh: vi.fn() };
+  const service = new SettingsService(repository as unknown as SettingRepository, scheduler as unknown as SchedulerService, backupScheduler as unknown as BackupScheduler);
+  expect(service.update({ backupEnabled: false }).backupEnabled).toBe(false);
+  expect(scheduler.refresh).toHaveBeenCalledTimes(1);
+  expect(backupScheduler.refresh).toHaveBeenCalledTimes(1);
 });
