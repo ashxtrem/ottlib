@@ -14,7 +14,7 @@ import { schedulePresetFor, schedulePresets, type SchedulePresetId, useScheduleV
 import { MetadataRefreshDialog } from '../components/MetadataRefreshDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
 import { QbittorrentSettingsSection } from '../components/QbittorrentSettingsSection';
-import { SkeletonSettings } from '../components/Skeleton';
+import { DelayedSkeleton, SkeletonSettings } from '../components/Skeleton';
 import { useSuccessPulse } from '../hooks/useSuccessPulse';
 import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection';
 import { ProfilesSettingsSection } from '../components/ProfilesSettingsSection';
@@ -22,6 +22,10 @@ import { useAuthStatus } from '../hooks/useAccessPin';
 import { SubtitleSettingsSection } from '../components/SubtitleSettingsSection';
 import { PlayerSettingsSection } from '../components/PlayerSettingsSection';
 import { TranscodeSettingsSection } from '../components/settings/TranscodeSettingsSection';
+import { BackupSettingsSection } from '../components/settings/BackupSettingsSection';
+import { HealthSettingsSection } from '../components/settings/HealthSettingsSection';
+import { ErrorState } from '../components/ErrorState';
+import { torrentPreferencesUpdate } from '../utils/torrentPreferences';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -58,7 +62,8 @@ export function SettingsPage() {
     setCustomScheduleCron(settings.data.scheduleCron);
   }, [settings.data]);
 
-  if (!settings.data) return <SkeletonSettings />;
+  if (settings.error && !settings.data) return <ErrorState resource="library" error={settings.error} retrying={settings.isFetching} onRetry={settings.refetch} />;
+  if (!settings.data) return <DelayedSkeleton><SkeletonSettings /></DelayedSkeleton>;
 
   const current = settings.data;
   const scheduleCron = schedulePreset === 'custom' ? customScheduleCron.trim() : schedulePresets.find((preset) => preset.id === schedulePreset)!.cron;
@@ -124,6 +129,7 @@ export function SettingsPage() {
           qbittorrentUsername: String(values.get('qbittorrentUsername') ?? '').trim(),
           qbittorrentCategory: String(values.get('qbittorrentCategory') ?? '').trim(),
           qbittorrentSavePath: String(values.get('qbittorrentSavePath') ?? '').trim(),
+          ...torrentPreferencesUpdate(values),
         });
         const tmdbApiKey = values.get('tmdbApiKey'); if (typeof tmdbApiKey === 'string') Object.assign(update, { tmdbApiKey });
         const omdbApiKey = values.get('omdbApiKey'); if (typeof omdbApiKey === 'string') Object.assign(update, { omdbApiKey });
@@ -177,6 +183,9 @@ export function SettingsPage() {
       {autoAcceptBackfill.run.error && <p className="mt-3 text-sm text-error">{autoAcceptBackfill.run.error.message}</p>}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-border/50 bg-warning-soft p-3"><div><p className="text-sm font-medium text-warning">Refresh all metadata</p><p className="mt-1 text-xs text-muted">Rechecks every available title. Automatic titles, artwork, and details may change; manual title overrides remain.</p></div><button type="button" onClick={() => setRefreshDialogOpen(true)} disabled={metadataRefresh.status.data?.status === 'running'} className="rounded-lg border border-warning-border px-3 py-1.5 text-sm font-medium text-warning hover:bg-warning-border/15 disabled:cursor-not-allowed disabled:opacity-60">Refresh all metadata</button></div>
     </section>
+
+    <HealthSettingsSection />
+    <BackupSettingsSection />
 
     <section className="rounded-xl border border-border bg-surface p-5">
       <h2 className="font-semibold">Recent scans</h2>

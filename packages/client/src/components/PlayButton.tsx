@@ -33,7 +33,7 @@ export function playLabel(resumePositionMs: number | null | undefined): string {
 export function PlayButton({ movie, variant = 'primary' }: { movie: Movie; variant?: PlayButtonVariant }) {
   const label = playLabel(movie.resumePositionMs);
   const isPrimary = variant === 'primary';
-  return <Link to={`/watch/${movie.id}`} title={label} aria-label={label} className={isPrimary ? primaryButtonClassName : compactButtonClassName}>
+  return <Link to={`/watch/${movie.id}`} viewTransition title={label} aria-label={label} className={isPrimary ? primaryButtonClassName : compactButtonClassName}>
     <svg aria-hidden="true" className="h-5 w-5 translate-x-px" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7V5Z" /></svg>
     {isPrimary ? <span>{label}</span> : <span className="sr-only">{label}</span>}
   </Link>;

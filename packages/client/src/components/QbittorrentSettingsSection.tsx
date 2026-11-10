@@ -1,6 +1,7 @@
 import type { Settings } from '@ottlib/shared';
 import { useSuccessPulse } from '../hooks/useSuccessPulse';
 import { focusRing, pressable } from './interactionStyles';
+import { torrentCodecOptions, torrentResolutionOptions } from '../utils/torrentPreferences';
 
 interface QbittorrentSettingsSectionProps {
   settings: Settings;
@@ -33,6 +34,15 @@ export function QbittorrentSettingsSection({ settings, enabled, onEnabledChange,
       <label className="block text-sm">Default category<input name="qbittorrentCategory" defaultValue={settings.qbittorrentCategory} placeholder="ottlib" className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2" /></label>
       <label className="block text-sm">Default save path (optional)<input name="qbittorrentSavePath" defaultValue={settings.qbittorrentSavePath} placeholder="E:\\Movies\\Downloads" className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2" /></label>
     </div>
+    <fieldset className="mt-4">
+      <legend className="text-sm font-medium">Preferred release</legend>
+      <p className="mt-1 text-sm text-muted">Scores search results and finds library titles worth upgrading. Leave a field empty for no preference.</p>
+      <div className="mt-3 grid gap-4 sm:grid-cols-3">
+        <label className="block text-sm">Resolution<select name="torrentPreferredResolution" defaultValue={settings.torrentPreferredResolution ?? ''} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">No preference</option>{torrentResolutionOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="block text-sm">Codec<select name="torrentPreferredCodec" defaultValue={settings.torrentPreferredCodec ?? ''} className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2"><option value="">No preference</option>{torrentCodecOptions.map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label>
+        <label className="block text-sm">Size cap (GB)<input name="torrentMaxSizeGb" type="number" min="0.1" max="10000" step="any" inputMode="decimal" defaultValue={settings.torrentMaxSizeGb ?? ''} placeholder="No cap" className="mt-1 w-full rounded-lg border border-border bg-field px-3 py-2" /></label>
+      </div>
+    </fieldset>
     <div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" onClick={onTest} disabled={testing} className={`rounded-lg border border-border-strong px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60 ${focusRing} ${pressable} ${tested ? 'border-success bg-success text-success-foreground hover:bg-success' : ''}`}>{testing ? 'Testing…' : tested ? 'Connected' : 'Test saved connection'}</button><span className="text-xs text-muted">Save settings before testing. qBittorrent needs Python and installed Search plugins.</span></div>
     {testMessage && <p className={`mt-3 text-sm ${testConnected ? 'text-success' : 'text-warning'}`}>{testMessage}</p>}
     {testError && <p className="mt-3 text-sm text-error">{testError}</p>}

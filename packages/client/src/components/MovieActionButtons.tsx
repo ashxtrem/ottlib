@@ -17,9 +17,11 @@ type MovieActionButtonsProps = {
   watchPending: boolean;
   hidden: boolean;
   onToggleHidden: () => void;
+  /** Opens the trailer; the button shows only when the title has a trailer. */
+  onTrailer?: () => void;
 };
 
-export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitles, onToggleWatched, watchPending, hidden, onToggleHidden }: MovieActionButtonsProps) {
+export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitles, onToggleWatched, watchPending, hidden, onToggleHidden, onTrailer }: MovieActionButtonsProps) {
   const watchLabel = movie.watched ? 'Mark as unwatched' : 'Mark as watched';
   const hideLabel = hidden ? (movie.showKey ? 'Unhide this show' : 'Unhide this title') : (movie.showKey ? 'Hide this show on this device' : 'Hide this title on this device');
   const torrentSearchEnabled = useTorrentSearchEnabled();
@@ -29,6 +31,7 @@ export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitle
       <div className="min-w-0 flex-1"><PlayButton movie={movie} /></div>
       <PlayMoreMenu movie={movie} />
     </div>
+    {movie.trailerKey && onTrailer && <button type="button" onClick={onTrailer} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised ${pressable} ${focusRing}`}>Trailer</button>}
     <button type="button" onClick={onSubtitles} disabled={movie.missing} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised disabled:opacity-50 ${focusRing}`}>Find subtitles</button>
     {torrentSearchEnabled && <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>}
     <div className="flex flex-wrap items-center gap-2">

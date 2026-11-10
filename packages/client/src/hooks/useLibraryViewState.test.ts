@@ -16,7 +16,7 @@ describe('search draft', () => {
 
 describe('library URL state', () => {
   it('reads shareable filter parameters', () => {
-    expect(libraryStateFromSearchParams(new URLSearchParams('genre=Sci-Fi&actor=Asha+Patel&quality=4K&audioLanguage=hin&availability=unavailable&mediaType=tv&watched=false&sort=quality&minRating=8&needsReview=true'))).toEqual({ search: '', genre: 'Sci-Fi', actor: 'Asha Patel', quality: '4K', audioLanguage: 'hin', availability: 'unavailable', mediaType: 'tv', watched: false, sort: 'quality', minRating: 8, needsReview: true });
+    expect(libraryStateFromSearchParams(new URLSearchParams('genre=Sci-Fi&actor=Asha+Patel&quality=4K&audioLanguage=hin&availability=unavailable&mediaType=tv&watched=false&sort=quality&minRating=8&needsReview=true&collection=12'))).toEqual({ search: '', genre: 'Sci-Fi', collection: '12', actor: 'Asha Patel', quality: '4K', audioLanguage: 'hin', availability: 'unavailable', mediaType: 'tv', watched: false, sort: 'quality', minRating: 8, needsReview: true });
   });
 
   it('omits default filters from URLs', () => {
@@ -25,5 +25,11 @@ describe('library URL state', () => {
     expect(libraryStateToSearchParams(initialLibraryViewState).toString()).toBe('');
     expect(libraryStateToSearchParams({ ...initialLibraryViewState, genre: 'Drama', actor: 'Asha Patel', quality: '4K', audioLanguage: 'hin', mediaType: 'movie' }).toString()).toBe('genre=Drama&actor=Asha+Patel&quality=4K&audioLanguage=hin&mediaType=movie');
     expect(libraryStateToSearchParams({ ...initialLibraryViewState, availability: undefined }).toString()).toBe('availability=all');
+  });
+
+  it('keeps the collection in the URL and ignores ids the server would reject', () => {
+    expect(libraryStateToSearchParams({ ...initialLibraryViewState, collection: '12' }).toString()).toBe('collection=12');
+    expect(libraryStateFromSearchParams(new URLSearchParams(libraryStateToSearchParams({ ...initialLibraryViewState, collection: '12' }))).collection).toBe('12');
+    for (const bad of ['0', '-3', 'abc', '1.5', '']) expect(libraryStateFromSearchParams(new URLSearchParams({ collection: bad })).collection).toBe('');
   });
 });

@@ -8,6 +8,7 @@ import { PlayerControls, type PlayerMenu } from '../components/player/PlayerCont
 import { PlayerTapLayer } from '../components/player/PlayerTapLayer';
 import { ResumeChip } from '../components/player/ResumeChip';
 import { SkipCreditsButton, isSkipCreditsRaised } from '../components/player/SkipCreditsButton';
+import { StartCover } from '../components/player/StartCover';
 import { UpNextOverlay } from '../components/player/UpNextOverlay';
 import { VideoSurface } from '../components/player/VideoSurface';
 import { useAutoHide } from '../hooks/useAutoHide';
@@ -15,6 +16,7 @@ import { useCredits } from '../hooks/useCredits';
 import { useCreditsActions } from '../hooks/useCreditsActions';
 import { useFullscreen, type FullscreenControls } from '../hooks/useFullscreen';
 import { usePlaybackProgress } from '../hooks/usePlaybackProgress';
+import { useMovie } from '../hooks/useMovies';
 import { usePlaybackSource } from '../hooks/usePlaybackSource';
 import { useHeldPosition } from '../hooks/useHeldPosition';
 import { useScrub } from '../hooks/useScrub';
@@ -73,6 +75,8 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   const caps = useMemo(() => probeBrowserCaps(), []);
   const hlsEngine = chooseHlsEngine(caps);
   const playback = usePlaybackSource(movieId, caps.request);
+  // String id: the title page's cache key (`['movie', '7']`), so the cover's backdrop and title are usually there already.
+  const movie = useMovie(movieId ? String(movieId) : undefined);
   const source = playback.source;
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const handleVideo = useCallback((element: HTMLVideoElement | null) => { setVideo(element); onVideoElement(element); }, [onVideoElement]);
@@ -153,9 +157,11 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
   const creditsKind = credits.showSkip ? 'skip' : credits.showWatch ? 'watch' : null;
   const cueClearance = { upNext: upNextShown, creditsButton: creditsKind ? (isSkipCreditsRaised(creditsKind, upNextShown) ? 'raised' as const : 'low' as const) : null };
   return <div onPointerMove={controls.show} className={`relative h-full w-full ${controls.visible ? '' : 'cursor-none'}`}>
-    {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} />
-      : source ? <>
-        <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} pictureMode={picture.mode} cueClearance={cueClearance} />
+    {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} /> : <>
+      {source && <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} pictureMode={picture.mode} cueClearance={cueClearance} />}
+      {/* Same slot with or without a source, so the cover isn't remounted when the source arrives. */}
+      <StartCover title={movie.data?.title ?? null} backdropUrl={movie.data?.backdropUrl ?? null} source={source ?? null} startMs={startMs} firstFrame={state.firstFrame && Boolean(source)} />
+      {source && <>
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls
           state={state} visible={controls.visible} fullscreen={screen.fullscreen} onBack={leave}
@@ -170,8 +176,8 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
         {resumeAtMs && switchStartMs === null ? <ResumeChip positionMs={resumeAtMs} onStartOver={() => commands.seekTo(0)} /> : null}
         {upNext.next && (phase.kind === 'preview' || phase.kind === 'countdown') && <UpNextOverlay next={upNext.next} phase={phase} onPlayNow={upNext.playNow} onCancel={upNext.cancel} />}
         {creditsKind && <SkipCreditsButton kind={creditsKind} aboveUpNext={upNextShown} onPress={creditsKind === 'skip' ? credits.skipCredits : credits.watchCredits} />}
-      </>
-        : <div className="flex h-full items-center justify-center" aria-live="polite"><svg aria-hidden="true" className="h-8 w-8 animate-spin text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12a8 8 0 1 1-2.34-5.66" /></svg><span className="sr-only">Loading…</span></div>}
+      </>}
+    </>}
     {finder.movie && <SubtitleDialog key={movieId} movie={finder.movie} onClose={finder.close} onDownloaded={tracks.showDownloaded} listFiles={false} />}
     {!problem && !source && <button type="button" onClick={leave} aria-label="Back" title="Back" className={`absolute left-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 md:left-5 md:top-5 ${focusRing}`}><BackIcon /></button>}
   </div>;

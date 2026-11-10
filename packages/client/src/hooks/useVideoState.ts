@@ -11,11 +11,13 @@ export interface VideoState {
   bufferedMs: number;
   volume: number;
   muted: boolean;
+  /** A picture is on screen: true from the first `loadeddata` or `playing`, false again on `emptied` (a new source). */
+  firstFrame: boolean;
 }
 
-const idle: VideoState = { paused: true, ended: false, positionMs: 0, durationMs: Number.NaN, bufferedMs: 0, volume: 1, muted: false };
+const idle: VideoState = { paused: true, ended: false, positionMs: 0, durationMs: Number.NaN, bufferedMs: 0, volume: 1, muted: false, firstFrame: false };
 
-const events = ['play', 'pause', 'playing', 'timeupdate', 'durationchange', 'loadedmetadata', 'progress', 'volumechange', 'ended', 'seeking', 'seeked', 'emptied'];
+const events = ['play', 'pause', 'playing', 'loadeddata', 'timeupdate', 'durationchange', 'loadedmetadata', 'progress', 'volumechange', 'ended', 'seeking', 'seeked', 'emptied'];
 
 function bufferedEnd(video: HTMLVideoElement): number {
   const { buffered, currentTime } = video;
@@ -25,9 +27,9 @@ function bufferedEnd(video: HTMLVideoElement): number {
   return currentTime * 1000;
 }
 
-function read(video: HTMLVideoElement, fallbackDurationMs: number | null, endGuard: EndGuard): VideoState {
+function read(video: HTMLVideoElement, fallbackDurationMs: number | null, endGuard: EndGuard, firstFrame: boolean): VideoState {
   const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration * 1000 : fallbackDurationMs ?? Number.NaN;
-  return { paused: video.paused, ended: video.ended && isRealVideoEnd(video, endGuard), positionMs: video.currentTime * 1000, durationMs: duration, bufferedMs: bufferedEnd(video), volume: video.volume, muted: video.muted };
+  return { paused: video.paused, ended: video.ended && isRealVideoEnd(video, endGuard), positionMs: video.currentTime * 1000, durationMs: duration, bufferedMs: bufferedEnd(video), volume: video.volume, muted: video.muted, firstFrame };
 }
 
 /**
@@ -37,8 +39,17 @@ function read(video: HTMLVideoElement, fallbackDurationMs: number | null, endGua
 export function useVideoState(video: HTMLVideoElement | null, fallbackDurationMs: number | null, endGuard: EndGuard): VideoState {
   const [state, setState] = useState<VideoState>(idle);
   useEffect(() => {
-    if (!video) return;
-    const update = () => setState(read(video, fallbackDurationMs, endGuard));
+    // No element (a source change remounts it): no picture, so the start cover must come back.
+    if (!video) { setState((current) => (current.firstFrame ? { ...current, firstFrame: false } : current)); return; }
+    // HAVE_CURRENT_DATA: an element that already shows a picture when the hook (re)attaches.
+    let firstFrame = video.readyState >= 2;
+    const update = (event?: Event) => {
+      // A loadeddata during the start seek (resume) is the frame at 0, not the one playback shows: wait for seeked/playing.
+      if (event?.type === 'playing') firstFrame = true;
+      else if ((event?.type === 'loadeddata' || event?.type === 'seeked') && !video.seeking && video.readyState >= 2) firstFrame = true;
+      else if (event?.type === 'emptied') firstFrame = false;
+      setState(read(video, fallbackDurationMs, endGuard, firstFrame));
+    };
     update();
     events.forEach((name) => video.addEventListener(name, update));
     return () => events.forEach((name) => video.removeEventListener(name, update));

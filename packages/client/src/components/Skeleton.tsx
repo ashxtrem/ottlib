@@ -1,5 +1,19 @@
+import type { ReactNode } from 'react';
+import { useLoadStage, type LoadStage } from '../hooks/useLoadStage';
+
 interface SkeletonBlockProps {
   className?: string;
+}
+
+/** Mount while loading: nothing for 150 ms, then the skeleton, then a "Still loading…" line after 10 s. */
+export function DelayedSkeleton({ children }: { children: ReactNode }) {
+  return <StagedSkeleton stage={useLoadStage(true)}>{children}</StagedSkeleton>;
+}
+
+export function StagedSkeleton({ stage, children }: { stage: LoadStage; children: ReactNode }) {
+  if (stage === 'quiet') return null;
+  if (stage === 'skeleton') return <>{children}</>;
+  return <>{children}<p role="status" className="mt-4 text-center text-sm text-muted">Still loading…</p></>;
 }
 
 export function SkeletonBlock({ className = '' }: SkeletonBlockProps) {

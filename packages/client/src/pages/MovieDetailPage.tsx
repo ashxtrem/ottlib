@@ -13,13 +13,18 @@ import { NoArtworkCard } from '../components/NoArtworkCard';
 import { ErrorState } from '../components/ErrorState';
 import { MetadataRefreshDialog } from '../components/MetadataRefreshDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
-import { SkeletonDetail } from '../components/Skeleton';
+import { DelayedSkeleton, SkeletonDetail } from '../components/Skeleton';
 import { PosterImage } from '../components/PosterImage';
 import { DuplicateCompareDialog } from '../components/DuplicateCompareDialog';
 import { SubtitleDialog } from '../components/SubtitleDialog';
 import { RecommendationsRow } from '../components/RecommendationsRow';
 import { useHiddenTitles } from '../hooks/useHiddenTitles';
 import { useToast } from '../hooks/useToast';
+import { TitleHeading } from '../components/TitleHeading';
+import { RatingsStrip } from '../components/RatingsStrip';
+import { CastRow } from '../components/CastRow';
+import { CollectionRow } from '../components/CollectionRow';
+import { TrailerDialog } from '../components/TrailerDialog';
 
 
 function BrowseFilterChips({ label, values, parameter }: { label: string; values: string[]; parameter: 'genre' | 'actor' }) {
@@ -41,6 +46,7 @@ export function MovieDetailPage() {
   const [refreshDialogOpen, setRefreshDialogOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [subtitlesOpen, setSubtitlesOpen] = useState(false);
+  const [trailerOpen, setTrailerOpen] = useState(false);
   const backdrop = useRef<HTMLImageElement>(null);
   const shelves = useShelves(); const shelfActions = useShelfActions();
   const metadataRefresh = useMetadataRefresh();
@@ -65,12 +71,13 @@ export function MovieDetailPage() {
   const needsReview = movie.data?.metadataStatus === 'suggested';
   const candidates = useMatchCandidates(id, needsReview && manualCandidates === null);
 
-  if (movie.isLoading) return <SkeletonDetail />;
+  if (movie.isLoading) return <DelayedSkeleton><SkeletonDetail /></DelayedSkeleton>;
   if (!movie.data) return <ErrorState resource="title" error={movie.error} retrying={movie.isFetching} onRetry={movie.refetch} />;
 
   const item = movie.data;
   const activeTitle = override ?? item.title;
   const runtime = formatRuntime(item.runtime, item.mediaInfo?.durationMs);
+  const castMembers = item.castMembers.length ? item.castMembers : item.cast.map((name) => ({ name, photoUrl: null }));
   const toggleHidden = () => {
     const name = hiddenDisplayTitle(item.title, item.showKey);
     if (hiddenTitles.isHidden(item)) { hiddenTitles.unhide(hideKeyOf(item)); show(`${name} is visible again.`, 'success'); return; }
@@ -81,26 +88,23 @@ export function MovieDetailPage() {
   return <section className="space-y-6">
     <button type="button" onClick={backToLibrary} className="text-sm text-accent hover:underline">← {backToLibraryLabel}</button>
     <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-      {item.backdropUrl && <div className="h-56 overflow-hidden md:h-80"><img ref={backdrop} src={item.backdropUrl} alt="" className="h-full w-full object-cover opacity-60" /></div>}
+      {item.backdropUrl && <div className="h-56 overflow-hidden md:h-80"><img ref={backdrop} src={item.backdropUrl} alt="" className="h-full w-full object-cover opacity-60" style={{ viewTransitionName: 'title-backdrop' }} /></div>}
       <div className="grid gap-6 p-5 md:grid-cols-[220px_minmax(0,1fr)] md:p-8 xl:grid-cols-[220px_minmax(0,1fr)_260px]">
         <div className="aspect-[2/3] overflow-hidden rounded-xl bg-surface-raised">
           {item.posterUrl ? <PosterImage src={item.posterUrl} alt={`${item.title} poster`} loading="lazy" decoding="async" className="h-full w-full object-cover" style={{ viewTransitionName: 'poster' }} /> : <NoArtworkCard title={item.title} year={item.year} status={item.metadataStatus} />}
         </div>
         <div className="space-y-5">
-          <div><h1 className="flex flex-wrap items-center gap-2 text-3xl font-bold">
-            <span>{item.title} {item.year && <span className="text-muted">({item.year})</span>}</span>
-            <a href={`https://www.google.com/search?q=${encodeURIComponent(`${item.title}${item.year ? ` ${item.year}` : ''}`)}`} target="_blank" rel="noopener noreferrer" title="Search Google for this title" className="text-subtle hover:text-accent" aria-label="Search Google for this title">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-            </a>
-          </h1><p className="mt-2 text-sm text-muted">{[runtime, item.rating ? `★ ${item.rating.toFixed(1)}` : null, item.metadataSource ?? 'Unmatched'].filter(Boolean).join(' · ')}</p>{duplicates.data?.length ? <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted"><span>{duplicates.data.length} other cop{duplicates.data.length === 1 ? 'y' : 'ies'} in your library</span><button type="button" onClick={() => setCompareOpen(true)} className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-raised">Compare</button></div> : null}</div>
-          <MovieActionButtons imdbUrl={imdbUrl} movie={item} onManageShelves={() => setShelfManagerOpen(true)} onSubtitles={() => setSubtitlesOpen(true)} onToggleWatched={() => actions.watch.mutate({ id: item.id, watched: !item.watched })} watchPending={actions.watch.isPending} hidden={hiddenTitles.isHidden(item)} onToggleHidden={toggleHidden} />
+          <div><TitleHeading title={item.title} year={item.year} logoUrl={item.logoUrl} /><p className="mt-2 text-sm text-muted">{[runtime, item.metadataSource ?? 'Unmatched'].filter(Boolean).join(' · ')}</p><div className="mt-2"><RatingsStrip ratings={item.ratings} fallback={item.rating} /></div>{duplicates.data?.length ? <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted"><span>{duplicates.data.length} other cop{duplicates.data.length === 1 ? 'y' : 'ies'} in your library</span><button type="button" onClick={() => setCompareOpen(true)} className="rounded-lg border border-border-strong px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface-raised">Compare</button></div> : null}</div>
+          <MovieActionButtons imdbUrl={imdbUrl} movie={item} onManageShelves={() => setShelfManagerOpen(true)} onSubtitles={() => setSubtitlesOpen(true)} onToggleWatched={() => actions.watch.mutate({ id: item.id, watched: !item.watched })} watchPending={actions.watch.isPending} hidden={hiddenTitles.isHidden(item)} onToggleHidden={toggleHidden} onTrailer={() => setTrailerOpen(true)} />
           {next.data && <NextTitlePanel current={item} next={next.data} shelfId={shelfId} />}
           {item.overview && <p className="max-w-3xl leading-7 text-foreground/90">{item.overview}</p>}
-          <div className="grid gap-5 sm:grid-cols-2"><BrowseFilterChips label="Genres" values={item.genres} parameter="genre" /><BrowseFilterChips label="Cast" values={item.cast} parameter="actor" /></div>
+          <BrowseFilterChips label="Genres" values={item.genres} parameter="genre" />
+          {castMembers.length ? <CastRow members={castMembers} /> : null}
         </div>
         <MediaInfoPanel mediaInfo={item.mediaInfo} filePath={item.filePath} />
       </div>
     </div>
+    {id && <CollectionRow movieId={id} />}
     {id && <RecommendationsRow movieId={id} />}
     <form onSubmit={(event) => { event.preventDefault(); actions.titleOverride.mutate({ id: item.id, titleOverride: activeTitle.trim() || null }); }} className="rounded-xl border border-border bg-surface p-5">
       <h2 className="font-semibold">Fix this match</h2>
@@ -133,5 +137,6 @@ export function MovieDetailPage() {
     <MetadataRefreshDialog open={refreshDialogOpen} title="Refresh title metadata" count={1} running={metadataRefresh.start.isPending} onClose={() => setRefreshDialogOpen(false)} onConfirm={() => metadataRefresh.start.mutate([item.id], { onSuccess: () => setRefreshDialogOpen(false) })} />
     <DuplicateCompareDialog open={compareOpen} onClose={() => setCompareOpen(false)} primary={item} duplicates={duplicates.data ?? []} onDeleted={(deletedId, remaining) => { if (remaining.length === 0) setCompareOpen(false); if (deletedId === item.id && remaining[0]) { setCompareOpen(false); navigate(`/movie/${remaining[0].id}`, { replace: true }); } }} />
     {subtitlesOpen && <SubtitleDialog key={item.id} movie={item} onClose={() => setSubtitlesOpen(false)} />}
+    {item.trailerKey && <TrailerDialog trailerKey={item.trailerKey} title={item.title} open={trailerOpen} onClose={() => setTrailerOpen(false)} />}
   </section>;
 }
