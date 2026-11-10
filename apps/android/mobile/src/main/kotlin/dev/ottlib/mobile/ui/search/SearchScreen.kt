@@ -38,10 +38,12 @@ import dev.ottlib.mobile.ui.components.windowWidth
 @Composable
 fun SearchScreen(onOpenMovie: (Long) -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { SearchViewModel(container.api, container.hiddenTitles.keys) }
+    val viewModel = viewModel { SearchViewModel(container.api, container.hiddenTitles.keys, container.recentSearches, container.recentSearchScope) }
     val text by viewModel.text.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
+    val recents by viewModel.recents.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
+    val gutter = windowWidth().gutter
     val field = remember { FocusRequester() }
 
     Scaffold { padding ->
@@ -57,10 +59,16 @@ fun SearchScreen(onOpenMovie: (Long) -> Unit) {
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = windowWidth().gutter, vertical = 8.dp).focusRequester(field),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 8.dp).focusRequester(field),
             )
             when (val current = results) {
-                null -> EmptyMessage("Type part of a title.")
+                null -> if (recents.isEmpty()) EmptyMessage("Type part of a title.")
+                else RecentSearches(
+                    recents,
+                    onUse = { keyboard?.hide(); viewModel.useRecent(it) },
+                    onRemove = viewModel::removeRecent,
+                    modifier = Modifier.padding(horizontal = gutter, vertical = 8.dp),
+                )
                 LoadState.Loading -> LoadingMessage(text = "Searching…")
                 is LoadState.Failed -> EmptyMessage(current.message)
                 is LoadState.Loaded -> if (current.value.isEmpty()) EmptyMessage("No titles match “${text.trim()}”.")

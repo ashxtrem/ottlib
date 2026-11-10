@@ -2,6 +2,7 @@ package dev.ottlib.core.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.ottlib.core.model.Movie
 import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.network.MovieSort
 import dev.ottlib.core.network.OttlibApi
@@ -21,8 +22,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
@@ -39,6 +43,21 @@ class HomeViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys: F
         if (current !is LoadState.Loaded || hidden.isEmpty()) current
         else LoadState.Loaded(current.value.map { it.copy(items = it.items.withoutHidden(hidden)) }.filter { it.items.isNotEmpty() })
     }.stateIn(viewModelScope, SharingStarted.Eagerly, state.value)
+
+    /** The first Continue watching title, else the first unwatched one, from the hidden-filtered [rows]; null when there are none. */
+    private val picked: Flow<Pair<PosterItem, Boolean>?> = rows.map { current ->
+        val loaded = (current as? LoadState.Loaded)?.value.orEmpty()
+        loaded.firstOrNull { it.key == CONTINUE_KEY }?.items?.firstOrNull()?.let { it to true }
+            ?: loaded.firstOrNull { it.key == UNWATCHED_KEY }?.items?.firstOrNull()?.let { it to false }
+    }
+    /** The picked title's full movie; fetched once per id (a refresh that keeps the same pick does not refetch). */
+    private val pickedMovie: Flow<Movie?> = picked.map { it?.first?.id }.distinctUntilChanged().transformLatest { id ->
+        emit(null)
+        if (id != null) emit(try { api.movie(id) } catch (error: CancellationException) { throw error } catch (_: Exception) { null })
+    }
+    val hero: StateFlow<HeroItem?> = combine(picked, pickedMovie) { pick, movie -> pick?.let { (item, fromContinue) -> heroOf(item, fromContinue, movie, api::resolve) } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     var lastFocus: FocusTarget? = null
     private var resumedOnce = false
     private var loading: Job? = null
@@ -53,7 +72,7 @@ class HomeViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys: F
                     if (current !is LoadState.Loaded) current else LoadState.Loaded(current.value.map { row ->
                         row.copy(items = row.items.map { item ->
                             if (item.id == change.movieId) item.copy(watched = change.watched, resumePositionMs = if (change.watched) null else item.resumePositionMs) else item
-                        }.filterNot { it.id == change.movieId && change.watched && row.key in listOf(CONTINUE_KEY, "unwatched") })
+                        }.filterNot { it.id == change.movieId && change.watched && row.key in listOf(CONTINUE_KEY, UNWATCHED_KEY) })
                     }.filter { it.items.isNotEmpty() })
                 }
             }
@@ -96,12 +115,13 @@ class HomeViewModel(private val api: OttlibApi, sync: LibrarySync, hiddenKeys: F
         listOfNotNull(
             continueWatching.await(),
             HomeRow("recent", "Recently added", recent.await().items.map { it.toPosterItem(resolve) }),
-            HomeRow("unwatched", "Unwatched", unwatched.await().items.map { it.toPosterItem(resolve) }),
+            HomeRow(UNWATCHED_KEY, "Unwatched", unwatched.await().items.map { it.toPosterItem(resolve) }),
         ).plus(shelfRows.awaitAll().filterNotNull()).plus(genreRows.awaitAll().filterNotNull()).filter { it.items.isNotEmpty() }
     }
 
     companion object {
         const val CONTINUE_KEY = "continue"
+        const val UNWATCHED_KEY = "unwatched"
         private val preferredGenres = listOf("Action", "Comedy", "Drama", "Thriller", "Science Fiction", "Animation", "Crime", "Horror", "Romance", "Adventure")
 
         /** A handful of familiar genre rows, falling back to whatever genres the library has. */

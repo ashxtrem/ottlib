@@ -84,6 +84,11 @@ class PlayerViewModel(
     private val area = MutableStateFlow<PictureArea?>(null)
     /** The real picture inside the current source's frame (burned-in bars excluded), or null for the whole frame. */
     val pictureArea: StateFlow<PictureArea?> = area.asStateFlow()
+    private val cover = StartCoverTracker()
+    /** Shown until [firstFrameShown]: the backdrop once details load, then the resume frame when resuming past 0. */
+    val startCover: StateFlow<StartCover?> = cover.startCover
+    /** True once the current media item has rendered a frame; false again on a new item (including the server swap). */
+    val firstFrameShown: StateFlow<Boolean> = cover.firstFrameShown
 
     private val next = MutableStateFlow<Movie?>(null)
     val nextMovie = next.asStateFlow()
@@ -154,6 +159,8 @@ class PlayerViewModel(
             currentProblem.value = problem
         }
 
+        override fun onRenderedFirstFrame() = cover.frameRendered()
+
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) {
                 ended = true
@@ -171,11 +178,13 @@ class PlayerViewModel(
     }
 
     private fun start() {
+        cover.newItem()
         startup = viewModelScope.launch {
             try {
                 val details = async { api.movie(movieId) }
                 val source = api.playbackSource(movieId)
                 val loaded = details.await().also { movie = it }
+                cover.detailsLoaded(loaded.title, api.resolve(loaded.backdropUrl))
                 viewModelScope.launch {
                     next.value = try { sequence.next(loaded) }
                     catch (error: CancellationException) { throw error }
@@ -188,6 +197,8 @@ class PlayerViewModel(
                 picture.value = pictureModes.get(movieId) ?: settings.defaultPictureMode
                 area.value = source.pictureArea
                 frameTemplate = source.framePreviewUrl
+                val resumeMs = if (fromStart) 0L else source.resumePositionMs ?: 0L
+                cover.resumeAt(resumeMs, ::framePreviewUrl)
                 credits.load(source.credits, source.autoSkipCredits)
                 val skipBackMs = settings.skipBackSeconds * 1_000L
                 val skipForwardMs = settings.skipForwardSeconds * 1_000L
@@ -200,7 +211,7 @@ class PlayerViewModel(
                     ProgressReporter(exo, viewModelScope, backgroundScope, source.durationMs ?: loaded.mediaInfo?.durationMs) { position, duration -> save(position, duration) },
                     TrackMemory(exo, savedTracks, ::rememberTracks),
                 )
-                exo.setMediaItem(source.toMediaItem(movieId, loaded.title) { api.resolve(it)!! }, if (fromStart) 0 else source.resumePositionMs ?: 0)
+                exo.setMediaItem(source.toMediaItem(movieId, loaded.title) { api.resolve(it)!! }, resumeMs)
                 exo.prepare()
                 exo.playWhenReady = true
                 credits.follow { player?.let { it.currentPosition to it.isPlaying } }
@@ -325,6 +336,7 @@ class PlayerViewModel(
             serverSession = source.sessionUrl
             frameTemplate = source.framePreviewUrl
             area.value = source.pictureArea
+            cover.newItem()
             active.setMediaItem(item, request.startMs ?: 0)
             active.prepare()
             active.playWhenReady = true

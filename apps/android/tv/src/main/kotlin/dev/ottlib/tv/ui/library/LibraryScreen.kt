@@ -26,6 +26,7 @@ import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.presentation.Choice
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.library.LibraryChoices
+import dev.ottlib.core.presentation.library.LibraryPreset
 import dev.ottlib.core.presentation.library.LibraryViewModel
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.ChoiceDialog
@@ -47,15 +48,24 @@ private val typeChoices = LibraryChoices.type
 
 @Composable
 fun LibraryScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Unit) {
+    LibraryGrid(onOpenMovie, preset = null) { TopNavigation(TopDestination.Library, onNavigate) }
+}
+
+/**
+ * The filterable library grid under [header]. A [preset] (actor or collection) stays applied through every filter change,
+ * and gets its own view model so it never shares state with the top-level library.
+ */
+@Composable
+fun LibraryGrid(onOpenMovie: (Long) -> Unit, preset: LibraryPreset?, header: @Composable () -> Unit) {
     val container = appContainer()
-    val viewModel = viewModel { LibraryViewModel(container.api, container.librarySync, container.hiddenTitles.keys) }
+    val viewModel = viewModel(key = preset?.let { "library-$it" }) { LibraryViewModel(container.api, container.librarySync, container.hiddenTitles.keys, preset) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<LibraryDialog?>(null) }
     val firstPoster = remember { FocusRequester() }
     val filters = state.filters
 
     Column(Modifier.fillMaxSize()) {
-        TopNavigation(TopDestination.Library, onNavigate)
+        header()
         Row(Modifier.padding(horizontal = ScreenPadding, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             FilterButton("Sort", sortChoices.first { it.value == filters.sort }.label, filters.sort != MovieSort.Title, onClick = { dialog = LibraryDialog.Sort })
             FilterButton("Show", watchedChoices.first { it.value == filters.watched }.label, filters.watched != null, onClick = { dialog = LibraryDialog.Watched })
@@ -71,7 +81,9 @@ fun LibraryScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> U
             else -> PosterGrid(
                 state.items,
                 onOpen = {
-                    container.playbackSequence.select(state.items.map { item -> item.id }, source = MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort), nextCursor = state.nextCursor)
+                    // filters already carry the preset's actor and collection, so the queue holds only this grid's titles.
+                    val source = MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort, actor = filters.actor, collection = filters.collectionId)
+                    container.playbackSequence.select(state.items.map { item -> item.id }, source = source, nextCursor = state.nextCursor)
                     onOpenMovie(it.id)
                 },
                 onNearEnd = viewModel::loadMore,

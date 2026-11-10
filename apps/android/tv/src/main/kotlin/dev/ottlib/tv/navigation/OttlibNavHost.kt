@@ -26,6 +26,7 @@ import dev.ottlib.tv.ui.connect.ConnectScreen
 import dev.ottlib.tv.ui.details.DetailsScreen
 import dev.ottlib.tv.ui.hidden.HiddenTitlesScreen
 import dev.ottlib.tv.ui.home.HomeScreen
+import dev.ottlib.tv.ui.library.FilteredLibraryScreen
 import dev.ottlib.tv.ui.library.LibraryScreen
 import dev.ottlib.tv.ui.player.PlayerScreen
 import dev.ottlib.tv.ui.profiles.ProfilesScreen
@@ -121,6 +122,8 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
                 movieId = entry.arguments!!.getLong("id"),
                 onOpenMovie = openMovie,
                 onCompare = { nav.navigate(Routes.compare(it)) },
+                onOpenActor = { nav.navigate(Routes.filteredByActor(it)) },
+                onOpenCollection = { id, name -> nav.navigate(Routes.filteredByCollection(id, name)) },
                 onPlay = { id, fromStart ->
                         if (id != entry.arguments!!.getLong("id")) {
                             nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }
@@ -128,6 +131,22 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
                         nav.navigate(Routes.player(id, fromStart))
                     },
                 onBack = { if (!nav.popBackStack()) nav.navigate(Routes.HOME) },
+            )
+        }
+        composable(
+            Routes.FILTERED,
+            arguments = listOf(
+                navArgument("actor") { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument("collection") { type = NavType.LongType; defaultValue = Routes.NO_COLLECTION },
+                navArgument("title") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { entry ->
+            val args = entry.arguments!!
+            FilteredLibraryScreen(
+                actor = args.getString("actor"),
+                collectionId = args.getLong("collection").takeIf { it != Routes.NO_COLLECTION },
+                title = args.getString("title").orEmpty(),
+                onOpenMovie = openMovie,
             )
         }
         composable(

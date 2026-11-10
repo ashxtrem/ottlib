@@ -16,6 +16,7 @@ import dev.ottlib.core.model.MetadataSearchRequest
 import dev.ottlib.core.model.MetadataSelection
 import dev.ottlib.core.model.Movie
 import dev.ottlib.core.model.MovieFilterOptions
+import dev.ottlib.core.model.MovieCollection
 import dev.ottlib.core.model.MovieListItem
 import dev.ottlib.core.model.MovieListPage
 import dev.ottlib.core.model.PinLoginRequest
@@ -103,6 +104,12 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     suspend fun continueWatching(limit: Int = 20): List<MovieListItem> =
         get(url("/api/movies/continue-watching").newBuilder().addQueryParameter("limit", limit.toString()).build())
     suspend fun movie(id: Long): Movie = get(url("/api/movies/$id"))
+    /** The saga the title with this movie id belongs to: the titles the library owns and the parts it lacks, or null when it has none (404). */
+    suspend fun collection(id: Long): MovieCollection? = try {
+        get<MovieCollection>(url("/api/movies/$id/collection"))
+    } catch (error: ApiException) {
+        if (error.statusCode == 404) null else throw error
+    }
     /** Other available copies of the same title (same IMDb id, or same title and year when unmatched). */
     suspend fun duplicates(id: Long): List<Movie> = get(url("/api/movies/$id/duplicates"))
     /** Permanently deletes this copy's video file from the server's disk and removes it from the library. The server refuses to delete the only copy. */

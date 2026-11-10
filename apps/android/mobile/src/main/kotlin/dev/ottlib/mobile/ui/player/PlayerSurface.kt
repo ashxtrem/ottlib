@@ -47,6 +47,7 @@ import dev.ottlib.core.player.SeekDirection
 import dev.ottlib.core.presentation.player.CreditsController
 import dev.ottlib.core.presentation.player.PlayerControls
 import dev.ottlib.core.presentation.player.creditsSummary
+import dev.ottlib.core.presentation.player.StartCover
 import dev.ottlib.core.presentation.player.SubtitleSearchController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -82,6 +83,8 @@ fun PlayerSurface(
     onSkipCredits: () -> Unit,
     /** A preview frame URL near a position, on direct play and "Play via server" alike; null when the source offers none, where scrubbing moves the video. */
     framePreview: (Long) -> String?,
+    /** Drawn over the video until its first frame renders (null after); it follows the video in picture-in-picture and tabletop. */
+    startCover: StartCover?,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current as? MainActivity
@@ -227,6 +230,7 @@ fun PlayerSurface(
     ) {
         if (split == null) {
             video(pictureMode, pictureArea, Modifier.fillMaxSize())
+            StartCoverImage(startCover)
             if (!inPictureInPicture) {
                 Box(touch)
                 AnimatedVisibility(controlsVisible, enter = fadeIn(), exit = fadeOut()) { OverlayControls(title, snapshot, controls, actions) }
@@ -237,6 +241,7 @@ fun PlayerSurface(
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxWidth().height(split.top)) {
                     video(pictureMode, pictureArea, Modifier.fillMaxSize())
+                    StartCoverImage(startCover)
                     Box(touch)
                     PlayerHintOverlay(hint)
                     pill(Modifier.align(Alignment.BottomEnd).padding(16.dp))

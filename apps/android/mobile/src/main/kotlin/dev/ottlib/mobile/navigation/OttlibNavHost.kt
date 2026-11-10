@@ -24,6 +24,7 @@ import dev.ottlib.mobile.ui.connect.ConnectScreen
 import dev.ottlib.mobile.ui.details.DetailsScreen
 import dev.ottlib.mobile.ui.hidden.HiddenTitlesScreen
 import dev.ottlib.mobile.ui.home.HomeScreen
+import dev.ottlib.mobile.ui.library.FilteredLibraryScreen
 import dev.ottlib.mobile.ui.library.LibraryScreen
 import dev.ottlib.mobile.ui.player.PlayerScreen
 import dev.ottlib.mobile.ui.search.SearchScreen
@@ -76,8 +77,25 @@ fun OttlibNavHost() {
                 )
             }
             composable(Routes.PROFILES_MANAGE) { ProfileManageScreen(onBack = { nav.popBackStack() }) }
-            composable(Routes.HOME) { HomeScreen(onOpenMovie = openMovie, onSwitchProfile = switchProfile) }
+            composable(Routes.HOME) { HomeScreen(onOpenMovie = openMovie, onPlay = { nav.navigate(Routes.player(it, fromStart = false)) }, onSwitchProfile = switchProfile) }
             composable(Routes.LIBRARY) { LibraryScreen(onOpenMovie = openMovie) }
+            composable(
+                Routes.FILTERED,
+                arguments = listOf(
+                    navArgument("actor") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("collection") { type = NavType.LongType; defaultValue = -1L },
+                    navArgument("title") { type = NavType.StringType; defaultValue = "Library" },
+                ),
+            ) { backStackEntry ->
+                val args = backStackEntry.arguments!!
+                FilteredLibraryScreen(
+                    actor = args.getString("actor"),
+                    collectionId = args.getLong("collection").takeIf { it > 0 },
+                    title = args.getString("title") ?: "Library",
+                    onOpenMovie = openMovie,
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable(Routes.SEARCH) { SearchScreen(onOpenMovie = openMovie) }
             composable(Routes.SETTINGS) {
                 SettingsScreen(
@@ -92,6 +110,8 @@ fun OttlibNavHost() {
                 DetailsScreen(
                     movieId = backStackEntry.arguments!!.getLong("id"),
                     onOpenMovie = openMovie,
+                    onOpenActor = { nav.navigate(Routes.actor(it)) },
+                    onOpenCollection = { id, name -> nav.navigate(Routes.collection(id, name)) },
                     onPlay = { id, fromStart ->
                         if (id != backStackEntry.arguments!!.getLong("id")) {
                             nav.navigate(Routes.details(id)) { popUpTo(Routes.DETAILS) { inclusive = true } }

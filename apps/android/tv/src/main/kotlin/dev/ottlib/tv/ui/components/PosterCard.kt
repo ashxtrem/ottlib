@@ -70,7 +70,11 @@ fun PosterCard(item: PosterItem, onClick: () -> Unit, modifier: Modifier = Modif
                 }
                 item.badge?.let { Badge(it, Modifier.align(Alignment.TopStart).padding(6.dp)) }
                 if (item.watched) WatchedMark(Modifier.align(Alignment.TopEnd).padding(6.dp))
-                item.progress?.let { ProgressBar(it, Modifier.align(Alignment.BottomCenter)) }
+                // "New" sits on the bottom edge, just above the progress bar when there is one.
+                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                    if (item.isNew) NewStrip()
+                    item.progress?.let { ProgressBar(it) }
+                }
             }
         }
         Text(
@@ -93,6 +97,18 @@ private fun Badge(text: String, modifier: Modifier) {
         fontWeight = FontWeight.Bold,
         color = OttlibColors.Foreground,
         modifier = modifier.background(OttlibColors.Canvas.copy(alpha = 0.75f), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
+@Composable
+private fun NewStrip() {
+    Text(
+        "New",
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        color = OttlibColors.Canvas,
+        modifier = Modifier.fillMaxWidth().background(OttlibColors.Accent.copy(alpha = 0.9f)).padding(vertical = 2.dp),
     )
 }
 

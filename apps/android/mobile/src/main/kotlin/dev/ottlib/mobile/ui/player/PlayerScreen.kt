@@ -37,6 +37,10 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
     val pictureMode by viewModel.pictureMode.collectAsStateWithLifecycle()
     val pictureArea by viewModel.pictureArea.collectAsStateWithLifecycle()
     val autoPlay by viewModel.autoPlay.collectAsStateWithLifecycle()
+    val startCover by viewModel.startCover.collectAsStateWithLifecycle()
+    val firstFrameShown by viewModel.firstFrameShown.collectAsStateWithLifecycle()
+    // State turns Ready before the first frame, so the cover outlives Loading and goes once a frame is up.
+    val cover = startCover.takeUnless { firstFrameShown }
     val context = LocalContext.current
     val inPictureInPicture = rememberInPictureInPicture()
     val openExternally = {
@@ -49,7 +53,11 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (val current = state) {
-            PlayerUiState.Loading -> LoadingMessage(text = "Starting playback…")
+            PlayerUiState.Loading -> {
+                StartCoverImage(cover)
+                if (cover?.imageUrl != null) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+                LoadingMessage(text = cover?.title?.let { "$it\nStarting playback…" } ?: "Starting playback…")
+            }
             is PlayerUiState.Failed -> ErrorMessage(current.message, actionLabel = "Back", onAction = onExit)
             PlayerUiState.Ended -> {
                 LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.cancelAutoPlay() }
@@ -95,6 +103,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                         }
                     },
                     framePreview = viewModel::framePreviewUrl,
+                    startCover = cover,
                 )
             }
         }

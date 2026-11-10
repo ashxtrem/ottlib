@@ -37,6 +37,8 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
     val pictureMode by viewModel.pictureMode.collectAsStateWithLifecycle()
     val pictureArea by viewModel.pictureArea.collectAsStateWithLifecycle()
     val autoPlay by viewModel.autoPlay.collectAsStateWithLifecycle()
+    val startCover by viewModel.startCover.collectAsStateWithLifecycle()
+    val firstFrameShown by viewModel.firstFrameShown.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val openExternally = {
         val url = viewModel.streamUrl
@@ -49,7 +51,10 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (val current = state) {
-            PlayerUiState.Loading -> LoadingMessage("Starting playback…")
+            PlayerUiState.Loading -> {
+                StartCoverImage(startCover)
+                LoadingMessage("Starting playback…")
+            }
             is PlayerUiState.Failed -> ErrorMessage(current.message, actionLabel = "Back", onAction = onExit)
             PlayerUiState.Ended -> {
                 LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.cancelAutoPlay() }
@@ -66,7 +71,10 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                     onClose = { viewModel.releasePlayback(); onExit() },
                 )
             }
-            is PlayerUiState.Ready -> PlayerSurface(
+            is PlayerUiState.Ready -> ReadyPlayer(
+                // Ready comes before the first frame: the cover stays over the surface until a frame is drawn.
+                cover = startCover.takeUnless { firstFrameShown },
+            ) { PlayerSurface(
                 player = current.player,
                 title = current.title,
                 controls = current.controls,
@@ -87,7 +95,7 @@ fun PlayerScreen(movieId: Long, fromStart: Boolean, onExit: () -> Unit, onNext: 
                     }
                 },
                 framePreview = viewModel::framePreviewUrl,
-            )
+            ) }
         }
     }
 
