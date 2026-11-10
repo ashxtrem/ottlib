@@ -22,7 +22,7 @@ import { TorrentConnectionService } from '../services/torrentConnectionService.j
  * any check fails. The config is found with `resolveAppRoot`, like the server and reset-pins.
  */
 const config = await loadBootstrapConfig(resolveAppRoot());
-const db = createDatabase(config.absoluteAppDataPath);
+const db = createDatabase(config.absoluteAppDataPath, { backupBeforeMigrate: true });
 try {
   const settings = new SettingRepository(db); const folders = new FolderRepository(db);
   const extras = new MovieExtrasRepository(db);
