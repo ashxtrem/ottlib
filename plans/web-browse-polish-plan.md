@@ -182,3 +182,16 @@ W1 → W2 → W6 → W8 run in order (all edit `HomePage.tsx`). W4 → W3 (the h
 
 ## 16. Progress log
 - 2026-11-10: plan written and approved.
+- 2026-11-10: built by /plan-runner (run 20261110-web-browse-polish), all 9 tasks reviewed and merged.
+  - W2 review fixes: drag no longer continues with no button held; click swallow clears after pointercancel; roving tab
+    stops restore a control's own tabindex. Lazy row placeholder is 396 / 420 px (estimated, not measured).
+  - W3 review fixes: trailer dialog portalled out of the row; focus returns to the card title; placement clamps against
+    the viewport without the scrollbar; preview links share the card's navigation state (`hooks/useOpenMovie.ts`);
+    portal keys no longer move the roving row. New strip about 34x20 px from x=110 at 144 px, clear of the shelf chip
+    (ends x<=100) and the badges (from y=48).
+  - W7 review fix: the start cover comes back when the video element is replaced (track switch, HLS reopen).
+  - W8: a failed settings load shows an error instead of "Still loading…" (from the W6 review).
+  - Checks: web build clean; npm test 1041 tests in 197 files (with contract fixtures); Android unit tests pass.
+  - Left as follow-ups: one shared torrent-search URL helper (three builders today); recents re-save a restored search
+    on reload; the browser's own Back clears row offsets (as it already does the vertical restore); not checked in a
+    browser at 375 / 1280 px.
