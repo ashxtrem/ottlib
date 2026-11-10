@@ -12,6 +12,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
@@ -38,10 +39,13 @@ object PlayerDefaults {
 
 /** Builds the ExoPlayer used for direct play of files streamed from `/api/stream/:id`. */
 class OttlibPlayerFactory(private val context: Context, private val httpClient: OkHttpClient) {
+    /** Shared by every player this factory makes, so one failed passthrough output decodes for the rest of the session. */
+    val passthrough = PassthroughState()
+
     fun create(settings: PlayerSettings): ExoPlayer {
         val dataSource = DefaultDataSource.Factory(context, OkHttpDataSource.Factory(httpClient))
         // Platform decoders first; FFmpeg only for formats the device cannot decode (e.g. DTS, TrueHD).
-        val renderers = NextRenderersFactory(context).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
+        val renderers = PcmFallbackRenderersFactory(context, passthrough).setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         val trackSelector = DefaultTrackSelector(context).apply { parameters = trackParameters(this, settings) }
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(PlayerDefaults.MIN_BUFFER_MS, PlayerDefaults.MAX_BUFFER_MS, PlayerDefaults.START_BUFFER_MS, PlayerDefaults.REBUFFER_MS)
@@ -56,6 +60,12 @@ class OttlibPlayerFactory(private val context: Context, private val httpClient: 
             .setHandleAudioBecomingNoisy(true)
             .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS)
             .build()
+    }
+
+    /** NextLib's renderers (FFmpeg fallback) over an audio sink that drops passthrough once it has failed. */
+    private class PcmFallbackRenderersFactory(context: Context, private val passthrough: PassthroughState) : NextRenderersFactory(context) {
+        override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink? =
+            super.buildAudioSink(context, enableFloatOutput, enableAudioTrackPlaybackParams)?.let { PcmFallbackAudioSink(it, passthrough) }
     }
 
     private fun trackParameters(selector: DefaultTrackSelector, preferences: PlayerSettings) = selector.buildUponParameters().apply {

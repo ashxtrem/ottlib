@@ -107,6 +107,7 @@ class PlayerViewModel(
     @Volatile private var frameTemplate: String? = null
     private var movie: Movie? = null
     private var warnedAboutTracks = false
+    private var retriedAsPcm = false
     val subtitles = SubtitleSearchController(api, movieId, viewModelScope,
         preferredLanguages = { preferences.current().subtitleSearchLanguages },
         saveLanguages = preferences::setSubtitleSearchLanguages,
@@ -129,6 +130,13 @@ class PlayerViewModel(
 
     private val listener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
+            // The device claimed it could pass DTS/TrueHD through but couldn't open that output: the sink now refuses
+            // passthrough, so preparing again decodes the audio (FFmpeg) and keeps direct play, once per title.
+            if (shouldRetryAsPcm(error.errorCode, playerFactory.passthrough.broken, retriedAsPcm)) {
+                retriedAsPcm = true
+                player?.prepare()
+                return
+            }
             currentProblem.value = PlaybackProblem.Error(playbackErrorMessage(error))
         }
 
@@ -379,6 +387,10 @@ class PlayerViewModel(
 
     override fun onCleared() = releasePlayback()
 }
+
+/** A failed audio output, after the sink has given up on passthrough, gets one silent re-prepare before the viewer sees an error. */
+internal fun shouldRetryAsPcm(errorCode: Int, passthroughBroken: Boolean, alreadyRetried: Boolean): Boolean =
+    errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED && passthroughBroken && !alreadyRetried
 
 private fun playbackErrorMessage(error: PlaybackException): String = when (error.errorCode) {
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
