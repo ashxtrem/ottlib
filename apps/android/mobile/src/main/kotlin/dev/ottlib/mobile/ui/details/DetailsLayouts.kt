@@ -26,13 +26,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.ottlib.core.model.Movie
 import dev.ottlib.core.presentation.metaLine
 import dev.ottlib.core.presentation.theme.OttlibColors
+import dev.ottlib.mobile.ui.components.TitleLogo
 
 /** Cover screen / portrait phone: backdrop banner, poster overlapping it, then everything in one column. */
 @Composable
@@ -45,11 +45,12 @@ fun CompactDetails(movie: Movie, imageUrl: String?, posterUrl: String?, busy: Bo
         }
         Row(Modifier.padding(horizontal = 16.dp).offset(y = (-40).dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
             Poster(posterUrl, 104.dp)
-            TitleBlock(movie, Modifier.padding(bottom = 4.dp))
+            TitleBlock(movie, actions.extras, Modifier.padding(bottom = 4.dp))
         }
         Column(Modifier.padding(horizontal = 16.dp).offset(y = (-24).dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionButtons(movie, busy, actions, fillWidth = true)
-            MovieInfo(movie)
+            MovieInfo(movie, actions)
+            CollectionRow(actions.extras.collection, actions.onOpenMovie, actions.onOpenCollection)
             RecommendationsRow(actions.recommendations, actions.onOpenMovie)
         }
     }
@@ -67,9 +68,10 @@ fun WideDetails(movie: Movie, imageUrl: String?, posterUrl: String?, busy: Boole
                 Modifier.weight(1f).widthIn(max = 720.dp).verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                TitleBlock(movie)
+                TitleBlock(movie, actions.extras)
                 ActionButtons(movie, busy, actions, fillWidth = false)
-                MovieInfo(movie)
+                MovieInfo(movie, actions)
+                CollectionRow(actions.extras.collection, actions.onOpenMovie, actions.onOpenCollection)
                 RecommendationsRow(actions.recommendations, actions.onOpenMovie)
             }
         }
@@ -87,10 +89,12 @@ private fun Poster(url: String?, width: Dp) {
 }
 
 @Composable
-private fun TitleBlock(movie: Movie, modifier: Modifier = Modifier) {
+private fun TitleBlock(movie: Movie, extras: DetailsExtras, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(movie.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 3)
+        // The logo art stands in for the title text (the title stays as its content description).
+        TitleLogo(extras.logoUrl, movie.title, maxHeight = 64.dp, maxWidth = 280.dp, style = MaterialTheme.typography.headlineSmall, maxLines = 3)
         Text(movie.metaLine(), style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted)
+        RatingChips(extras.ratings)
         if (movie.genres.isNotEmpty()) Text(movie.genres.joinToString("  ·  "), style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted)
     }
 }

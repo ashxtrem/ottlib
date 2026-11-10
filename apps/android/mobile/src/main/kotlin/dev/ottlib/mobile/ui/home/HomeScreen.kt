@@ -43,10 +43,11 @@ import dev.ottlib.mobile.ui.profiles.ProfileChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onOpenMovie: (Long) -> Unit, onSwitchProfile: () -> Unit) {
+fun HomeScreen(onOpenMovie: (Long) -> Unit, onPlay: (Long) -> Unit, onSwitchProfile: () -> Unit) {
     val container = appContainer()
     val viewModel = viewModel { HomeViewModel(container.api, container.librarySync, container.hiddenTitles.keys) }
     val state by viewModel.rows.collectAsStateWithLifecycle()
+    val hero by viewModel.hero.collectAsStateWithLifecycle()
     val profile by container.profileSession.state.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.onResume()
@@ -66,8 +67,21 @@ fun HomeScreen(onOpenMovie: (Long) -> Unit, onSwitchProfile: () -> Unit) {
                 is LoadState.Loaded -> if (current.value.isEmpty()) {
                     EmptyMessage("Your library is empty.\nAdd folders and run a scan from the Ottlib web app.")
                 } else {
+                    // Opening or playing a title (from a row or the hero) queues the rest of its row; Continue watching queues nothing.
+                    val queueFrom = { row: HomeRow -> container.playbackSequence.select(if (row.key == "continue") emptyList() else row.items.map { it.id }, shelf = row.key.removePrefix("shelf-").toLongOrNull()) }
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        items(current.value, key = { it.key }) { row -> PosterRow(row, width) { id -> container.playbackSequence.select(if (row.key == "continue") emptyList() else row.items.map { it.id }, shelf = row.key.removePrefix("shelf-").toLongOrNull()); onOpenMovie(id) } }
+                        hero?.let { featured ->
+                            val heroRow = current.value.firstOrNull { row -> row.items.any { it.id == featured.item.id } }
+                            item(key = "hero") {
+                                HomeHero(
+                                    featured,
+                                    width,
+                                    onPlay = { heroRow?.let(queueFrom); onPlay(featured.item.id) },
+                                    onDetails = { heroRow?.let(queueFrom); onOpenMovie(featured.item.id) },
+                                )
+                            }
+                        }
+                        items(current.value, key = { it.key }) { row -> PosterRow(row, width) { id -> queueFrom(row); onOpenMovie(id) } }
                     }
                 }
             }

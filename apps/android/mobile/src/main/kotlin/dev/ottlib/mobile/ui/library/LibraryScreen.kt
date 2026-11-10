@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -22,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,6 +33,7 @@ import dev.ottlib.core.network.MovieQuery
 import dev.ottlib.core.presentation.Choice
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.library.LibraryChoices
+import dev.ottlib.core.presentation.library.LibraryPreset
 import dev.ottlib.core.presentation.library.LibraryViewModel
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.mobile.ui.components.ChoiceDialog
@@ -45,9 +49,10 @@ private enum class LibraryDialog { Sort, Watched, Genre, Type }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(onOpenMovie: (Long) -> Unit) {
+fun LibraryScreen(onOpenMovie: (Long) -> Unit, preset: LibraryPreset? = null, title: String = "Library", onBack: (() -> Unit)? = null) {
     val container = appContainer()
-    val viewModel = viewModel { LibraryViewModel(container.api, container.librarySync, container.hiddenTitles.keys) }
+    // A preset grid gets its own ViewModel, never the top-level library's.
+    val viewModel = viewModel(key = preset?.let { "library-$it" }) { LibraryViewModel(container.api, container.librarySync, container.hiddenTitles.keys, preset) }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var dialog by rememberSaveable { mutableStateOf<LibraryDialog?>(null) }
     val filters = state.filters
@@ -55,7 +60,8 @@ fun LibraryScreen(onOpenMovie: (Long) -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Library") },
+                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                navigationIcon = { onBack?.let { back -> IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } } },
                 actions = {
                     state.total?.let { Text("$it titles", style = MaterialTheme.typography.labelLarge, color = OttlibColors.Muted) }
                     LibrarySyncAction()
@@ -78,7 +84,7 @@ fun LibraryScreen(onOpenMovie: (Long) -> Unit) {
                 state.items.isEmpty() && state.loading -> LoadingMessage()
                 state.items.isEmpty() -> EmptyMessage("Nothing matches these filters.")
                 else -> PosterGrid(state.items, onOpen = {
-                    container.playbackSequence.select(state.items.map { item -> item.id }, source = MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort), nextCursor = state.nextCursor)
+                    container.playbackSequence.select(state.items.map { item -> item.id }, source = MovieQuery(watched = filters.watched, genre = filters.genre, mediaType = filters.mediaType, sort = filters.sort, actor = filters.actor, collection = filters.collectionId), nextCursor = state.nextCursor)
                     onOpenMovie(it.id)
                 }, onNearEnd = viewModel::loadMore)
             }
