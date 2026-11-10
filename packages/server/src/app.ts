@@ -91,6 +91,10 @@ import { AutoSkipRepository } from './repositories/autoSkipRepository.js';
 import { CreditsResolver } from './services/credits/creditsResolver.js';
 import { CreditsEditService } from './services/credits/creditsEditService.js';
 import { registerCreditsRoutes } from './routes/credits.js';
+import { BackupRepository } from './repositories/backupRepository.js';
+import { BackupScheduler } from './services/backupScheduler.js';
+import { BackupService } from './services/backupService.js';
+import { registerBackupRoutes } from './routes/backups.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -118,7 +122,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const ffmpeg = overrides.ffmpeg ?? new FfmpegLocator(); const locate = () => ffmpeg.locate();
   const pictureArea = new PictureAreaService(movies, locate, undefined, (message) => app.log.warn(message));
   const credits = new CreditsService(movies, undefined, (message) => app.log.warn(message));
-  const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo, pictureArea, credits); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
+  const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo, pictureArea, credits); const scheduler = new SchedulerService(settings, scanner); const backups = new BackupService(new BackupRepository(db), appDataPath); const backupScheduler = new BackupScheduler(settings, backups, (message) => app.log.warn(message)); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
   const subtitleLibrary = new SubtitleLibraryService(new DownloadedSubtitleRepository(db), appDataPath, id => pins.streamQuery(id));
   const encoderSetting = () => settings.get().transcodeEncoder;
   const registries = new WeakMap<FfmpegBinary, EncoderRegistry>();
@@ -133,13 +137,14 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
-  registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerHideRoutes(app, new HideService(new HideRepository(db))); registerPlayRoutes(app, movies, playHistory); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
+  registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerHideRoutes(app, new HideService(new HideRepository(db))); registerPlayRoutes(app, movies, playHistory); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler, backupScheduler));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback); registerEmbeddedSubtitleRoutes(app, playback, embeddedSubtitles);
   registerCreditsRoutes(app, new CreditsEditService(movies, autoSkip, creditsResolver));
   registerHlsRoutes(app, hlsSessions, new TranscodeInfoService(locate, encodersFor, encoderSetting));
   registerFrameRoutes(app, new FrameService(playback, movies, locate));
   registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
+  registerBackupRoutes(app, backups);
   app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
   registerMediaStatic(app, appDataPath);
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');
@@ -147,7 +152,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     app.register(fastifyStatic, { root: clientDist, prefix: '/' });
     app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/media/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
-  scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
+  scheduler.refresh(); backupScheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop()); app.addHook('onClose', () => backupScheduler.stop());
   app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions); app.decorate('pictureArea', pictureArea); app.decorate('credits', credits);
   app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
