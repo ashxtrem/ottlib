@@ -9,9 +9,10 @@ class FakeRow extends EventTarget {
   releasePointerCapture = vi.fn();
 }
 
-function pointer(type: string, clientX: number, timeStamp: number, pointerType = 'mouse') {
+/** `buttons` defaults to the primary button held while pressing or moving, and none on release. */
+function pointer(type: string, clientX: number, timeStamp: number, pointerType = 'mouse', buttons = type === 'pointerup' || type === 'pointercancel' ? 0 : 1) {
   const event = new Event(type, { cancelable: true });
-  Object.defineProperties(event, { clientX: { value: clientX }, timeStamp: { value: timeStamp }, pointerType: { value: pointerType }, button: { value: 0 }, pointerId: { value: 1 } });
+  Object.defineProperties(event, { clientX: { value: clientX }, timeStamp: { value: timeStamp }, pointerType: { value: pointerType }, button: { value: 0 }, buttons: { value: buttons }, pointerId: { value: 1 } });
   return event;
 }
 
@@ -24,7 +25,7 @@ function click(row: FakeRow) {
   return { prevented: event.defaultPrevented, reached: reached.mock.calls.length > 0 };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('drag threshold', () => {
   it('needs more than 5 px sideways', () => {
@@ -62,6 +63,35 @@ describe('attachRowDragScroll', () => {
     expect(row.style.scrollSnapType).toBe('');
     expect(click(row)).toEqual({ prevented: true, reached: false });
     // Only that one click: the next one opens the card as usual.
+    expect(click(row)).toEqual({ prevented: false, reached: true });
+    detach();
+  });
+
+  it('does not drag once the button came up outside the row', () => {
+    const row = new FakeRow();
+    attachRowDragScroll(row as unknown as HTMLElement);
+    row.dispatchEvent(pointer('pointerdown', 300, 0));
+    // Released off the row: no pointerup here, the next move arrives with no button held.
+    row.dispatchEvent(pointer('pointermove', 200, 16, 'mouse', 0));
+    row.dispatchEvent(pointer('pointermove', 150, 32, 'mouse', 0));
+    expect(row.scrollLeft).toBe(200);
+    expect(row.setPointerCapture).not.toHaveBeenCalled();
+    // A later press still drags as usual.
+    row.dispatchEvent(pointer('pointerdown', 300, 40));
+    row.dispatchEvent(pointer('pointermove', 260, 56));
+    expect(row.scrollLeft).toBe(240);
+  });
+
+  it('lets a keyboard click through after a drag ended by pointercancel', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) });
+    const row = new FakeRow();
+    const detach = attachRowDragScroll(row as unknown as HTMLElement);
+    row.dispatchEvent(pointer('pointerdown', 300, 0));
+    row.dispatchEvent(pointer('pointermove', 260, 16));
+    row.dispatchEvent(pointer('pointercancel', 260, 20));
+    vi.runAllTimers();
+    // Enter on a card fires a click with no press before it.
     expect(click(row)).toEqual({ prevented: false, reached: true });
     detach();
   });

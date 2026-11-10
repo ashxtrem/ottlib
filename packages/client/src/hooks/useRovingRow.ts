@@ -1,7 +1,7 @@
 import { useEffect, useState, type FocusEvent, type KeyboardEvent, type RefObject } from 'react';
 
 const focusableSelector = 'a[href], button, input, select, textarea, [tabindex]';
-/** Marks the controls this hook took out of the tab order, so it only ever restores its own. */
+/** Marks the controls this hook took out of the tab order and holds their own tabindex ('' when they had none). */
 const rovedAttribute = 'data-roved';
 const nonTextInputTypes = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file', 'image']);
 
@@ -29,9 +29,12 @@ export function isTextField(element: Element | null | undefined): boolean {
 export function applyRovingTabStops(items: Element[], activeIndex: number): void {
   items.forEach((item, index) => item.querySelectorAll<HTMLElement>(focusableSelector).forEach((control) => {
     if (index === activeIndex) {
-      if (control.hasAttribute(rovedAttribute)) { control.removeAttribute('tabindex'); control.removeAttribute(rovedAttribute); }
+      if (!control.hasAttribute(rovedAttribute)) return;
+      const original = control.getAttribute(rovedAttribute);
+      if (original) control.setAttribute('tabindex', original); else control.removeAttribute('tabindex');
+      control.removeAttribute(rovedAttribute);
     } else if (!control.hasAttribute(rovedAttribute)) {
-      control.setAttribute(rovedAttribute, '');
+      control.setAttribute(rovedAttribute, control.getAttribute('tabindex') ?? '');
       control.tabIndex = -1;
     }
   }));

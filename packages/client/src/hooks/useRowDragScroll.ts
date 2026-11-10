@@ -30,6 +30,7 @@ export function attachRowDragScroll(el: HTMLElement): () => void {
   let dragging = false;
   let swallowClick = false;
   let lastX = 0, lastT = 0, velocity = 0, frame = 0;
+  let clickWindow: ReturnType<typeof setTimeout> | undefined;
 
   const settle = () => { el.style.scrollSnapType = ''; el.style.cursor = ''; el.style.userSelect = ''; };
   const stopGlide = () => { if (frame) cancelAnimationFrame(frame); frame = 0; };
@@ -55,6 +56,8 @@ export function attachRowDragScroll(el: HTMLElement): () => void {
   };
   const onPointerMove = (event: PointerEvent) => {
     if (!start) return;
+    // The button came up outside the row (pointerup never reached it): the press is over.
+    if (!(event.buttons & 1)) { start = null; return; }
     const dx = event.clientX - start.x;
     if (!dragging) {
       if (!isDragDistance(dx)) return;
@@ -72,6 +75,9 @@ export function attachRowDragScroll(el: HTMLElement): () => void {
     start = null;
     if (!dragging) return;
     dragging = false; swallowClick = true;
+    // The click (if any) follows in the same task; after that a click is the keyboard's or a new press's.
+    clearTimeout(clickWindow);
+    clickWindow = setTimeout(() => { swallowClick = false; }, 0);
     if (el.hasPointerCapture?.(event.pointerId)) el.releasePointerCapture(event.pointerId);
     // A pause before letting go means no fling.
     if (event.timeStamp - lastT > 80 || prefersReducedMotion() || velocity === 0) { settle(); return; }
@@ -91,7 +97,7 @@ export function attachRowDragScroll(el: HTMLElement): () => void {
   el.addEventListener('click', onClick, true);
   el.addEventListener('dragstart', onDragStart);
   return () => {
-    stopGlide();
+    stopGlide(); clearTimeout(clickWindow);
     el.removeEventListener('pointerdown', onPointerDown);
     el.removeEventListener('pointermove', onPointerMove);
     el.removeEventListener('pointerup', onPointerUp);
