@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -78,6 +79,7 @@ class AppContainer(context: Context, val continueWatching: ContinueWatchingPubli
 
     /** Recent searches are kept per server address and profile; follows both. Null while no server is active. */
     val recentSearchScope: Flow<String?> = combine(connection.activeServer, profileSession.state) { server, profile -> RecentSearchScope.of(server, profile) }
+        .distinctUntilChanged()
 
     val playbackSequence = PlaybackSequence(api)
     val autoPlayStreak = AutoPlayStreak()

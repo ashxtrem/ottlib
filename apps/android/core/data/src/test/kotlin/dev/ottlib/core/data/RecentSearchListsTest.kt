@@ -56,6 +56,8 @@ class RecentSearchListsTest {
         assertEquals("192.168.1.5:8080/-", RecentSearchScope.of(server, ProfileState.Unsupported))
         assertEquals("192.168.1.6:8080/2", RecentSearchScope.of(other, state))
         assertNull(RecentSearchScope.of(null, state))
+        assertNull(RecentSearchScope.of(server, ProfileState.Unknown))
+        assertNull(RecentSearchScope.of(server, ProfileState.NeedsPick(listOf(kid))))
     }
 
     @Test

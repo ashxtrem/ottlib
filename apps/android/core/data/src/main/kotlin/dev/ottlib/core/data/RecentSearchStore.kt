@@ -42,12 +42,21 @@ class RecentSearchStore(private val context: Context) : RecentSearches {
 
 /** Builds the key recents are stored under: the server's host and port plus the profile in use. */
 object RecentSearchScope {
-    /** Used when the server has no profiles (or none is chosen yet). */
+    /** Used when the server has no profiles. */
     const val NO_PROFILE = "-"
 
-    /** Null while no server is active. There is no server id, so the address stands in for it. */
-    fun of(server: HttpUrl?, profile: ProfileState): String? =
-        server?.let { of("${it.host}:${it.port}", profile.current?.id?.toString()) }
+    /**
+     * Null while no server is active, or while the profile is unknown or being picked (so nothing is saved
+     * into the wrong list). There is no server id, so the address stands in for it.
+     */
+    fun of(server: HttpUrl?, profile: ProfileState): String? {
+        val profileId = when (profile) {
+            is ProfileState.Unsupported -> null
+            is ProfileState.Single, is ProfileState.Selected -> profile.current?.id?.toString()
+            else -> return null
+        }
+        return server?.let { of("${it.host}:${it.port}", profileId) }
+    }
 
     fun of(address: String, profileId: String?): String = "$address/${profileId ?: NO_PROFILE}"
 }
