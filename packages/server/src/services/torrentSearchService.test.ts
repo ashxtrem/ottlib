@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { QbittorrentError } from '../providers/torrent/qbittorrentClient.js';
+import { noReleasePreferences, type ReleasePreferences } from './torrent/releaseScore.js';
 import { TorrentSearchService } from './torrentSearchService.js';
 
 function searchDouble() {
@@ -26,6 +27,35 @@ describe('TorrentSearchService', () => {
     expect(state.results).toHaveLength(2);
     expect(state.results[0]).toMatchObject({ nbSeeders: 10, engines: ['One', 'Two'], libraryStatus: 'owned' });
     expect(state.results[1]).toMatchObject({ libraryStatus: 'missing', nbSeeders: 0 });
+  });
+
+  describe('release scores', () => {
+    async function resultsFor(preferences: ReleasePreferences) {
+      const search = searchDouble();
+      search.start.mockResolvedValue('7'); search.status.mockResolvedValue({ id: '7', status: 'Stopped', total: 3 });
+      search.results.mockResolvedValue({ total: 3, results: [
+        { fileName: 'Film.2020.720p.WEB-DL.x264-AAA', fileUrl: 'magnet:?xt=urn:btih:a', nbSeeders: 20, engineName: 'One' },
+        { fileName: 'Film.2020.1080p.WEB-DL.x264-BBB', fileUrl: 'magnet:?xt=urn:btih:b', nbSeeders: 20, engineName: 'One' },
+        { fileName: 'Film.2020.1080p.BluRay.x265-CCC', fileUrl: 'magnet:?xt=urn:btih:c', nbSeeders: 5, engineName: 'One', fileSize: 40 * 1024 ** 3 }
+      ] });
+      const service = new TorrentSearchService(search as never, { findForTorrentMatch: vi.fn() } as never, () => true, () => preferences);
+      await service.start('Film');
+      return (await service.status('7')).results;
+    }
+
+    it('leaves every score null and bestMatch false with no preference', async () => {
+      const results = await resultsFor(noReleasePreferences);
+      expect(results.map((result) => [result.score, result.bestMatch])).toEqual([[null, false], [null, false], [null, false]]);
+    });
+
+    it('ranks the preferred resolution above a lower one at equal seeders, flags one best match and keeps seeders-first order', async () => {
+      const results = await resultsFor({ resolution: '1080p', codec: null, maxSizeGb: 10 });
+      const byName = (needle: string) => results.find((result) => result.fileName.includes(needle))!;
+      expect(byName('BBB').score!).toBeGreaterThan(byName('AAA').score!);
+      expect(byName('CCC').score).toBe(0);
+      expect(results.filter((result) => result.bestMatch).map((result) => result.fileName)).toEqual([byName('BBB').fileName]);
+      expect(results.map((result) => result.nbSeeders)).toEqual([20, 20, 5]);
+    });
   });
 
   it('reaps only its oldest active search before retrying one 409 start', async () => {

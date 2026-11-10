@@ -8,7 +8,9 @@ export * from './profiles.js';
 export * from './backups.js';
 export * from './health.js';
 export * from './collections.js';
+export * from './upgradeCandidates.js';
 import { collectionFilterOptionSchema } from './collections.js';
+import { torrentPreferredCodecSchema, torrentPreferredResolutionSchema } from './torrent.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -200,6 +202,10 @@ export const settingsSchema = z.object({
   qbittorrentPassword: z.string(),
   qbittorrentCategory: z.string(),
   qbittorrentSavePath: z.string(),
+  /** What a good torrent release looks like; null means no preference. Drives release scores and upgrade candidates. */
+  torrentPreferredResolution: torrentPreferredResolutionSchema.nullable(),
+  torrentPreferredCodec: torrentPreferredCodecSchema.nullable(),
+  torrentMaxSizeGb: z.number().positive().max(10_000).nullable(),
   extensions: z.array(z.string()),
   ignoredPatterns: z.array(z.string()),
   excludedFolders: z.array(z.string()),

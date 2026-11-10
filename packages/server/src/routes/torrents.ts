@@ -4,9 +4,11 @@ import { TorrentConnectionService } from '../services/torrentConnectionService.j
 import { TorrentHandoffService } from '../services/torrentHandoffService.js';
 import { TorrentSearchService } from '../services/torrentSearchService.js';
 import { TorrentDownloadService } from '../services/torrentDownloadService.js';
+import type { UpgradeCandidateService } from '../services/torrent/upgradeCandidateService.js';
+import { requireProfile } from './profileContext.js';
 
 /** Torrent search is opt-in: while it is switched off in Settings every torrent route answers 404. */
-export function registerTorrentRoutes(app: FastifyInstance, searches: TorrentSearchService, handoff: TorrentHandoffService, connection: TorrentConnectionService, downloads: TorrentDownloadService, enabled: () => boolean): void {
+export function registerTorrentRoutes(app: FastifyInstance, searches: TorrentSearchService, handoff: TorrentHandoffService, connection: TorrentConnectionService, downloads: TorrentDownloadService, upgrades: UpgradeCandidateService, enabled: () => boolean): void {
   void app.register(async (scope) => {
     scope.addHook('onRequest', async (_request, reply) => { if (!enabled()) return reply.code(404).send({ error: 'Torrent search is turned off. Turn it on in Settings.' }); });
     scope.post('/api/torrents/search', async (request) => searches.start(...toSearchArgs(torrentSearchStartSchema.parse(request.body))));
@@ -16,6 +18,7 @@ export function registerTorrentRoutes(app: FastifyInstance, searches: TorrentSea
     scope.get('/api/torrents/connection', async () => connection.status());
     scope.post('/api/torrents/connection/test', async () => connection.test());
     scope.get('/api/torrents/active', async () => downloads.active());
+    scope.get('/api/torrents/upgrade-candidates', async (request) => upgrades.candidates(requireProfile(request)));
   });
 }
 

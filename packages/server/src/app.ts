@@ -71,6 +71,9 @@ import { TorrentSearchService } from './services/torrentSearchService.js';
 import { TorrentHandoffService } from './services/torrentHandoffService.js';
 import { TorrentConnectionService } from './services/torrentConnectionService.js';
 import { TorrentDownloadService } from './services/torrentDownloadService.js';
+import { releasePreferences } from './services/torrent/releaseScore.js';
+import { UpgradeCandidateService } from './services/torrent/upgradeCandidateService.js';
+import { MovieUpgradeRepository } from './repositories/movieUpgradeRepository.js';
 import { DownloadedSubtitleRepository } from './repositories/downloadedSubtitleRepository.js';
 import { SubtitleLibraryService } from './services/subtitles/subtitleLibraryService.js';
 import { SubtitleService } from './services/subtitles/subtitleService.js';
@@ -148,7 +151,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const autoSkip = new AutoSkipRepository(db); const creditsResolver = new CreditsResolver(movies, autoSkip);
   const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary, undefined, planner, embeddedSubtitles, creditsResolver);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
-  const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
+  const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured(), () => releasePreferences(settings.get())); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
   const appVersion = readAppVersion(); const latestRelease = new LatestRelease();
   const health = new HealthService(() => healthChecks({ appDataPath, folders: () => folders.list().map((folder) => folder.path), locateFfmpeg: locate, tmdbKey: () => settings.get().tmdbApiKey, testTmdbKey: checkTmdbKey, torrentSearchEnabled: () => settings.get().torrentSearchEnabled, testQbittorrent: () => torrentConnection.test(), backups, idsMissingExtras: () => movieExtras.idsMissingExtras(), update: { version: () => appVersion, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() } }));
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
@@ -160,7 +163,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   registerCreditsRoutes(app, new CreditsEditService(movies, autoSkip, creditsResolver));
   registerHlsRoutes(app, hlsSessions, new TranscodeInfoService(locate, encodersFor, encoderSetting));
   registerFrameRoutes(app, new FrameService(playback, movies, locate));
-  registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
+  registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, new UpgradeCandidateService(new MovieUpgradeRepository(db), () => settings.get()), () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
   registerBackupRoutes(app, backups);
   registerHealthRoutes(app, health);
