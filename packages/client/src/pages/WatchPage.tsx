@@ -160,7 +160,7 @@ function WatchPlayer({ movieId, shelfId, screen, onVideoElement }: WatchPlayerPr
     {problem ? <PlaybackProblem movieId={movieId} message={problem} onBack={leave} /> : <>
       {source && <VideoSurface source={source} hlsEngine={hlsEngine} startMs={startMs} textTracks={tracks.readyTracks} onVideoElement={handleVideo} onPlaybackError={onPlaybackError} endGuard={endGuard} pictureMode={picture.mode} cueClearance={cueClearance} />}
       {/* Same slot with or without a source, so the cover isn't remounted when the source arrives. */}
-      <StartCover title={movie.data?.title ?? null} backdropUrl={movie.data?.backdropUrl ?? null} source={source ?? null} startMs={startMs} firstFrame={state.firstFrame} />
+      <StartCover title={movie.data?.title ?? null} backdropUrl={movie.data?.backdropUrl ?? null} source={source ?? null} startMs={startMs} firstFrame={state.firstFrame && Boolean(source)} />
       {source && <>
         <PlayerTapLayer onTogglePlay={commands.togglePlay} onToggleControls={controls.toggle} onSeekBy={commands.seekBy} />
         <PlayerControls

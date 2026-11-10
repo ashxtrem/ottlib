@@ -39,7 +39,8 @@ function read(video: HTMLVideoElement, fallbackDurationMs: number | null, endGua
 export function useVideoState(video: HTMLVideoElement | null, fallbackDurationMs: number | null, endGuard: EndGuard): VideoState {
   const [state, setState] = useState<VideoState>(idle);
   useEffect(() => {
-    if (!video) return;
+    // No element (a source change remounts it): no picture, so the start cover must come back.
+    if (!video) { setState((current) => (current.firstFrame ? { ...current, firstFrame: false } : current)); return; }
     // HAVE_CURRENT_DATA: an element that already shows a picture when the hook (re)attaches.
     let firstFrame = video.readyState >= 2;
     const update = (event?: Event) => {
