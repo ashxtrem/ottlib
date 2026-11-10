@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { PlayerControls } from './PlayerControls';
 
 const noop = () => undefined;
-const state = { paused: false, ended: false, positionMs: 0, durationMs: 600_000, bufferedMs: 0, volume: 1, muted: false };
+const state = { paused: false, ended: false, positionMs: 0, durationMs: 600_000, bufferedMs: 0, volume: 1, muted: false, firstFrame: true };
 
 function render() {
   return renderToStaticMarkup(<PlayerControls
