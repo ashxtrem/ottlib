@@ -1,7 +1,21 @@
+import type { OutsideRating } from '@ottlib/shared';
 import type { EpisodeMetadata, MediaType, MetadataCandidate, MetadataProvider, MovieMetadata } from './MetadataProvider.js';
+import { RatingsLimitReachedError, type RatingsProvider } from './RatingsProvider.js';
 import { externalRequestTimeoutMs } from '../../config/defaults.js';
 
-export class OmdbProvider implements MetadataProvider {
+const ratingSources: Record<string, OutsideRating['source']> = { 'Internet Movie Database': 'imdb', 'Rotten Tomatoes': 'rottenTomatoes', Metacritic: 'metacritic' };
+
+/** OMDb writes ratings as "8.8/10", "87%" or "74/100". */
+export function parseOmdbRating(entry: { Source?: string; Value?: string }): OutsideRating | null {
+  const source = entry.Source ? ratingSources[entry.Source] : undefined; if (!source || !entry.Value) return null;
+  const percent = entry.Value.match(/^\s*(\d+(?:\.\d+)?)\s*%\s*$/);
+  if (percent) return { source, value: Number(percent[1]), max: 100 };
+  const fraction = entry.Value.match(/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*$/);
+  if (fraction && Number(fraction[2]) > 0) return { source, value: Number(fraction[1]), max: Number(fraction[2]) };
+  return null;
+}
+
+export class OmdbProvider implements MetadataProvider, RatingsProvider {
   public readonly name = 'omdb';
   public constructor(private readonly apiKey: string) {}
 
@@ -25,6 +39,14 @@ export class OmdbProvider implements MetadataProvider {
       posterUrl: item.Poster === 'N/A' ? null : item.Poster, backdropUrl: null, genres: item.Genre === 'N/A' ? [] : item.Genre.split(', '),
       cast: item.Actors === 'N/A' ? [] : item.Actors.split(', '), rating: Number.parseFloat(item.imdbRating) || null, runtime: Number.parseInt(item.Runtime, 10) || null,
       imdbId: item.imdbID ?? providerId };
+  }
+
+  public async getRatings(imdbId: string): Promise<OutsideRating[]> {
+    const response = await fetch(`https://www.omdbapi.com/?${new URLSearchParams({ apikey: this.apiKey, i: imdbId })}`, { signal: AbortSignal.timeout(externalRequestTimeoutMs) });
+    const item = await response.json().catch(() => ({})) as any;
+    if (typeof item.Error === 'string' && /request limit reached/i.test(item.Error)) throw new RatingsLimitReachedError('OMDb', item.Error);
+    if (!response.ok || item.Response === 'False') throw new Error(`OMDb ratings lookup failed (${response.status}): ${item.Error ?? 'Unknown provider error'}`);
+    return (Array.isArray(item.Ratings) ? item.Ratings : []).map(parseOmdbRating).filter((rating: OutsideRating | null): rating is OutsideRating => rating !== null);
   }
 
   public async getEpisodeDetails(providerId: string, season: number, episode: number): Promise<EpisodeMetadata | null> {

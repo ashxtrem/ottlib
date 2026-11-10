@@ -10,7 +10,7 @@ describe('LibraryFilters', () => {
   });
 
   it('renders only search and the filter trigger by default', () => {
-    const markup = renderToStaticMarkup(<LibraryFilters values={{ search: '', availability: undefined, genre: '', actor: '', quality: '', audioLanguage: '', minRating: undefined, watched: undefined, sort: 'title' }} options={{ genres: [], actors: [], resolutions: [], audioLanguages: [] }} idPrefix="test" {...callbacks} />);
+    const markup = renderToStaticMarkup(<LibraryFilters values={{ search: '', availability: undefined, genre: '', actor: '', quality: '', audioLanguage: '', minRating: undefined, watched: undefined, sort: 'title' }} options={{ genres: [], actors: [], resolutions: [], audioLanguages: [], collections: [] }} idPrefix="test" {...callbacks} />);
     expect(markup).toContain('Filters');
     expect(markup).not.toContain('Minimum rating');
   });

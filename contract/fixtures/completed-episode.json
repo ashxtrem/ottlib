@@ -27,5 +27,11 @@
   "resumePositionMs": null,
   "missing": false,
   "addedAt": "2026-01-01T00:00:00.000Z",
-  "shelves": []
+  "shelves": [],
+  "castMembers": [],
+  "logoUrl": null,
+  "ratings": [],
+  "collection": null,
+  "trailerKey": null,
+  "fresh": null
 }

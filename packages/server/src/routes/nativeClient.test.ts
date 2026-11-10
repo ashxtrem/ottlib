@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PROFILE_SESSION_HEADER, authStatusSchema, autoSkipDefaultsSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { PROFILE_SESSION_HEADER, authStatusSchema, autoSkipDefaultsSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieCollectionSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
@@ -11,8 +11,10 @@ import { buildApp, type AppOverrides } from '../app.js';
 import { SessionBusyError, type HlsSessionOpener } from '../services/hls/sessionOpener.js';
 import { createDatabase } from '../db/db.js';
 import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
+import { MovieExtrasRepository } from '../repositories/movieExtrasRepository.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
 import { ScanRunRepository } from '../repositories/scanRunRepository.js';
+import { PosterCacheService } from '../services/posterCacheService.js';
 
 // Endpoints used by the native (Android TV) client. Responses are written to /contract/fixtures, which the
 // Kotlin tests decode strictly — a shape change here fails there. Refresh fixtures with `npx vitest run -u`.
@@ -35,6 +37,10 @@ function fixture(overrides: AppOverrides = {}) {
   movies.upsertScanned({ folderId: 1, path: otherPath, filename: 'Home.Video.mp4', title: 'Home Video', year: null, size: 10, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
   movies.applyMetadata(1, { source: 'tmdb', providerId: '329865', mediaType: 'movie', title: 'Arrival', year: 2016, overview: 'A linguist is recruited to talk to visitors.', posterFile: 'arrival.jpg', backdropFile: 'arrival-backdrop.jpg', genres: ['Drama', 'Science Fiction'], cast: ['Amy Adams', 'Jeremy Renner'], rating: 7.6, runtime: 116, imdbId: 'tt2543164' });
   movies.markUnmatched(2);
+  const extras = new MovieExtrasRepository(db);
+  extras.applyExtras(1, { castMembers: [{ name: 'Amy Adams', photoUrl: '/media/people/tmdb-person-amy.jpg' }, { name: 'Jeremy Renner', photoUrl: null }], logoFile: 'tmdb-logo-arrival.png', collection: { id: 1234, name: 'Arrival Collection' }, trailerKey: 'tNZfcqGEmnQ' });
+  extras.applyRatings(1, [{ source: 'imdb', value: 7.9, max: 10 }, { source: 'rottenTomatoes', value: 94, max: 100 }, { source: 'metacritic', value: 81, max: 100 }]);
+  db.prepare("UPDATE movies SET added_at = datetime('now', '-30 days') WHERE id = 1").run(); // the first import; the unwatched Home Video added after it is 'new'
   movies.applyMediaInfo(1, { container: 'MKV', durationMs: 6_960_000, width: 3840, height: 2160, videoCodec: 'HEVC', videoProfile: 'Main 10', videoBitRate: 40_000_000, hdrFormat: 'HDR10' });
   movies.applyPictureArea(1, { x: 0, y: 270, width: 3840, height: 1620 }, 'done');
   new MediaTrackRepository(db).replaceForMovie(1, [
@@ -303,6 +309,30 @@ describe('native client endpoints', () => {
       expect(recommendations.map((item) => item.movie.title)).toEqual(['Contact']);
       await snapshot('recommendations', recommendations, media);
       expect((await app.inject({ method: 'GET', url: '/api/movies/999/recommendations', headers })).statusCode).toBe(404);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('serve a title collection in the shape the native client decodes', async () => {
+    const { app, db, media } = fixture();
+    try {
+      new MovieRepository(db).upsertScanned({ folderId: 1, path: join(media, 'Arrival.Sequel.2019.mkv'), filename: 'Arrival.Sequel.2019.mkv', title: 'Arrival Sequel', year: 2019, size: 10, mtimeMs: 1, seenAt: '2026-01-01T00:00:00.000Z' });
+      new MovieRepository(db).applyMetadata(3, { source: 'tmdb', providerId: '400', mediaType: 'movie', title: 'Arrival Sequel', year: 2019, overview: null, posterFile: 'sequel.jpg', backdropFile: null, genres: ['Drama'], cast: [], rating: 7.1, runtime: 110, imdbId: 'tt0000400' });
+      new MovieExtrasRepository(db).applyExtras(3, { castMembers: [], logoFile: null, collection: { id: 1234, name: 'Arrival Collection' }, trailerKey: null });
+      const provider: MetadataProvider = {
+        name: 'tmdb', searchCandidates: vi.fn(), getDetails: vi.fn(),
+        getCollection: vi.fn().mockResolvedValue({ id: 1234, name: 'Arrival Collection', parts: [
+          { id: '329865', title: 'Arrival', year: 2016, posterUrl: null }, { id: '400', title: 'Arrival Sequel', year: 2019, posterUrl: null },
+          { id: '401', title: 'Arrival Origins', year: 2022, posterUrl: 'https://image.tmdb.org/t/p/w500/origins.jpg' }] })
+      };
+      vi.spyOn(metadataProviders, 'createMetadataProviders').mockReturnValue([provider]);
+      vi.spyOn(PosterCacheService.prototype, 'cache').mockResolvedValue('tmdb-part-401.jpg');
+      const response = await app.inject({ method: 'GET', url: '/api/movies/1/collection', headers });
+      expect(response.statusCode).toBe(200);
+      const collection = movieCollectionSchema.parse(response.json());
+      expect(collection.owned.map((movie) => movie.id)).toEqual([1, 3]);
+      expect(collection.missing).toEqual([{ tmdbId: '401', title: 'Arrival Origins', year: 2022, posterUrl: '/media/posters/tmdb-part-401.jpg' }]);
+      await snapshot('movie-collection', collection, media);
+      expect((await app.inject({ method: 'GET', url: '/api/movies/2/collection', headers })).statusCode).toBe(404);
     } finally { await app.close(); db.close(); }
   });
 

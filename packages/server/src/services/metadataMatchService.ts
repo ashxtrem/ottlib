@@ -5,6 +5,8 @@ import { MovieRepository, type MetadataTarget } from '../repositories/movieRepos
 import { ScanRunRepository } from '../repositories/scanRunRepository.js';
 import { SettingRepository } from '../repositories/settingRepository.js';
 import { PosterCacheService } from './posterCacheService.js';
+import type { MovieExtrasRepository } from '../repositories/movieExtrasRepository.js';
+import { TitleExtrasService, newRatingsRun, ratingsLimitNotice, type RatingsRun } from './titleExtrasService.js';
 import type { ScanRun } from '@ottlib/shared';
 
 export const autoAcceptScoreThreshold = 0.75;
@@ -15,7 +17,7 @@ export function extractImdbId(input: string): string | null {
 }
 
 export type AcceptOptions = { season?: number; episode?: number };
-export type SuggestOptions = { autoAccept?: boolean };
+export type SuggestOptions = { autoAccept?: boolean; ratingsRun?: RatingsRun };
 export type ManualMatchSelection = Pick<ManualMatchCandidate, 'provider' | 'providerId' | 'mediaType' | 'season' | 'episode'>;
 type AutoAcceptOutcome = { accepted: true } | { accepted: false; error?: string };
 type SuggestedTarget = { id: number; title: string; rawFilename: string };
@@ -30,14 +32,18 @@ function detectSeasonEpisode(filename: string): AcceptOptions | null {
 }
 
 export class MetadataMatchService {
-  public constructor(private readonly movies: MovieRepository, private readonly settings: SettingRepository, private readonly cache: PosterCacheService, private readonly runs?: ScanRunRepository) {}
+  private readonly titleExtras?: TitleExtrasService;
+
+  public constructor(private readonly movies: MovieRepository, private readonly settings: SettingRepository, private readonly cache: PosterCacheService, private readonly runs?: ScanRunRepository, extras?: MovieExtrasRepository, log?: (message: string) => void) {
+    if (extras) this.titleExtras = new TitleExtrasService(extras, cache, settings, log);
+  }
 
   public async suggest(movieId: number, searchTitle?: string, options: SuggestOptions = {}): Promise<void> {
     const target = this.movies.metadataTarget(movieId); if (!target) return;
     const { shortlist, error } = await this.findCandidates(target, searchTitle);
     if (!shortlist.length) { this.movies.markUnmatched(movieId, error); return; }
     this.movies.saveCandidates(movieId, shortlist);
-    if (options.autoAccept) await this.autoAcceptTopCandidate(movieId, target.rawFilename);
+    if (options.autoAccept) await this.autoAcceptTopCandidate(movieId, target.rawFilename, options.ratingsRun);
   }
 
   public async findManualCandidates(movieId: number, searchTitle?: string): Promise<ManualMatchCandidate[]> {
@@ -120,9 +126,10 @@ export class MetadataMatchService {
   private async executeBackfill(runId: number, targets: SuggestedTarget[]): Promise<void> {
     if (!this.runs) return;
     try {
-      const { failures } = await this.acceptTargets(targets, (processed, acceptedCount) => this.runs?.progress(runId, targets.length, processed, acceptedCount));
-      const summary = failures.length ? `${failures.length} ${failures.length === 1 ? 'title could' : 'titles could'} not be accepted.\n${failures.slice(0, 5).join('\n')}` : null;
-      this.runs.finish(runId, 'completed', summary);
+      const ratingsRun = newRatingsRun();
+      const { failures } = await this.acceptTargets(targets, (processed, acceptedCount) => this.runs?.progress(runId, targets.length, processed, acceptedCount), ratingsRun);
+      const summary = [failures.length ? `${failures.length} ${failures.length === 1 ? 'title could' : 'titles could'} not be accepted.\n${failures.slice(0, 5).join('\n')}` : null, ratingsLimitNotice(ratingsRun)].filter(Boolean).join('\n');
+      this.runs.finish(runId, 'completed', summary || null);
     } catch (error) {
       this.runs.finish(runId, 'failed', error instanceof Error ? error.message : 'Automatic acceptance failed');
     }
@@ -130,18 +137,18 @@ export class MetadataMatchService {
 
   private async executeMetadataRefresh(runId: number, targets: MetadataTarget[]): Promise<void> {
     if (!this.runs) return;
-    let next = 0; let processed = 0; let matched = 0; const notices: string[] = [];
+    let next = 0; let processed = 0; let matched = 0; const notices: string[] = []; const ratingsRun = newRatingsRun();
     const worker = async () => {
       while (next < targets.length) {
         const target = targets[next++];
         try {
           if (target.metadataSource && target.providerId) {
-            const result = await this.refreshMatchedMetadata(target);
+            const result = await this.refreshMatchedMetadata(target, ratingsRun);
             if (result.refreshed) matched += 1;
             if (result.notice) notices.push(`${target.title}: ${result.notice}`);
           } else {
             this.movies.resetForRematch(target.id);
-            await this.suggest(target.id, target.title, { autoAccept: true });
+            await this.suggest(target.id, target.title, { autoAccept: true, ratingsRun });
             if (this.movies.get(target.id)?.metadataStatus === 'matched') matched += 1;
           }
         } catch (error) {
@@ -152,8 +159,9 @@ export class MetadataMatchService {
     };
     try {
       await Promise.all(Array.from({ length: Math.min(autoAcceptConcurrency, targets.length) }, worker));
-      const summary = notices.length ? notices.slice(0, 5).join('\n') : null;
-      this.runs.finish(runId, 'completed', summary);
+      const limit = ratingsLimitNotice(ratingsRun);
+      const summary = [...(limit ? [limit] : []), ...notices].slice(0, 5);
+      this.runs.finish(runId, 'completed', summary.length ? summary.join('\n') : null);
     } catch (error) {
       this.runs.finish(runId, 'failed', error instanceof Error ? error.message : 'Metadata refresh failed');
     }
@@ -184,11 +192,11 @@ export class MetadataMatchService {
     }
   }
 
-  private async acceptTargets(targets: SuggestedTarget[], onProgress?: (processed: number, accepted: number) => void): Promise<{ accepted: number; failures: string[] }> {
+  private async acceptTargets(targets: SuggestedTarget[], onProgress?: (processed: number, accepted: number) => void, ratingsRun = newRatingsRun()): Promise<{ accepted: number; failures: string[] }> {
     let next = 0; let processed = 0; let accepted = 0; const failures: string[] = [];
     const worker = async () => {
       while (next < targets.length) {
-        const target = targets[next++]; const result = await this.autoAcceptTopCandidate(target.id, target.rawFilename);
+        const target = targets[next++]; const result = await this.autoAcceptTopCandidate(target.id, target.rawFilename, ratingsRun);
         if (result.accepted) accepted += 1;
         else if (result.error) failures.push(`${target.title}: ${result.error}`);
         processed += 1; onProgress?.(processed, accepted);
@@ -207,10 +215,10 @@ export class MetadataMatchService {
     return { candidate, episode };
   }
 
-  private async autoAcceptTopCandidate(movieId: number, rawFilename: string): Promise<AutoAcceptOutcome> {
+  private async autoAcceptTopCandidate(movieId: number, rawFilename: string, ratingsRun?: RatingsRun): Promise<AutoAcceptOutcome> {
     const match = this.autoAcceptCandidate(movieId, rawFilename); if (!match) return { accepted: false };
     try {
-      const result = await this.accept(movieId, match.candidate.id, match.episode);
+      const result = await this.acceptSaved(movieId, match.candidate.id, match.episode, ratingsRun);
       return result === 'ok' ? { accepted: true } : { accepted: false, error: 'Saved candidate is no longer available' };
     } catch (error) {
       return { accepted: false, error: error instanceof Error ? error.message : 'Metadata lookup failed' };
@@ -218,26 +226,30 @@ export class MetadataMatchService {
   }
 
   public async accept(movieId: number, candidateId: number, options: AcceptOptions = {}): Promise<'ok' | 'not-found' | 'needs-episode'> {
+    return this.acceptSaved(movieId, candidateId, options);
+  }
+
+  private async acceptSaved(movieId: number, candidateId: number, options: AcceptOptions, ratingsRun?: RatingsRun): Promise<'ok' | 'not-found' | 'needs-episode'> {
     const candidate = this.movies.getCandidate(movieId, candidateId); if (!candidate) return 'not-found';
-    return this.acceptSelection(movieId, candidate, options);
+    return this.acceptSelection(movieId, candidate, options, ratingsRun);
   }
 
   public async acceptManualCandidate(movieId: number, candidate: ManualMatchSelection, options: AcceptOptions = {}): Promise<'ok' | 'not-found' | 'needs-episode'> {
     return this.acceptSelection(movieId, candidate, options);
   }
 
-  private async acceptSelection(movieId: number, candidate: ManualMatchSelection, options: AcceptOptions): Promise<'ok' | 'not-found' | 'needs-episode'> {
+  private async acceptSelection(movieId: number, candidate: ManualMatchSelection, options: AcceptOptions, ratingsRun?: RatingsRun): Promise<'ok' | 'not-found' | 'needs-episode'> {
     const providers = createMetadataProviders(this.settings.get());
     const provider = providers.find((item) => item.name === candidate.provider); if (!provider) return 'not-found';
     const show = await provider.getDetails(candidate.providerId, candidate.mediaType); if (!show) return 'not-found';
 
     const season = options.season ?? candidate.season; const episodeNumber = options.episode ?? candidate.episode;
     if (candidate.mediaType === 'tv' && (!season || !episodeNumber)) return 'needs-episode';
-    await this.saveMetadata(movieId, provider, candidate.mediaType, show, { season, episode: episodeNumber });
+    await this.saveMetadata(movieId, provider, candidate.mediaType, show, { season, episode: episodeNumber }, false, ratingsRun);
     return 'ok';
   }
 
-  private async refreshMatchedMetadata(target: MetadataTarget): Promise<MetadataRefreshOutcome> {
+  private async refreshMatchedMetadata(target: MetadataTarget, ratingsRun: RatingsRun): Promise<MetadataRefreshOutcome> {
     const providers = createMetadataProviders(this.settings.get());
     const provider = providers.find((item) => item.name === target.metadataSource);
     const notices: string[] = [];
@@ -246,7 +258,7 @@ export class MetadataMatchService {
     const mediaTypes: Array<'movie' | 'tv'> = target.mediaType ? [target.mediaType] : detectedEpisode ? ['tv', 'movie'] : ['movie', 'tv'];
     if (provider && target.providerId) {
       try {
-        if (await this.refreshFromProvider(target, provider, target.providerId, mediaTypes, detectedEpisode ?? {})) return { refreshed: true };
+        if (await this.refreshFromProvider(target, provider, target.providerId, mediaTypes, detectedEpisode ?? {}, ratingsRun)) return { refreshed: true };
         notices.push(`${provider.name} returned no matching metadata`);
       } catch (error) {
         notices.push(error instanceof Error ? error.message : `${provider.name} metadata lookup failed`);
@@ -259,7 +271,7 @@ export class MetadataMatchService {
           const candidate = await fallback.getByImdbId(target.imdbId);
           if (!candidate) { notices.push(`${fallback.name} could not find IMDb ID ${target.imdbId}`); continue; }
           const episode = candidate.mediaType === 'tv' ? { season: candidate.season ?? detectedEpisode?.season, episode: candidate.episode ?? detectedEpisode?.episode } : {};
-          if (await this.refreshFromProvider(target, fallback, candidate.id, [candidate.mediaType], episode)) {
+          if (await this.refreshFromProvider(target, fallback, candidate.id, [candidate.mediaType], episode, ratingsRun)) {
             const fallbackNotice = `Refreshed using ${fallback.name.toUpperCase()} via IMDb ID.`;
             return { refreshed: true, notice: notices.length ? `${notices.join('; ')}. ${fallbackNotice}` : fallbackNotice };
           }
@@ -272,11 +284,11 @@ export class MetadataMatchService {
     return { refreshed: false, notice: notices.join('; ') || 'Saved metadata provider is unavailable' };
   }
 
-  private async refreshFromProvider(target: MetadataTarget, provider: MetadataProvider, providerId: string, mediaTypes: Array<'movie' | 'tv'>, episode: AcceptOptions): Promise<boolean> {
+  private async refreshFromProvider(target: MetadataTarget, provider: MetadataProvider, providerId: string, mediaTypes: Array<'movie' | 'tv'>, episode: AcceptOptions, ratingsRun: RatingsRun): Promise<boolean> {
     for (const mediaType of mediaTypes) {
       const show = await provider.getDetails(providerId, mediaType);
       if (!show) continue;
-      await this.saveMetadata(target.id, provider, mediaType, show, mediaType === 'tv' ? episode : {}, true);
+      await this.saveMetadata(target.id, provider, mediaType, show, mediaType === 'tv' ? episode : {}, true, ratingsRun);
       return true;
     }
     return false;
@@ -305,7 +317,7 @@ export class MetadataMatchService {
     return undefined;
   }
 
-  private async saveMetadata(movieId: number, provider: MetadataProvider, mediaType: 'movie' | 'tv', show: MovieMetadata, options: AcceptOptions, refreshArtwork = false): Promise<void> {
+  private async saveMetadata(movieId: number, provider: MetadataProvider, mediaType: 'movie' | 'tv', show: MovieMetadata, options: AcceptOptions, refreshArtwork = false, ratingsRun = newRatingsRun()): Promise<void> {
     let title = show.title; let overview = show.overview; let posterUrl = show.posterUrl; let rating = show.rating;
     if (mediaType === 'tv' && options.season && options.episode) {
       const episode = provider.getEpisodeDetails ? await provider.getEpisodeDetails(show.providerId, options.season, options.episode) : null;
@@ -317,7 +329,10 @@ export class MetadataMatchService {
     const [posterFile, backdropFile] = await Promise.all([
       this.cache.cache(posterUrl, 'posters', prefix, refreshArtwork), this.cache.cache(show.backdropUrl, 'backdrops', prefix, refreshArtwork)
     ]);
+    const before = this.movies.metadataTarget(movieId);
+    const sameTitle = Boolean(before) && ((before?.metadataSource === provider.name && before?.providerId === show.providerId) || (Boolean(before?.imdbId) && before?.imdbId === show.imdbId));
     this.movies.applyMetadata(movieId, { source: provider.name, providerId: show.providerId, mediaType, season: mediaType === 'tv' ? options.season ?? null : null, episode: mediaType === 'tv' ? options.episode ?? null : null, title, year: show.year, overview, posterFile, backdropFile, genres: show.genres, cast: show.cast, rating, runtime: show.runtime, imdbId: show.imdbId });
+    await this.titleExtras?.save(movieId, provider.name, show, ratingsRun, sameTitle);
   }
 
   public async suggestFromImdb(movieId: number, rawInput: string): Promise<'ok' | 'invalid-id' | 'not-found'> {

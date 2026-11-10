@@ -2,12 +2,16 @@ import { access, mkdir, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { extname, join } from 'node:path';
 import { externalRequestTimeoutMs } from '../config/defaults.js';
-import { MEDIA_STATIC_EXTENSIONS } from '../config/mediaStatic.js';
+import { MEDIA_STATIC_EXTENSIONS, type MediaStaticFolder } from '../config/mediaStatic.js';
 
 export class PosterCacheService {
   public constructor(private readonly appDataPath: string) {}
 
-  public async cache(url: string | null, kind: 'posters' | 'backdrops', key: string, refresh = false): Promise<string | null> {
+  /**
+   * refresh=true writes a new hash-suffixed name each time. Files shared between titles (people photos) and files whose name
+   * already follows the remote path (logos) must use refresh=false so the stable name is reused.
+   */
+  public async cache(url: string | null, kind: MediaStaticFolder, key: string, refresh = false): Promise<string | null> {
     if (!url) return null;
     const extension = MEDIA_STATIC_EXTENSIONS.includes(extname(new URL(url).pathname).toLowerCase()) ? extname(new URL(url).pathname) : '.jpg';
     const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');

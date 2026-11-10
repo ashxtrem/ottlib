@@ -1,5 +1,33 @@
-import type { EpisodeMetadata, MediaType, MetadataCandidate, MetadataProvider, MovieMetadata } from './MetadataProvider.js';
+import type { CastMember } from '@ottlib/shared';
+import type { EpisodeMetadata, MediaType, MetadataCandidate, MetadataProvider, MovieMetadata, TitleCollection } from './MetadataProvider.js';
 import { externalRequestTimeoutMs } from '../../config/defaults.js';
+
+const imageBase = 'https://image.tmdb.org/t/p';
+const castMemberLimit = 8;
+
+/** The first billed cast that have a photo. */
+function castMembers(cast: any[] | undefined): CastMember[] {
+  return (cast ?? []).filter((person) => person?.profile_path && person.name).slice(0, castMemberLimit).map((person) => ({ name: person.name, photoUrl: `${imageBase}/w185${person.profile_path}` }));
+}
+
+/** The best-voted English PNG logo, else the best language-less one. */
+function logoUrl(logos: any[] | undefined): string | null {
+  const pngs = (logos ?? []).filter((logo) => typeof logo?.file_path === 'string' && logo.file_path.toLowerCase().endsWith('.png'));
+  const best = (language: string | null) => pngs.filter((logo) => (logo.iso_639_1 ?? null) === language).sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0];
+  const logo = best('en') ?? best(null);
+  return logo ? `${imageBase}/w500${logo.file_path}` : null;
+}
+
+/** A YouTube trailer, official first; a teaser when there is no trailer. */
+function trailerKey(videos: any[] | undefined): string | null {
+  const youTube = (videos ?? []).filter((video) => video?.site === 'YouTube' && video.key);
+  for (const type of ['Trailer', 'Teaser']) {
+    const ofType = youTube.filter((video) => video.type === type);
+    const pick = ofType.find((video) => video.official) ?? ofType[0];
+    if (pick) return pick.key;
+  }
+  return null;
+}
 
 export class TmdbProvider implements MetadataProvider {
   public readonly name = 'tmdb';
@@ -25,14 +53,24 @@ export class TmdbProvider implements MetadataProvider {
   }
 
   public async getDetails(providerId: string, mediaType: MediaType): Promise<MovieMetadata | null> {
-    const params = new URLSearchParams({ append_to_response: 'credits,external_ids' }); if (!this.isAccessToken()) params.set('api_key', this.apiKey);
+    const params = new URLSearchParams({ append_to_response: 'credits,external_ids,images,videos', include_image_language: 'en,null' }); if (!this.isAccessToken()) params.set('api_key', this.apiKey);
     const response = await this.request(`https://api.themoviedb.org/3/${mediaType}/${encodeURIComponent(providerId)}?${params}`);
     if (!response.ok) return null; const item = await response.json() as any;
     const releaseDate = mediaType === 'movie' ? item.release_date : item.first_air_date;
     return { providerId, title: mediaType === 'movie' ? item.title : item.name, year: releaseDate ? Number(releaseDate.slice(0, 4)) : null, overview: item.overview || null,
       posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null, backdropUrl: item.backdrop_path ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}` : null,
       genres: (item.genres ?? []).map((genre: any) => genre.name), cast: (item.credits?.cast ?? []).slice(0, 12).map((person: any) => person.name), rating: item.vote_average ?? null,
-      runtime: mediaType === 'movie' ? (item.runtime ?? null) : (item.episode_run_time?.[0] ?? null), imdbId: item.external_ids?.imdb_id ?? null };
+      runtime: mediaType === 'movie' ? (item.runtime ?? null) : (item.episode_run_time?.[0] ?? null), imdbId: item.external_ids?.imdb_id ?? null,
+      castMembers: castMembers(item.credits?.cast), logoUrl: logoUrl(item.images?.logos), trailerKey: trailerKey(item.videos?.results),
+      collection: item.belongs_to_collection?.id ? { id: Number(item.belongs_to_collection.id), name: item.belongs_to_collection.name ?? '' } : null };
+  }
+
+  public async getCollection(collectionId: number): Promise<TitleCollection | null> {
+    const params = new URLSearchParams(); if (!this.isAccessToken()) params.set('api_key', this.apiKey);
+    const response = await this.request(`https://api.themoviedb.org/3/collection/${encodeURIComponent(String(collectionId))}?${params}`);
+    if (!response.ok) return null; const item = await response.json() as any;
+    return { id: Number(item.id ?? collectionId), name: item.name ?? '', parts: (item.parts ?? []).map((part: any) => ({ id: String(part.id), title: part.title ?? part.name ?? '',
+      year: part.release_date ? Number(part.release_date.slice(0, 4)) : null, posterUrl: part.poster_path ? `${imageBase}/w500${part.poster_path}` : null })) };
   }
 
   public async getEpisodeDetails(providerId: string, season: number, episode: number): Promise<EpisodeMetadata | null> {
