@@ -31,6 +31,31 @@ class OttlibApiTest {
     }
 
     @Test
+    fun encodesActorAndCollectionWhenSetAndOmitsThemWhenNull() = runTest {
+        server.enqueue(MockResponse().setBody("""{"items":[],"nextCursor":null,"total":0}"""))
+        server.enqueue(MockResponse().setBody("""{"items":[],"nextCursor":null,"total":0}"""))
+        api.movies(MovieQuery(actor = "Tom Hanks", collection = 42, limit = 10))
+        api.movies(MovieQuery(limit = 10))
+        val withBoth = server.takeRequest().requestUrl!!
+        assertEquals("Tom Hanks", withBoth.queryParameter("actor"))
+        assertEquals("42", withBoth.queryParameter("collection"))
+        val without = server.takeRequest().requestUrl!!
+        assertFalse("actor" in without.queryParameterNames)
+        assertFalse("collection" in without.queryParameterNames)
+    }
+
+    @Test
+    fun readsACollectionAndMapsA404ToNull() = runTest {
+        server.enqueue(MockResponse().setBody("""{"id":9,"name":"Alien","owned":[],"missing":[{"tmdbId":"1","title":"Prometheus","year":2012,"posterUrl":null}]}"""))
+        server.enqueue(MockResponse().setResponseCode(404).setBody("""{"error":"Not found"}"""))
+        val found = api.collection(9)
+        assertEquals("/api/movies/9/collection", server.takeRequest().path)
+        assertEquals("Alien", found?.name)
+        assertEquals(1, found?.missing?.size)
+        assertNull(api.collection(10))
+    }
+
+    @Test
     fun putsProgressAsJson() = runTest {
         server.enqueue(MockResponse().setBody("""{"resumePositionMs":1830000,"watched":false,"futureField":1}"""))
         val result = api.saveProgress(7, PlaybackProgressUpdate(1_830_000, 6_960_000))

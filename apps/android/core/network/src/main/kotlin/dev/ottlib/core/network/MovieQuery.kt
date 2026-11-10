@@ -15,6 +15,8 @@ data class MovieQuery(
     val availableOnly: Boolean = true,
     val limit: Int = 48,
     val cursor: String? = null,
+    val actor: String? = null,
+    val collection: Long? = null,
 ) {
     internal fun applyTo(builder: HttpUrl.Builder): HttpUrl.Builder = builder.apply {
         search?.takeIf { it.isNotBlank() }?.let { addQueryParameter("search", it.trim()) }
@@ -22,6 +24,8 @@ data class MovieQuery(
         genre?.let { addQueryParameter("genre", it) }
         quality?.let { addQueryParameter("quality", it) }
         mediaType?.let { addQueryParameter("mediaType", it) }
+        actor?.let { addQueryParameter("actor", it) }
+        collection?.let { addQueryParameter("collection", it.toString()) }
         if (availableOnly) addQueryParameter("availability", "available")
         addQueryParameter("sort", sort.value)
         addQueryParameter("limit", limit.toString())
