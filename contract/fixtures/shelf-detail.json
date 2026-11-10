@@ -89,7 +89,41 @@
           "id": 1,
           "name": "Sci-Fi"
         }
-      ]
+      ],
+      "castMembers": [
+        {
+          "name": "Amy Adams",
+          "photoUrl": "/media/people/tmdb-person-amy.jpg"
+        },
+        {
+          "name": "Jeremy Renner",
+          "photoUrl": null
+        }
+      ],
+      "logoUrl": "/media/logos/tmdb-logo-arrival.png",
+      "ratings": [
+        {
+          "source": "imdb",
+          "value": 7.9,
+          "max": 10
+        },
+        {
+          "source": "rottenTomatoes",
+          "value": 94,
+          "max": 100
+        },
+        {
+          "source": "metacritic",
+          "value": 81,
+          "max": 100
+        }
+      ],
+      "collection": {
+        "id": 1234,
+        "name": "Arrival Collection"
+      },
+      "trailerKey": "tNZfcqGEmnQ",
+      "fresh": null
     }
   ]
 }

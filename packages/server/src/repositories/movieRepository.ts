@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
-import { formatResolution, type MatchCandidate, type MediaInfo, type Movie, type MovieListItem, type MovieListPage } from '@ottlib/shared';
+import { formatResolution, type MatchCandidate, type MovieFilterOptions, type MediaInfo, type Movie, type MovieListItem, type MovieListPage } from '@ottlib/shared';
+import { extrasOf, freshOf, libraryFirstAddedSql } from './movieExtrasMapping.js';
 
 interface MovieRow {
   id: number; canonical_path: string; folder_path: string; raw_filename: string; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null;
@@ -10,6 +11,8 @@ interface MovieRow {
   media_probe_status: string; container_format: string | null; duration_ms: number | null; video_width: number | null; video_height: number | null;
   video_codec: string | null; video_profile: string | null; video_bit_rate: number | null; hdr_format: string | null;
   picture_x: number | null; picture_y: number | null; picture_width: number | null; picture_height: number | null; picture_status: PictureStatus;
+  cast_members_json: string | null; logo_file: string | null; collection_id: number | null; collection_name: string | null; trailer_key: string | null; ratings_json: string | null;
+  library_first_added_at: string | null;
 }
 
 /** Where the real picture sits inside the video frame, in source pixels. */
@@ -18,11 +21,19 @@ export type PictureStatus = 'pending' | 'done' | 'none' | 'failed';
 /** A file waiting for picture-area detection; the frame fields are null until media info has been probed. */
 export interface PicturePendingRow { id: number; path: string; size: number; mtimeMs: number; durationMs: number | null; frameWidth: number | null; frameHeight: number | null }
 
-interface MovieListItemRow {
+const profileScopedJoins = `(SELECT ? AS profile_id) viewer CROSS JOIN movies m
+      LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.profile_id = viewer.profile_id
+      LEFT JOIN playback_progress pp ON pp.movie_id = m.id AND pp.profile_id = viewer.profile_id`;
+
+/** SELECT + FROM for list cards; its first `?` is the profile id. Callers append their own WHERE. */
+export const movieSummarySelect = `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
+      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, ${libraryFirstAddedSql}, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${profileScopedJoins}`;
+
+export interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
   resume_position_ms: number | null; duration_ms: number | null; metadata_media_type: string | null;
-  imdb_id: string | null; metadata_source: string | null; provider_id: string | null;
+  imdb_id: string | null; metadata_source: string | null; provider_id: string | null; library_first_added_at: string | null;
 }
 
 /** Every episode of a show shares this key, so a client can treat the show as one hideable title. */
@@ -53,8 +64,9 @@ export type ProbedMediaInfo = Omit<MediaInfo, 'tracks'>;
 export interface PlaybackMovie { id: number; path: string; folderPath: string; filename: string; missing: boolean }
 export interface TorrentMovieMatch { id: number; missing: boolean }
 export interface MetadataTarget { id: number; title: string; year: number | null; rawFilename: string; metadataSource: string | null; providerId: string | null; mediaType: 'movie' | 'tv' | null; imdbId: string | null }
-export interface MovieListQuery { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; mediaType?: 'movie' | 'tv'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; cursor?: string; limit?: number }
-export interface MovieFilterOptions { genres: string[]; actors: string[]; resolutions: string[]; audioLanguages: string[] }
+export interface MovieListQuery { search?: string; watched?: boolean; availability?: 'available' | 'unavailable'; mediaType?: 'movie' | 'tv'; sort?: string; genre?: string; actor?: string; quality?: string; audioLanguage?: string; minRating?: number; needsReview?: boolean; collection?: number; cursor?: string; limit?: number }
+/** A title the library owns in a collection; `providerId` is the provider's id for it (used to tell which collection parts are missing). */
+export interface CollectionTitleRow { id: number; providerId: string | null; source: string | null }
 
 type MovieSort = 'title' | 'year' | 'added' | 'quality';
 type MovieListCursor =
@@ -113,8 +125,17 @@ export class MovieRepository {
       genres: uniqueSorted(rows.flatMap((row) => JSON.parse(row.genres_json) as string[])),
       actors: uniqueSorted(rows.flatMap((row) => JSON.parse(row.cast_json) as string[])),
       resolutions: uniqueSorted(mediaRows.flatMap((row) => formatResolution(row.video_height) ?? [])).sort((left, right) => this.resolutionRank(right) - this.resolutionRank(left)),
-      audioLanguages: uniqueSorted(trackRows.map((row) => row.language))
+      audioLanguages: uniqueSorted(trackRows.map((row) => row.language)),
+      collections: this.db.prepare(`SELECT collection_id AS id, MAX(collection_name) AS name, COUNT(*) AS count FROM movies
+        WHERE missing = 0 AND collection_id IS NOT NULL GROUP BY collection_id HAVING COUNT(*) >= 2 ORDER BY MAX(collection_name) COLLATE NOCASE, collection_id`).all() as MovieFilterOptions['collections']
     };
+  }
+
+  /** Titles the library has in a collection, oldest first; copies marked missing are left out. */
+  public listCollectionTitles(collectionId: number): CollectionTitleRow[] {
+    const rows = this.db.prepare(`SELECT id, provider_id, metadata_source FROM movies WHERE collection_id = ? AND missing = 0
+      ORDER BY COALESCE(metadata_year, parsed_year) IS NULL, COALESCE(metadata_year, parsed_year), COALESCE(title_override, metadata_title, parsed_title) COLLATE NOCASE, id`).all(collectionId) as Array<{ id: number; provider_id: string | null; metadata_source: string | null }>;
+    return rows.map((row) => ({ id: row.id, providerId: row.provider_id, source: row.metadata_source }));
   }
 
   public get(id: number, profileId?: number): Movie | undefined {
@@ -426,21 +447,14 @@ export class MovieRepository {
   }
 
   private selectSql(): string {
-    return `SELECT m.*, f.path AS folder_path, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}
+    return `SELECT m.*, f.path AS folder_path, ${libraryFirstAddedSql}, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}
       JOIN folders f ON f.id = m.folder_id`;
   }
 
-  private summarySelectSql(): string {
-    return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}`;
-  }
+  private summarySelectSql(): string { return movieSummarySelect; }
 
   /** Binds the profile id once (first `?`) and exposes it to both per-profile joins. */
-  private profileScopedJoins(): string {
-    return `(SELECT ? AS profile_id) viewer CROSS JOIN movies m
-      LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.profile_id = viewer.profile_id
-      LEFT JOIN playback_progress pp ON pp.movie_id = m.id AND pp.profile_id = viewer.profile_id`;
-  }
+  private profileScopedJoins(): string { return profileScopedJoins; }
 
   private filters(query: MovieListQuery): { clauses: string[]; values: unknown[] } {
     const clauses = ['1 = 1']; const values: unknown[] = [];
@@ -457,6 +471,7 @@ export class MovieRepository {
     if (query.audioLanguage?.trim()) { clauses.push("EXISTS (SELECT 1 FROM media_tracks mt WHERE mt.movie_id = m.id AND mt.track_type = 'audio' AND LOWER(COALESCE(mt.language, '')) = ?)"); values.push(query.audioLanguage.trim().toLowerCase()); }
     if (query.minRating !== undefined) { clauses.push('m.rating >= ?'); values.push(query.minRating); }
     if (query.needsReview) clauses.push("m.metadata_status = 'suggested'");
+    if (query.collection !== undefined) { clauses.push('m.collection_id = ?'); values.push(query.collection); }
     return { clauses, values };
   }
 
@@ -540,15 +555,21 @@ export class MovieRepository {
       videoCodec: row.video_codec, videoProfile: row.video_profile, videoBitRate: row.video_bit_rate, hdrFormat: row.hdr_format, tracks: [],
       pictureWidth: row.picture_status === 'done' ? row.picture_width : null, pictureHeight: row.picture_status === 'done' ? row.picture_height : null
     } : null,
-    watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, missing: Boolean(row.missing), addedAt: row.added_at, shelves: []
+    watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, missing: Boolean(row.missing), addedAt: row.added_at, shelves: [],
+    ...extrasOf(row), fresh: freshOf(row)
   });
 
-  private mapListItem = (row: MovieListItemRow): MovieListItem => ({
+  private mapListItem = mapMovieListItem;
+}
+
+/** The list-card shape of a `movieSummarySelect` row; shared with repositories that list movies for other reasons. */
+export function mapMovieListItem(row: MovieListItemRow): MovieListItem {
+  return {
     nextUp: row.resume_position_ms === 0 ? (row.metadata_media_type === 'tv' ? 'episode' : 'collection') : null,
     id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format, showKey: showKeyOf(row),
     watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, durationMs: row.duration_ms,
-    missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: []
-  });
+    missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: [], fresh: freshOf(row)
+  };
 }

@@ -9,22 +9,24 @@ function mediaInfo(height: number, hdrFormat: string | null, language: string): 
   };
 }
 
+const noExtras: Pick<Movie, 'castMembers' | 'logoUrl' | 'ratings' | 'collection' | 'trailerKey' | 'fresh'> = { castMembers: [], logoUrl: null, ratings: [], collection: null, trailerKey: null, fresh: null };
+
 const movies: Movie[] = [
   {
     id: 1, title: 'Dragon Dawn', year: 2024, rawFilename: 'dragon-dawn.mkv', filePath: 'D:/media/dragon-dawn.mkv', titleOverride: null, overview: null, posterUrl: null,
     backdropUrl: null, genres: ['Action'], cast: ['Asha Patel'], rating: 8.1, runtime: null, imdbId: 'tt0000001', metadataStatus: 'matched', metadataSource: null, mediaType: 'movie', season: null, episode: null, fileSizeBytes: 1, watched: false, resumePositionMs: null,
-    missing: false, showKey: null, addedAt: '2025-01-01T00:00:00.000Z', shelves: [{ id: 7, name: 'Anime' }], mediaInfo: mediaInfo(2160, 'HDR10', 'jpn')
+    missing: false, showKey: null, addedAt: '2025-01-01T00:00:00.000Z', shelves: [{ id: 7, name: 'Anime' }], mediaInfo: mediaInfo(2160, 'HDR10', 'jpn'), ...noExtras
   },
   {
     id: 2, title: 'Quiet Night', year: 2022, rawFilename: 'quiet-night.mkv', filePath: 'D:/media/quiet-night.mkv', titleOverride: null, overview: null, posterUrl: null,
     backdropUrl: null, genres: ['Drama'], cast: ['Morgan Lee'], rating: 6.5, runtime: null, imdbId: null, metadataStatus: 'suggested', metadataSource: null, mediaType: null, season: null, episode: null, fileSizeBytes: 1, watched: true, resumePositionMs: null,
-    missing: true, showKey: null, addedAt: '2024-01-01T00:00:00.000Z', shelves: [], mediaInfo: mediaInfo(1080, null, 'eng')
+    missing: true, showKey: null, addedAt: '2024-01-01T00:00:00.000Z', shelves: [], mediaInfo: mediaInfo(1080, null, 'eng'), ...noExtras
   }
 ];
 
 describe('shelf movie filters', () => {
   it('derives filter options from the titles in the shelf', () => {
-    expect(shelfMovieFilterOptions(movies)).toEqual({ genres: ['Action', 'Drama'], actors: ['Asha Patel', 'Morgan Lee'], resolutions: ['4K', '1080p'], audioLanguages: ['eng', 'jpn'] });
+    expect(shelfMovieFilterOptions(movies)).toEqual({ genres: ['Action', 'Drama'], actors: ['Asha Patel', 'Morgan Lee'], resolutions: ['4K', '1080p'], audioLanguages: ['eng', 'jpn'], collections: [] });
   });
 
   it('filters shelf titles and keeps the poster card fields', () => {

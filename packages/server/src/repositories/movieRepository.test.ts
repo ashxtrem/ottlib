@@ -75,7 +75,7 @@ describe('MovieRepository filters', () => {
       expect(repository.list(undefined, { search: 'https://www.imdb.com/title/tt1234567/' })).toHaveLength(1);
       expect(repository.list(undefined, { mediaType: 'movie' })).toHaveLength(1);
       expect(repository.list(undefined, { mediaType: 'tv' })).toHaveLength(1);
-      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: [], audioLanguages: [] });
+      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: [], audioLanguages: [], collections: [] });
     } finally {
       close();
     }
@@ -200,7 +200,7 @@ describe('MovieRepository filters', () => {
       expect(repository.list(undefined, { quality: '1080p' })).toHaveLength(0);
       expect(repository.list(undefined, { audioLanguage: 'hin' })).toHaveLength(1);
       expect(repository.list(undefined, { audioLanguage: 'eng' })).toHaveLength(0);
-      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: ['4K'], audioLanguages: ['hin'] });
+      expect(repository.listFilterOptions()).toEqual({ genres: ['Drama'], actors: ['Asha Patel'], resolutions: ['4K'], audioLanguages: ['hin'], collections: [] });
     } finally {
       close();
     }
@@ -232,7 +232,7 @@ describe('MovieRepository filters', () => {
       expect(first.nextCursor).toEqual(expect.any(String));
       expect(second).toMatchObject({ total: 3, nextCursor: null, items: [{ title: 'Example' }] });
       expect([...first.items, ...second.items].map((movie) => movie.title)).toEqual(['Bravo', 'Charlie', 'Example']);
-      expect(Object.keys(first.items[0]).sort()).toEqual(['durationMs', 'hdrFormat', 'id', 'metadataStatus', 'missing', 'nextUp', 'posterUrl', 'resolution', 'resumePositionMs', 'shelves', 'showKey', 'title', 'watched', 'year']);
+      expect(Object.keys(first.items[0]).sort()).toEqual(['durationMs', 'fresh', 'hdrFormat', 'id', 'metadataStatus', 'missing', 'nextUp', 'posterUrl', 'resolution', 'resumePositionMs', 'shelves', 'showKey', 'title', 'watched', 'year']);
     } finally {
       close();
     }

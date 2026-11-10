@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { FolderRepository } from './repositories/folderRepository.js';
 import { MovieRepository } from './repositories/movieRepository.js';
+import { MovieExtrasRepository } from './repositories/movieExtrasRepository.js';
 import { ScanRunRepository } from './repositories/scanRunRepository.js';
 import { SettingRepository } from './repositories/settingRepository.js';
 import { WatchStateRepository } from './repositories/watchStateRepository.js';
@@ -49,6 +50,9 @@ import { registerFolderRoutes } from './routes/folders.js';
 import { registerLibraryRoutes } from './routes/library.js';
 import { LibraryDeletionService } from './services/libraryDeletionService.js';
 import { registerRecommendationRoutes } from './routes/recommendations.js';
+import { registerCollectionRoutes } from './routes/collections.js';
+import { CollectionService } from './services/collectionService.js';
+import { CollectionRepository } from './repositories/collectionRepository.js';
 import { RecommendationService } from './services/recommendations/recommendationService.js';
 import { RecommendationSignalRepository } from './repositories/recommendationSignalRepository.js';
 import { registerPlaybackRoutes } from './routes/playback.js';
@@ -67,6 +71,9 @@ import { TorrentSearchService } from './services/torrentSearchService.js';
 import { TorrentHandoffService } from './services/torrentHandoffService.js';
 import { TorrentConnectionService } from './services/torrentConnectionService.js';
 import { TorrentDownloadService } from './services/torrentDownloadService.js';
+import { releasePreferences } from './services/torrent/releaseScore.js';
+import { UpgradeCandidateService } from './services/torrent/upgradeCandidateService.js';
+import { MovieUpgradeRepository } from './repositories/movieUpgradeRepository.js';
 import { DownloadedSubtitleRepository } from './repositories/downloadedSubtitleRepository.js';
 import { SubtitleLibraryService } from './services/subtitles/subtitleLibraryService.js';
 import { SubtitleService } from './services/subtitles/subtitleService.js';
@@ -91,6 +98,18 @@ import { AutoSkipRepository } from './repositories/autoSkipRepository.js';
 import { CreditsResolver } from './services/credits/creditsResolver.js';
 import { CreditsEditService } from './services/credits/creditsEditService.js';
 import { registerCreditsRoutes } from './routes/credits.js';
+import { BackupRepository } from './repositories/backupRepository.js';
+import { BackupScheduler } from './services/backupScheduler.js';
+import { BackupService } from './services/backupService.js';
+import { registerBackupRoutes } from './routes/backups.js';
+import { HealthService } from './services/health/healthService.js';
+import { healthChecks } from './services/health/healthChecks.js';
+import { LatestRelease } from './services/health/latestRelease.js';
+import { checkTmdbKey } from './services/settingsService.js';
+import { readAppVersion } from './config/appVersion.js';
+import { registerHealthRoutes } from './routes/health.js';
+import { startTitleExtrasBackfill } from './services/titleExtrasBackfill.js';
+import { createMetadataProviders } from './providers/metadata/metadataProviders.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -100,6 +119,8 @@ declare module 'fastify' {
     pictureArea: PictureAreaService;
     /** The credits chapter pass; index.ts starts it at server start and each scan starts it again. */
     credits: CreditsService;
+    /** Starts a metadata refresh for matched titles without extras, unless a metadata run is active; index.ts calls it once after listening. */
+    startTitleExtrasBackfill: () => boolean;
   }
 }
 
@@ -114,11 +135,13 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     try { done(null, JSON.parse(text)); } catch (error) { done(error as Error); }
   });
   const movies = new MovieRepository(db); const folders = new FolderRepository(db); const settings = new SettingRepository(db); const watches = new WatchStateRepository(db); const runs = new ScanRunRepository(db); const shelfRecords = new ShelfRepository(db); const shelfMovies = new ShelfMovieRepository(db); const mediaTracks = new MediaTrackRepository(db); runs.failAbandonedRuns();
-  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
+  const movieExtras = new MovieExtrasRepository(db);
+  const posters = new PosterCacheService(appDataPath);
+  const metadata = new MetadataMatchService(movies, settings, posters, runs, movieExtras, (message) => app.log.warn(message));
   const ffmpeg = overrides.ffmpeg ?? new FfmpegLocator(); const locate = () => ffmpeg.locate();
   const pictureArea = new PictureAreaService(movies, locate, undefined, (message) => app.log.warn(message));
   const credits = new CreditsService(movies, undefined, (message) => app.log.warn(message));
-  const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo, pictureArea, credits); const scheduler = new SchedulerService(settings, scanner); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
+  const mediaInfo = new MediaInfoService(movies, mediaTracks, new MediaProbeService()); const scanner = new ScanService(folders, movies, runs, settings, metadata, mediaInfo, pictureArea, credits); const scheduler = new SchedulerService(settings, scanner); const backups = new BackupService(new BackupRepository(db), appDataPath); const backupScheduler = new BackupScheduler(settings, backups, (message) => app.log.warn(message)); const pins = new AccessPinService(new AccessPinRepository(db), new AuthSessionRepository(db));
   const subtitleLibrary = new SubtitleLibraryService(new DownloadedSubtitleRepository(db), appDataPath, id => pins.streamQuery(id));
   const encoderSetting = () => settings.get().transcodeEncoder;
   const registries = new WeakMap<FfmpegBinary, EncoderRegistry>();
@@ -129,17 +152,22 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const autoSkip = new AutoSkipRepository(db); const creditsResolver = new CreditsResolver(movies, autoSkip);
   const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary, undefined, planner, embeddedSubtitles, creditsResolver);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
-  const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured()); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
+  const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured(), () => releasePreferences(settings.get())); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
+  const appVersion = readAppVersion(); const latestRelease = new LatestRelease();
+  const health = new HealthService(() => healthChecks({ appDataPath, folders: () => folders.list().map((folder) => folder.path), locateFfmpeg: locate, tmdbKey: () => settings.get().tmdbApiKey, testTmdbKey: checkTmdbKey, torrentSearchEnabled: () => settings.get().torrentSearchEnabled, testQbittorrent: () => torrentConnection.test(), backups, idsMissingExtras: () => movieExtras.idsMissingExtras(), update: { version: () => appVersion, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() } }));
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
-  registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerHideRoutes(app, new HideService(new HideRepository(db))); registerPlayRoutes(app, movies, playHistory); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler));
+  registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerHideRoutes(app, new HideService(new HideRepository(db))); registerPlayRoutes(app, movies, playHistory); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler, backupScheduler));
+  registerCollectionRoutes(app, new CollectionService(movies, new CollectionRepository(db), posters, () => settings.get()));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback); registerEmbeddedSubtitleRoutes(app, playback, embeddedSubtitles);
   registerCreditsRoutes(app, new CreditsEditService(movies, autoSkip, creditsResolver));
   registerHlsRoutes(app, hlsSessions, new TranscodeInfoService(locate, encodersFor, encoderSetting));
   registerFrameRoutes(app, new FrameService(playback, movies, locate));
-  registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, () => settings.get().torrentSearchEnabled);
+  registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, new UpgradeCandidateService(new MovieUpgradeRepository(db), () => settings.get()), () => settings.get().torrentSearchEnabled);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
+  registerBackupRoutes(app, backups);
+  registerHealthRoutes(app, health);
   app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
   registerMediaStatic(app, appDataPath);
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');
@@ -147,8 +175,9 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     app.register(fastifyStatic, { root: clientDist, prefix: '/' });
     app.setNotFoundHandler((request, reply) => request.raw.url?.startsWith('/api/') || request.raw.url?.startsWith('/media/') ? reply.code(404).send({ error: 'Not found' }) : reply.sendFile('index.html'));
   }
-  scheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop());
+  scheduler.refresh(); backupScheduler.refresh(); void metadata.startMissingMediaTypeBackfill(); app.addHook('onClose', () => scheduler.stop()); app.addHook('onClose', () => backupScheduler.stop());
   app.addHook('onClose', () => hlsSessions.shutdown()); app.decorate('hlsSessions', hlsSessions); app.decorate('pictureArea', pictureArea); app.decorate('credits', credits);
+  app.decorate('startTitleExtrasBackfill', () => startTitleExtrasBackfill({ hasMetadataProvider: () => createMetadataProviders(settings.get()).length > 0, idsMissingExtras: () => movieExtras.idsMissingExtras(), startSelectedRefresh: (ids) => metadata.startSelectedMetadataRefresh(ids), log: (message) => app.log.info(message) }));
   app.setErrorHandler((error, _request, reply) => error instanceof ProfileError ? sendProfileError(reply, error) : reply.code(400).send({ error: error instanceof Error ? error.message : 'Invalid request' }));
   return app;
 }

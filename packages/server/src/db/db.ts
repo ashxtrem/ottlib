@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { SCHEMA_VERSION, backupFileName, backupsDir, pruneBackups, readSchemaVersion, vacuumInto, writeSchemaVersion } from './backupFile.js';
 import { initialMigration } from './migrations/001_initial.js';
 import { matchCandidatesMigration } from './migrations/002_match_candidates.js';
 import { ensureCandidateMediaType } from './migrations/003_candidate_media_type.js';
@@ -24,13 +25,31 @@ import { ensureProfileScope } from './migrations/020_profile_scope.js';
 import { ensureStreamSecretRotated } from './migrations/021_stream_secret_rotation.js';
 import { ensurePictureArea } from './migrations/022_picture_area.js';
 import { ensureCredits } from './migrations/023_credits.js';
+import { ensureTitleExtras } from './migrations/024_title_extras.js';
 
-export function createDatabase(appDataPath: string): Database.Database {
+export interface CreateDatabaseOptions {
+  /** Copy an existing library to `backups/pre-update-*.sqlite` before migrating it to a newer schema. Only the server start passes true. */
+  backupBeforeMigrate?: boolean;
+}
+
+const KEEP_PRE_UPDATE_BACKUPS = 3;
+
+function backupBeforeUpdate(db: Database.Database, appDataPath: string): void {
+  const existing = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'movies'").get();
+  if (!existing || readSchemaVersion(db) >= SCHEMA_VERSION) return;
+  const dir = backupsDir(appDataPath);
+  mkdirSync(dir, { recursive: true });
+  vacuumInto(db, join(dir, backupFileName('pre-update')));
+  pruneBackups(dir, 'pre-update', KEEP_PRE_UPDATE_BACKUPS);
+}
+
+export function createDatabase(appDataPath: string, options: CreateDatabaseOptions = {}): Database.Database {
   mkdirSync(appDataPath, { recursive: true });
   const db = new Database(join(appDataPath, 'library.sqlite'));
   db.pragma('foreign_keys = ON');
   db.pragma('journal_mode = WAL');
   db.pragma('busy_timeout = 5000');
+  if (options.backupBeforeMigrate) backupBeforeUpdate(db, appDataPath);
   db.exec(initialMigration);
   db.exec(matchCandidatesMigration);
   ensureCandidateMediaType(db);
@@ -54,5 +73,8 @@ export function createDatabase(appDataPath: string): Database.Database {
   ensureStreamSecretRotated(db);
   ensurePictureArea(db);
   ensureCredits(db);
+  ensureTitleExtras(db);
+  // A library already on a newer schema (opened after a downgrade) keeps its version.
+  if (readSchemaVersion(db) < SCHEMA_VERSION) writeSchemaVersion(db, SCHEMA_VERSION);
   return db;
 }
