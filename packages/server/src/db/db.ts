@@ -25,6 +25,7 @@ import { ensureProfileScope } from './migrations/020_profile_scope.js';
 import { ensureStreamSecretRotated } from './migrations/021_stream_secret_rotation.js';
 import { ensurePictureArea } from './migrations/022_picture_area.js';
 import { ensureCredits } from './migrations/023_credits.js';
+import { ensureTitleExtras } from './migrations/024_title_extras.js';
 
 export interface CreateDatabaseOptions {
   /** Copy an existing library to `backups/pre-update-*.sqlite` before migrating it to a newer schema. Only the server start passes true. */
@@ -72,6 +73,8 @@ export function createDatabase(appDataPath: string, options: CreateDatabaseOptio
   ensureStreamSecretRotated(db);
   ensurePictureArea(db);
   ensureCredits(db);
-  writeSchemaVersion(db, SCHEMA_VERSION);
+  ensureTitleExtras(db);
+  // A library already on a newer schema (opened after a downgrade) keeps its version.
+  if (readSchemaVersion(db) < SCHEMA_VERSION) writeSchemaVersion(db, SCHEMA_VERSION);
   return db;
 }

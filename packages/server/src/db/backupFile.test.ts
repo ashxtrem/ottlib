@@ -91,6 +91,16 @@ describe('createDatabase backups', () => {
     expect(existsSync(backupsDir(dir))).toBe(false);
   });
 
+  it('keeps a newer schema version after a downgrade', () => {
+    const dir = tempDir();
+    const newer = createDatabase(dir);
+    writeSchemaVersion(newer, SCHEMA_VERSION + 3);
+    newer.close();
+    const db = createDatabase(dir);
+    expect(readSchemaVersion(db)).toBe(SCHEMA_VERSION + 3);
+    db.close();
+  });
+
   it('keeps only the newest three pre-update backups', () => {
     const dir = tempDir();
     mkdirSync(backupsDir(dir), { recursive: true });
