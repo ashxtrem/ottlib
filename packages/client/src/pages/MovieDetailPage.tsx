@@ -13,7 +13,7 @@ import { NoArtworkCard } from '../components/NoArtworkCard';
 import { ErrorState } from '../components/ErrorState';
 import { MetadataRefreshDialog } from '../components/MetadataRefreshDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
-import { SkeletonDetail } from '../components/Skeleton';
+import { DelayedSkeleton, SkeletonDetail } from '../components/Skeleton';
 import { PosterImage } from '../components/PosterImage';
 import { DuplicateCompareDialog } from '../components/DuplicateCompareDialog';
 import { SubtitleDialog } from '../components/SubtitleDialog';
@@ -71,7 +71,7 @@ export function MovieDetailPage() {
   const needsReview = movie.data?.metadataStatus === 'suggested';
   const candidates = useMatchCandidates(id, needsReview && manualCandidates === null);
 
-  if (movie.isLoading) return <SkeletonDetail />;
+  if (movie.isLoading) return <DelayedSkeleton><SkeletonDetail /></DelayedSkeleton>;
   if (!movie.data) return <ErrorState resource="title" error={movie.error} retrying={movie.isFetching} onRetry={movie.refetch} />;
 
   const item = movie.data;

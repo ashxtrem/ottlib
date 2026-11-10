@@ -6,7 +6,7 @@ import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
 import { LibraryFilters } from './LibraryFilters';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Modal } from './Modal';
-import { SkeletonPosterGrid } from './Skeleton';
+import { DelayedSkeleton, SkeletonPosterGrid } from './Skeleton';
 import { PosterImage } from './PosterImage';
 
 interface ShelfSelectionDialogProps {
@@ -74,11 +74,11 @@ export function ShelfSelectionDialog({ open, title, confirmLabel, requireName = 
       <div className="flex flex-wrap items-center gap-3"><p className="text-sm text-muted">{selectedIds.length} title{selectedIds.length === 1 ? '' : 's'} selected</p><button type="button" onClick={selectAllShown} disabled={!movies.data?.items.length} className="text-sm text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-50">Select all shown</button>{selectedIds.length > 0 && <button type="button" onClick={() => setSelectedIds([])} className="text-sm text-muted hover:text-foreground hover:underline">Clear selection</button>}</div>
     </div>
     <div className="min-h-0 flex-1 overflow-y-auto p-5">
-      {movies.isLoading && <SkeletonPosterGrid count={8} compact />}
+      {movies.isLoading && <DelayedSkeleton><SkeletonPosterGrid count={8} compact /></DelayedSkeleton>}
       {movies.error && <p className="text-error">{movies.error.message}</p>}
       {movies.isSuccess && movies.data?.items.length === 0 && <p className="text-muted">No titles match this search.</p>}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3">{movies.data?.items.map((movie) => <SelectableMovieCard key={movie.id} movie={movie} checked={selected.has(movie.id)} onToggle={() => toggle(movie)} />)}</div>
-      {movies.hasNextPage && <div ref={loadMore} className="py-6 text-center text-sm text-muted">{movies.isFetchingNextPage ? <SkeletonPosterGrid count={4} compact /> : 'Scroll for more titles'}</div>}
+      {movies.hasNextPage && <div ref={loadMore} className="py-6 text-center text-sm text-muted">{movies.isFetchingNextPage ? <DelayedSkeleton><SkeletonPosterGrid count={4} compact /></DelayedSkeleton> : 'Scroll for more titles'}</div>}
     </div>
   </Modal>;
 }

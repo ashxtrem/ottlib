@@ -14,7 +14,7 @@ import { schedulePresetFor, schedulePresets, type SchedulePresetId, useScheduleV
 import { MetadataRefreshDialog } from '../components/MetadataRefreshDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
 import { QbittorrentSettingsSection } from '../components/QbittorrentSettingsSection';
-import { SkeletonSettings } from '../components/Skeleton';
+import { DelayedSkeleton, SkeletonSettings } from '../components/Skeleton';
 import { useSuccessPulse } from '../hooks/useSuccessPulse';
 import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection';
 import { ProfilesSettingsSection } from '../components/ProfilesSettingsSection';
@@ -59,7 +59,7 @@ export function SettingsPage() {
     setCustomScheduleCron(settings.data.scheduleCron);
   }, [settings.data]);
 
-  if (!settings.data) return <SkeletonSettings />;
+  if (!settings.data) return <DelayedSkeleton><SkeletonSettings /></DelayedSkeleton>;
 
   const current = settings.data;
   const scheduleCron = schedulePreset === 'custom' ? customScheduleCron.trim() : schedulePresets.find((preset) => preset.id === schedulePreset)!.cron;

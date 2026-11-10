@@ -12,7 +12,7 @@ import { ShelfSelectionDialog } from '../components/ShelfSelectionDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
 import { useShelf, useShelfActions } from '../hooks/useShelves';
 import { filterShelfMovies, initialShelfMovieFilters, shelfMovieFilterOptions, shelfSortOptions, toShelfPosterItems, type ShelfMovieFilters } from '../utils/shelfMovieFilters';
-import { SkeletonPosterGrid } from '../components/Skeleton';
+import { DelayedSkeleton, SkeletonPosterGrid } from '../components/Skeleton';
 
 export function ShelfDetailPage() {
   const { id } = useParams(); const { state: locationState } = useLocation(); const shelf = useShelf(id); const actions = useShelfActions(); const metadataRefresh = useMetadataRefresh(); const navigate = useNavigate();
@@ -36,7 +36,7 @@ export function ShelfDetailPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [restoreShelfScrollY, shelf.isSuccess]);
 
-  if (shelf.isLoading) return <SkeletonPosterGrid />;
+  if (shelf.isLoading) return <DelayedSkeleton><SkeletonPosterGrid /></DelayedSkeleton>;
   if (!shelf.data) return <ErrorState resource="shelf" error={shelf.error} retrying={shelf.isFetching} onRetry={shelf.refetch} />;
 
   const item = shelf.data;
