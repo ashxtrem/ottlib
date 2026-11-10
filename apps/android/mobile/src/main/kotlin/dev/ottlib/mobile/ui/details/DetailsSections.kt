@@ -76,10 +76,12 @@ private fun SecondaryButton(label: String, icon: ImageVector, enabled: Boolean, 
 }
 
 @Composable
-fun MovieInfo(movie: Movie) {
+fun MovieInfo(movie: Movie, actions: DetailsActions) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         movie.overview?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-        if (movie.cast.isNotEmpty()) Text("Starring ${movie.cast.take(6).joinToString(", ")}", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted)
+        // Photo cards when the server has the cast with photos; the plain names line otherwise.
+        if (actions.extras.castMembers.isNotEmpty()) CastRow(actions.extras.castMembers, actions.onOpenActor)
+        else if (movie.cast.isNotEmpty()) Text("Starring ${movie.cast.take(6).joinToString(", ")}", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted)
         TechnicalDetails(movie)
     }
 }

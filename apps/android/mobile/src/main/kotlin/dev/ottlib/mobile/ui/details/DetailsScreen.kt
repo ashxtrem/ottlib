@@ -27,7 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.ottlib.core.model.CastMember
+import dev.ottlib.core.model.OutsideRating
 import dev.ottlib.core.presentation.LoadState
+import dev.ottlib.core.presentation.details.CollectionSummary
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.details.DetailsViewModel
 import dev.ottlib.core.presentation.metadata.MetadataViewModel
@@ -39,7 +42,14 @@ import dev.ottlib.mobile.ui.components.WindowWidth
 import dev.ottlib.mobile.ui.components.windowWidth
 
 @Composable
-fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit, onOpenMovie: (Long) -> Unit, onBack: () -> Unit) {
+fun DetailsScreen(
+    movieId: Long,
+    onPlay: (id: Long, fromStart: Boolean) -> Unit,
+    onOpenMovie: (Long) -> Unit,
+    onOpenActor: (String) -> Unit,
+    onOpenCollection: (id: Long, name: String) -> Unit,
+    onBack: () -> Unit,
+) {
     val container = appContainer()
     val viewModel = viewModel(key = "details-$movieId") { DetailsViewModel(container.api, container.continueWatching, container.appScope, movieId, container.playbackSequence, container.hiddenTitles) }
     val state by viewModel.movie.collectAsStateWithLifecycle()
@@ -47,6 +57,10 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
     val nextMovie by viewModel.nextMovie.collectAsStateWithLifecycle()
     val hidden by viewModel.hidden.collectAsStateWithLifecycle()
     val recommendations by viewModel.recommendations.collectAsStateWithLifecycle()
+    val logoUrl by viewModel.logoUrl.collectAsStateWithLifecycle()
+    val ratings by viewModel.ratings.collectAsStateWithLifecycle()
+    val castMembers by viewModel.castMembers.collectAsStateWithLifecycle()
+    val collection by viewModel.collection.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var menuOpen by rememberSaveable(movieId) { mutableStateOf(false) }
     var metadataOpen by rememberSaveable(movieId) { mutableStateOf(false) }
@@ -73,6 +87,9 @@ fun DetailsScreen(movieId: Long, onPlay: (id: Long, fromStart: Boolean) -> Unit,
                         val url = viewModel.streamUrl()
                         if (url == null || !openInExternalPlayer(context, url, current.value.title)) Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
                     },
+                    extras = DetailsExtras(logoUrl, ratings, castMembers, collection),
+                    onOpenActor = onOpenActor,
+                    onOpenCollection = onOpenCollection,
                 )
                 val imageUrl = container.api.resolve(current.value.backdropUrl ?: current.value.posterUrl)
                 val posterUrl = container.api.resolve(current.value.posterUrl)
@@ -120,4 +137,15 @@ class DetailsActions(
     val onPlayElsewhere: () -> Unit,
     val recommendations: List<dev.ottlib.core.presentation.details.RecommendedPoster>,
     val onOpenMovie: (Long) -> Unit,
+    val extras: DetailsExtras = DetailsExtras(),
+    val onOpenActor: (String) -> Unit = {},
+    val onOpenCollection: (id: Long, name: String) -> Unit = { _, _ -> },
+)
+
+/** The richer title data shown when the server has it: logo art, outside ratings, cast photos and the collection. */
+data class DetailsExtras(
+    val logoUrl: String? = null,
+    val ratings: List<OutsideRating> = emptyList(),
+    val castMembers: List<CastMember> = emptyList(),
+    val collection: CollectionSummary? = null,
 )
