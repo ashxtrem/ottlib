@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { FolderRepository } from './repositories/folderRepository.js';
 import { MovieRepository } from './repositories/movieRepository.js';
+import { MovieExtrasRepository } from './repositories/movieExtrasRepository.js';
 import { ScanRunRepository } from './repositories/scanRunRepository.js';
 import { SettingRepository } from './repositories/settingRepository.js';
 import { WatchStateRepository } from './repositories/watchStateRepository.js';
@@ -118,7 +119,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
     try { done(null, JSON.parse(text)); } catch (error) { done(error as Error); }
   });
   const movies = new MovieRepository(db); const folders = new FolderRepository(db); const settings = new SettingRepository(db); const watches = new WatchStateRepository(db); const runs = new ScanRunRepository(db); const shelfRecords = new ShelfRepository(db); const shelfMovies = new ShelfMovieRepository(db); const mediaTracks = new MediaTrackRepository(db); runs.failAbandonedRuns();
-  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs);
+  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs, new MovieExtrasRepository(db));
   const ffmpeg = overrides.ffmpeg ?? new FfmpegLocator(); const locate = () => ffmpeg.locate();
   const pictureArea = new PictureAreaService(movies, locate, undefined, (message) => app.log.warn(message));
   const credits = new CreditsService(movies, undefined, (message) => app.log.warn(message));
