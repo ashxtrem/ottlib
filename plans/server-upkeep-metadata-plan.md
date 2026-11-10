@@ -226,3 +226,15 @@ index. T4 touches only its own file and can run alongside anything. T3 and T5 ca
 
 ## 13. Progress log
 - 2026-11-10: plan written and approved.
+- 2026-11-10: built by /plan-runner (T1–T8). Each task got a review, then a full check (web build plus 900 tests across
+  the 3 workspaces, the Android unit tests, and the :tv/:mobile compiles), then two gate passes. Changes from the plan:
+  - Backups and the restore marker sit beside `library.sqlite` in the data dir.
+  - Restore stages the copy, checkpoints the live WAL first, and rolls back on failure.
+  - `user_version` is never lowered.
+  - The backfill only takes titles that have a provider id, and skips when no metadata provider is set.
+  - When a refresh lacks extras, the stored ones are kept.
+  - A ratings error that isn't the request limit defers that title by 1 day.
+  - A collection whose TMDb fetch fails returns its stale cached parts if it has any.
+  - Upgrade candidates judge resolution by width as well, so scope pictures aren't flagged.
+  - The `filter-options` fixture records `collections: []`; the non-empty case is tested in routes/collections.test.ts.
+  - Release score weights: resolution 50/25/15, codec 20, seeders up to 20 (log10, full at 1000), BluRay/WEB-DL/WEBRip 10.
