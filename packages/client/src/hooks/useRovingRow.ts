@@ -59,6 +59,8 @@ export function useRovingRow(listRef: RefObject<HTMLElement | null>, count: numb
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    // React bubbles keys from portals (hover preview, trailer dialog) through the row: only keys from the row's own cards move it.
+    if (indexOf(event.target) < 0) return;
     if (isTextField(event.target as Element) || isTextField(document.activeElement)) return;
     const items = listRef.current ? Array.from(listRef.current.children) : [];
     const current = indexOf(event.target);
