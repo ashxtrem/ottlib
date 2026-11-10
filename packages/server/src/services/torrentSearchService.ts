@@ -4,6 +4,7 @@ import { QbittorrentSearch } from '../providers/torrent/qbittorrentSearch.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
 import { parseReleaseName } from './scanner/titleParser.js';
 import { releaseQuality } from './torrent/releaseQuality.js';
+import { noReleasePreferences, releaseScore, type ReleasePreferences } from './torrent/releaseScore.js';
 
 const resultPageSize = 100;
 const trackedSearchMaxAgeMs = 10 * 60_000;
@@ -19,7 +20,12 @@ interface TrackedSearch {
 export class TorrentSearchService {
   private readonly tracked = new Map<string, TrackedSearch>();
 
-  public constructor(private readonly search: QbittorrentSearch, private readonly movies: MovieRepository, private readonly configured: () => boolean) {}
+  public constructor(
+    private readonly search: QbittorrentSearch,
+    private readonly movies: MovieRepository,
+    private readonly configured: () => boolean,
+    private readonly preferences: () => ReleasePreferences = () => noReleasePreferences
+  ) {}
 
   public async start(query: string, year?: number): Promise<{ searchId?: string; status: 'running' | 'not-configured' | 'unreachable'; error?: string }> {
     if (!this.configured()) return { status: 'not-configured' };
@@ -95,6 +101,7 @@ export class TorrentSearchService {
       const fileName = stringField(item, ['fileName', 'file_name', 'name']).trim() || fileUrl;
       const parsed = parseReleaseName(fileName);
       const match = this.movies.findForTorrentMatch(parsed.title, parsed.year);
+      const quality = releaseQuality(fileName);
       const result: TorrentResult = {
         fileName,
         fileSize: nonNegativeNumber(item.fileSize ?? item.file_size),
@@ -105,7 +112,9 @@ export class TorrentSearchService {
         descrLink: optionalString(item.descrLink ?? item.descr_link),
         engines: [stringField(item, ['engineName', 'engine_name']).trim()].filter(Boolean),
         publishedAt: optionalString(item.pubDate ?? item.publishedAt ?? item.date),
-        quality: releaseQuality(fileName),
+        quality,
+        score: null,
+        bestMatch: false,
         libraryStatus: match ? (match.missing ? 'missing' : 'owned') : 'new'
       };
       const key = normalizeTorrentUrl(fileUrl);
@@ -115,7 +124,17 @@ export class TorrentSearchService {
       if (seederRank(result.nbSeeders) > seederRank(existing.nbSeeders)) deduped.set(key, { ...result, engines });
       else deduped.set(key, { ...existing, engines });
     }
-    return [...deduped.values()].sort((left, right) => seederRank(right.nbSeeders) - seederRank(left.nbSeeders) || left.fileName.localeCompare(right.fileName));
+    const sorted = [...deduped.values()].sort((left, right) => seederRank(right.nbSeeders) - seederRank(left.nbSeeders) || left.fileName.localeCompare(right.fileName));
+    return this.withScores(sorted);
+  }
+
+  /** Scores every result against the preferences and flags the one top score above 0; the order stays seeders-first. */
+  private withScores(results: TorrentResult[]): TorrentResult[] {
+    const preferences = this.preferences();
+    const scored = results.map((result) => ({ ...result, score: releaseScore(result, preferences) }));
+    const top = scored.reduce((best, result) => Math.max(best, result.score ?? 0), 0);
+    const bestIndex = top > 0 ? scored.findIndex((result) => result.score === top) : -1;
+    return scored.map((result, index) => ({ ...result, bestMatch: index === bestIndex }));
   }
 
   private state(tracked: TrackedSearch): TorrentSearchState {

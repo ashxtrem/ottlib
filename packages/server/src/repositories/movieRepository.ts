@@ -21,7 +21,15 @@ export type PictureStatus = 'pending' | 'done' | 'none' | 'failed';
 /** A file waiting for picture-area detection; the frame fields are null until media info has been probed. */
 export interface PicturePendingRow { id: number; path: string; size: number; mtimeMs: number; durationMs: number | null; frameWidth: number | null; frameHeight: number | null }
 
-interface MovieListItemRow {
+const profileScopedJoins = `(SELECT ? AS profile_id) viewer CROSS JOIN movies m
+      LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.profile_id = viewer.profile_id
+      LEFT JOIN playback_progress pp ON pp.movie_id = m.id AND pp.profile_id = viewer.profile_id`;
+
+/** SELECT + FROM for list cards; its first `?` is the profile id. Callers append their own WHERE. */
+export const movieSummarySelect = `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
+      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, ${libraryFirstAddedSql}, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${profileScopedJoins}`;
+
+export interface MovieListItemRow {
   id: number; parsed_title: string; parsed_year: number | null; metadata_title: string | null; metadata_year: number | null; title_override: string | null; poster_file: string | null;
   metadata_status: Movie['metadataStatus']; watched: number; missing: number; added_at: string; video_height: number | null; hdr_format: string | null;
   resume_position_ms: number | null; duration_ms: number | null; metadata_media_type: string | null;
@@ -443,17 +451,10 @@ export class MovieRepository {
       JOIN folders f ON f.id = m.folder_id`;
   }
 
-  private summarySelectSql(): string {
-    return `SELECT m.id, m.parsed_title, m.parsed_year, m.metadata_title, m.metadata_year, m.title_override, m.poster_file, m.metadata_status, m.added_at,
-      m.missing, m.metadata_media_type, m.imdb_id, m.metadata_source, m.provider_id, m.video_height, m.hdr_format, m.duration_ms, ${libraryFirstAddedSql}, COALESCE(ws.watched, 0) AS watched, pp.position_ms AS resume_position_ms FROM ${this.profileScopedJoins()}`;
-  }
+  private summarySelectSql(): string { return movieSummarySelect; }
 
   /** Binds the profile id once (first `?`) and exposes it to both per-profile joins. */
-  private profileScopedJoins(): string {
-    return `(SELECT ? AS profile_id) viewer CROSS JOIN movies m
-      LEFT JOIN movie_watch_state ws ON ws.movie_id = m.id AND ws.profile_id = viewer.profile_id
-      LEFT JOIN playback_progress pp ON pp.movie_id = m.id AND pp.profile_id = viewer.profile_id`;
-  }
+  private profileScopedJoins(): string { return profileScopedJoins; }
 
   private filters(query: MovieListQuery): { clauses: string[]; values: unknown[] } {
     const clauses = ['1 = 1']; const values: unknown[] = [];
@@ -558,12 +559,17 @@ export class MovieRepository {
     ...extrasOf(row), fresh: freshOf(row)
   });
 
-  private mapListItem = (row: MovieListItemRow): MovieListItem => ({
+  private mapListItem = mapMovieListItem;
+}
+
+/** The list-card shape of a `movieSummarySelect` row; shared with repositories that list movies for other reasons. */
+export function mapMovieListItem(row: MovieListItemRow): MovieListItem {
+  return {
     nextUp: row.resume_position_ms === 0 ? (row.metadata_media_type === 'tv' ? 'episode' : 'collection') : null,
     id: row.id, title: row.title_override ?? row.metadata_title ?? row.parsed_title, year: row.metadata_year ?? row.parsed_year,
     posterUrl: row.poster_file ? `/media/posters/${encodeURIComponent(row.poster_file)}` : null,
     resolution: formatResolution(row.video_height), hdrFormat: row.hdr_format, showKey: showKeyOf(row),
     watched: Boolean(row.watched), resumePositionMs: row.resume_position_ms, durationMs: row.duration_ms,
     missing: Boolean(row.missing), metadataStatus: row.metadata_status, shelves: [], fresh: freshOf(row)
-  });
+  };
 }
