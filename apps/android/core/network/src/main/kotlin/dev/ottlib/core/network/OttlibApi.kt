@@ -104,7 +104,7 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     suspend fun continueWatching(limit: Int = 20): List<MovieListItem> =
         get(url("/api/movies/continue-watching").newBuilder().addQueryParameter("limit", limit.toString()).build())
     suspend fun movie(id: Long): Movie = get(url("/api/movies/$id"))
-    /** The saga with this id: the titles the library owns and the parts it lacks, or null when the server has no such collection (404). */
+    /** The saga the title with this movie id belongs to: the titles the library owns and the parts it lacks, or null when it has none (404). */
     suspend fun collection(id: Long): MovieCollection? = try {
         get<MovieCollection>(url("/api/movies/$id/collection"))
     } catch (error: ApiException) {
