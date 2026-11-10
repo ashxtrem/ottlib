@@ -50,6 +50,9 @@ import { registerFolderRoutes } from './routes/folders.js';
 import { registerLibraryRoutes } from './routes/library.js';
 import { LibraryDeletionService } from './services/libraryDeletionService.js';
 import { registerRecommendationRoutes } from './routes/recommendations.js';
+import { registerCollectionRoutes } from './routes/collections.js';
+import { CollectionService } from './services/collectionService.js';
+import { CollectionRepository } from './repositories/collectionRepository.js';
 import { RecommendationService } from './services/recommendations/recommendationService.js';
 import { RecommendationSignalRepository } from './repositories/recommendationSignalRepository.js';
 import { registerPlaybackRoutes } from './routes/playback.js';
@@ -129,7 +132,8 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   });
   const movies = new MovieRepository(db); const folders = new FolderRepository(db); const settings = new SettingRepository(db); const watches = new WatchStateRepository(db); const runs = new ScanRunRepository(db); const shelfRecords = new ShelfRepository(db); const shelfMovies = new ShelfMovieRepository(db); const mediaTracks = new MediaTrackRepository(db); runs.failAbandonedRuns();
   const movieExtras = new MovieExtrasRepository(db);
-  const metadata = new MetadataMatchService(movies, settings, new PosterCacheService(appDataPath), runs, movieExtras, (message) => app.log.warn(message));
+  const posters = new PosterCacheService(appDataPath);
+  const metadata = new MetadataMatchService(movies, settings, posters, runs, movieExtras, (message) => app.log.warn(message));
   const ffmpeg = overrides.ffmpeg ?? new FfmpegLocator(); const locate = () => ffmpeg.locate();
   const pictureArea = new PictureAreaService(movies, locate, undefined, (message) => app.log.warn(message));
   const credits = new CreditsService(movies, undefined, (message) => app.log.warn(message));
@@ -151,6 +155,7 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
   registerLibraryRoutes(app, movies, progress, metadata, library, new LibraryDeletionService(movies)); registerRecommendationRoutes(app, movies, new RecommendationService(movies, new RecommendationSignalRepository(db), () => settings.get())); registerPlaybackProgressRoutes(app, movies, progress); registerNextPlaybackRoutes(app, nextPlayback, progress, library); registerShelfRoutes(app, shelves); registerHideRoutes(app, new HideService(new HideRepository(db))); registerPlayRoutes(app, movies, playHistory); registerFolderRoutes(app, new FolderService(folders, movies)); registerSettingsRoutes(app, new SettingsService(settings, scheduler, backupScheduler));
+  registerCollectionRoutes(app, new CollectionService(movies, new CollectionRepository(db), posters, () => settings.get()));
   registerScanRoutes(app, scanner, runs); registerStreamRoutes(app, new StreamService(playback), playback); registerPlaybackRoutes(app, playback); registerEmbeddedSubtitleRoutes(app, playback, embeddedSubtitles);
   registerCreditsRoutes(app, new CreditsEditService(movies, autoSkip, creditsResolver));
   registerHlsRoutes(app, hlsSessions, new TranscodeInfoService(locate, encodersFor, encoderSetting));

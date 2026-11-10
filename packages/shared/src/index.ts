@@ -7,6 +7,8 @@ export * from './hiddenTitles.js';
 export * from './profiles.js';
 export * from './backups.js';
 export * from './health.js';
+export * from './collections.js';
+import { collectionFilterOptionSchema } from './collections.js';
 
 const languageNames: Record<string, string> = {
   en: 'English', eng: 'English', hi: 'Hindi', hin: 'Hindi', ta: 'Tamil', tam: 'Tamil', te: 'Telugu', tel: 'Telugu', ml: 'Malayalam', mal: 'Malayalam',
@@ -224,7 +226,9 @@ export const movieFilterOptionsSchema = z.object({
   genres: z.array(z.string()),
   actors: z.array(z.string()),
   resolutions: z.array(z.string()),
-  audioLanguages: z.array(z.string())
+  audioLanguages: z.array(z.string()),
+  /** Collections (sagas) with two or more owned titles. */
+  collections: z.array(collectionFilterOptionSchema)
 });
 export const shelfNameSchema = z.string().trim().min(1).max(100);
 export const shelfCreateSchema = z.object({ name: shelfNameSchema, movieIds: z.array(z.number().int().positive()).min(0) });

@@ -22,6 +22,7 @@ class ContractFixturesTest {
         "movie-list-page" to MovieListPage.serializer(),
         "recommendations" to ListSerializer(Recommendation.serializer()),
         "movie" to Movie.serializer(),
+        "movie-collection" to MovieCollection.serializer(),
         "movie-unmatched" to Movie.serializer(),
         "filter-options" to MovieFilterOptions.serializer(),
         "continue-watching" to ListSerializer(MovieListItem.serializer()),
@@ -137,6 +138,16 @@ class ContractFixturesTest {
         val movie = strict.decodeFromString(Movie.serializer(), File(fixtures, "movie.json").readText())
         assertEquals(3840, movie.mediaInfo?.pictureWidth)
         assertEquals(1620, movie.mediaInfo?.pictureHeight)
+    }
+
+    @Test
+    fun movieCollectionFixtureCarriesOwnedAndMissingParts() {
+        val collection = strict.decodeFromString(MovieCollection.serializer(), File(fixtures, "movie-collection.json").readText())
+        assertEquals(1234L, collection.id)
+        assertEquals(listOf(1L, 3L), collection.owned.map { it.id })
+        assertEquals(MissingCollectionPart("401", "Arrival Origins", 2022, "/media/posters/tmdb-part-401.jpg"), collection.missing.single())
+        val options = strict.decodeFromString(MovieFilterOptions.serializer(), File(fixtures, "filter-options.json").readText())
+        assertEquals(emptyList<CollectionFilterOption>(), options.collections)
     }
 
     @Test

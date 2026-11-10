@@ -1,0 +1,48 @@
+{
+  "id": 1234,
+  "name": "Arrival Collection",
+  "owned": [
+    {
+      "nextUp": null,
+      "id": 1,
+      "title": "Arrival",
+      "year": 2016,
+      "posterUrl": "/media/posters/arrival.jpg",
+      "resolution": "4K",
+      "hdrFormat": "HDR10",
+      "showKey": null,
+      "watched": false,
+      "resumePositionMs": null,
+      "durationMs": 6960000,
+      "missing": false,
+      "metadataStatus": "matched",
+      "shelves": [],
+      "fresh": null
+    },
+    {
+      "nextUp": null,
+      "id": 3,
+      "title": "Arrival Sequel",
+      "year": 2019,
+      "posterUrl": "/media/posters/sequel.jpg",
+      "resolution": null,
+      "hdrFormat": null,
+      "showKey": null,
+      "watched": false,
+      "resumePositionMs": null,
+      "durationMs": null,
+      "missing": false,
+      "metadataStatus": "matched",
+      "shelves": [],
+      "fresh": "new"
+    }
+  ],
+  "missing": [
+    {
+      "tmdbId": "401",
+      "title": "Arrival Origins",
+      "year": 2022,
+      "posterUrl": "/media/posters/tmdb-part-401.jpg"
+    }
+  ]
+}

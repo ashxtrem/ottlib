@@ -26,7 +26,8 @@ export function shelfMovieFilterOptions(movies: Movie[]): MovieFilterOptions {
     genres: uniqueSorted(movies.flatMap((movie) => movie.genres)),
     actors: uniqueSorted(movies.flatMap((movie) => movie.cast)),
     resolutions: uniqueSorted(movies.flatMap((movie) => formatResolution(movie.mediaInfo?.height) ?? [])).sort((left, right) => resolutionRank(right) - resolutionRank(left)),
-    audioLanguages: uniqueSorted(movies.flatMap((movie) => movie.mediaInfo?.tracks.filter((track) => track.type === 'audio').flatMap((track) => track.language ?? '') ?? []))
+    audioLanguages: uniqueSorted(movies.flatMap((movie) => movie.mediaInfo?.tracks.filter((track) => track.type === 'audio').flatMap((track) => track.language ?? '') ?? [])),
+    collections: []
   };
 }
 

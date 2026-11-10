@@ -36,4 +36,13 @@ data class MovieFilterOptions(
     val actors: List<String>,
     val resolutions: List<String>,
     val audioLanguages: List<String>,
+    /** Collections (sagas) with two or more owned titles; empty from servers that predate them. */
+    val collections: List<CollectionFilterOption> = emptyList(),
+)
+
+@Serializable
+data class CollectionFilterOption(
+    val id: Long,
+    val name: String,
+    val count: Int,
 )
