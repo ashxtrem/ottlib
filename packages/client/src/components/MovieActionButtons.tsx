@@ -31,7 +31,7 @@ export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitle
       <div className="min-w-0 flex-1"><PlayButton movie={movie} /></div>
       <PlayMoreMenu movie={movie} />
     </div>
-    {movie.trailerKey && onTrailer && <button type="button" onClick={onTrailer} className={`mr-2 rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised ${pressable} ${focusRing}`}>Trailer</button>}
+    {movie.trailerKey && onTrailer && <button type="button" onClick={onTrailer} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised ${pressable} ${focusRing}`}>Trailer</button>}
     <button type="button" onClick={onSubtitles} disabled={movie.missing} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised disabled:opacity-50 ${focusRing}`}>Find subtitles</button>
     {torrentSearchEnabled && <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>}
     <div className="flex flex-wrap items-center gap-2">

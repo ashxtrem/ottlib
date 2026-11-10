@@ -28,7 +28,7 @@ describe('LibraryFilters', () => {
   });
 
   it('puts the shortcut id on the search input and lists no recents until it is focused', () => {
-    const markup = renderToStaticMarkup(<LibraryFilters values={values} options={options} idPrefix="test" searchInputId="library-search"recentSearches={['alien']} {...callbacks} />);
+    const markup = renderToStaticMarkup(<LibraryFilters values={values} options={options} idPrefix="test" searchInputId="library-search" recentSearches={['alien']} {...callbacks} />);
     expect(markup).toContain('id="library-search"');
     expect(markup).not.toContain('Recent searches');
   });

@@ -99,7 +99,7 @@ export function MovieDetailPage() {
           {next.data && <NextTitlePanel current={item} next={next.data} shelfId={shelfId} />}
           {item.overview && <p className="max-w-3xl leading-7 text-foreground/90">{item.overview}</p>}
           <BrowseFilterChips label="Genres" values={item.genres} parameter="genre" />
-          {castMembers.length ? <CastRow members={castMembers} /> : <BrowseFilterChips label="Cast" values={[]} parameter="actor" />}
+          {castMembers.length ? <CastRow members={castMembers} /> : null}
         </div>
         <MediaInfoPanel mediaInfo={item.mediaInfo} filePath={item.filePath} />
       </div>
