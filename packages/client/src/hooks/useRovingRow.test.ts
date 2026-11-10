@@ -6,6 +6,7 @@ class FakeControl {
   get tabIndex() { return Number(this.attributes.get('tabindex') ?? 0); }
   set tabIndex(value: number) { this.attributes.set('tabindex', String(value)); }
   hasAttribute(name: string) { return this.attributes.has(name); }
+  getAttribute(name: string) { return this.attributes.get(name) ?? null; }
   setAttribute(name: string, value: string) { this.attributes.set(name, value); }
   removeAttribute(name: string) { this.attributes.delete(name); }
 }
@@ -78,5 +79,16 @@ describe('applyRovingTabStops', () => {
     own.controls[0]!.tabIndex = 0;
     applyRovingTabStops([own.element], 0);
     expect(own.controls[0]!.hasAttribute('tabindex')).toBe(true);
+  });
+
+  it('gives a control its own tabindex back when its card becomes active again', () => {
+    const cards = [card(), card()];
+    cards[0]!.controls[2]!.setAttribute('tabindex', '0');
+    applyRovingTabStops(cards.map((c) => c.element), 1);
+    expect(tabbable(cards[0]!.controls)).toEqual([false, false, false]);
+    applyRovingTabStops(cards.map((c) => c.element), 0);
+    expect(cards[0]!.controls[2]!.getAttribute('tabindex')).toBe('0');
+    expect(cards[0]!.controls[0]!.hasAttribute('tabindex')).toBe(false);
+    expect(cards[0]!.controls[2]!.hasAttribute('data-roved')).toBe(false);
   });
 });
