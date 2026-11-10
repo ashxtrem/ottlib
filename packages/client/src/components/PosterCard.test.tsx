@@ -57,11 +57,13 @@ describe('PosterCard watch state', () => {
     const markup = renderToStaticMarkup(<MemoryRouter><PosterCard movie={{ ...movie, fresh: 'new', resolution: '4K', missing: true, metadataStatus: 'suggested', posterUrl: '/p.jpg', shelves: [{ id: 1, name: 'A very long shelf name' }] } as MovieListItem} onToggleWatched={vi.fn()} /></MemoryRouter>);
     // Shelf chip: left-2 (8 px) + max-w calc(100% - 3.25rem) ends at 144 - 52 + 8 = 100 px.
     expect(markup).toContain('left-2 top-2 z-10 max-w-[calc(100%-3.25rem)]');
-    // Strip: right-0 top-0, 16 px line + 4 px padding = 20 px tall; "NEW" at 10 px bold + 12 px padding is about 34 px wide.
+    // Strip pin: right-0 top-0, 16 px line + 4 px padding = 20 px tall; "NEW" at 10 px bold + 12 px (px-1.5) padding is
+    // about 34 px wide, so on a 144 px card it starts near 110 px, right of the chip's 100 px end. Changing the size,
+    // padding or corner of the strip needs that arithmetic redone, which is why these classes are pinned.
     expect(freshStripClassName).toContain('right-0 top-0');
+    expect(freshStripClassName).toContain('px-1.5 py-0.5');
     expect(freshStripClassName).toContain('text-[10px]');
     expect(freshStripClassName).toContain('leading-4');
-    expect(144 - 34).toBeGreaterThan(100);
     // Unavailable and Needs review start at top-12 (48 px), below the 20 px strip; quality markers sit at the poster bottom.
     expect(markup).toContain('absolute right-2 top-12');
     expect(markup).toContain('absolute bottom-2 left-2');
