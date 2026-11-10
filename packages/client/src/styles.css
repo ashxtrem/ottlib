@@ -43,6 +43,10 @@
     --color-warning-foreground: 69 26 3;
     --color-imdb: 138 109 0;
     --color-imdb-hover: 119 92 0;
+    /* Text over artwork: the same in light and dark, since the art sits on its own dark scrim. */
+    --color-on-art: 255 255 255;
+    --color-on-art-muted: 226 232 240;
+    --color-on-art-scrim: 2 6 23;
   }
 
   :root.dark {
@@ -78,6 +82,9 @@
     --color-warning-foreground: 2 6 23;
     --color-imdb: 220 174 0;
     --color-imdb-hover: 245 197 24;
+    --color-on-art: 255 255 255;
+    --color-on-art-muted: 226 232 240;
+    --color-on-art-scrim: 2 6 23;
   }
 
   body { @apply min-h-screen bg-canvas text-foreground antialiased; }
