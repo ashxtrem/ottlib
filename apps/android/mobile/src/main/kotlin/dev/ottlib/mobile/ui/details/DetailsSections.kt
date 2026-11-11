@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ fun ActionButtons(movie: Movie, busy: Boolean, actions: DetailsActions, fillWidt
                 onClick = actions.onToggleWatched,
             )
             SecondaryButton("Other app", Icons.AutoMirrored.Filled.OpenInNew, enabled = !movie.missing, onClick = actions.onPlayElsewhere)
+            if (actions.findAvailable) SecondaryButton("Find in Hashlark", Icons.Filled.Search, enabled = true, onClick = actions.onFind)
         }
         if (movie.resumePositionMs != null) TextButton(onClick = actions.onClearProgress, enabled = !busy) { Text("Remove from Continue watching") }
         if (movie.metadataStatus == "suggested") TextButton(onClick = actions.onManageMetadata) { Text("Review suggested matches") }
