@@ -33,6 +33,7 @@ import dev.ottlib.core.presentation.LoadState
 import dev.ottlib.core.presentation.details.CollectionSummary
 import dev.ottlib.core.presentation.appContainer
 import dev.ottlib.core.presentation.details.DetailsViewModel
+import dev.ottlib.core.presentation.details.MissingPart
 import dev.ottlib.core.presentation.metadata.MetadataViewModel
 import dev.ottlib.core.presentation.openInExternalPlayer
 import dev.ottlib.core.presentation.theme.OttlibColors
@@ -61,6 +62,7 @@ fun DetailsScreen(
     val ratings by viewModel.ratings.collectAsStateWithLifecycle()
     val castMembers by viewModel.castMembers.collectAsStateWithLifecycle()
     val collection by viewModel.collection.collectAsStateWithLifecycle()
+    val findAvailable by container.findLauncher.available.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var menuOpen by rememberSaveable(movieId) { mutableStateOf(false) }
     var metadataOpen by rememberSaveable(movieId) { mutableStateOf(false) }
@@ -90,6 +92,9 @@ fun DetailsScreen(
                     extras = DetailsExtras(logoUrl, ratings, castMembers, collection),
                     onOpenActor = onOpenActor,
                     onOpenCollection = onOpenCollection,
+                    findAvailable = findAvailable,
+                    onFind = { container.findLauncher.find(current.value.title, current.value.year, current.value.imdbId) },
+                    onFindMissing = { part -> container.findLauncher.find(part.title, part.year) },
                 )
                 val imageUrl = container.api.resolve(current.value.backdropUrl ?: current.value.posterUrl)
                 val posterUrl = container.api.resolve(current.value.posterUrl)
@@ -140,6 +145,10 @@ class DetailsActions(
     val extras: DetailsExtras = DetailsExtras(),
     val onOpenActor: (String) -> Unit = {},
     val onOpenCollection: (id: Long, name: String) -> Unit = { _, _ -> },
+    /** True when the server hands searches to Hashlark: shows "Find in Hashlark" and the missing-part cards. */
+    val findAvailable: Boolean = false,
+    val onFind: () -> Unit = {},
+    val onFindMissing: (MissingPart) -> Unit = {},
 )
 
 /** The richer title data shown when the server has it: logo art, outside ratings, cast photos and the collection. */
