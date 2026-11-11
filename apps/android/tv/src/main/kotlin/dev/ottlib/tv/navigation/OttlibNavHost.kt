@@ -1,6 +1,7 @@
 package dev.ottlib.tv.navigation
 
 import android.app.Activity
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +40,11 @@ fun OttlibNavHost(deepLinkMovieId: MutableStateFlow<Long?>) {
     val nav = rememberNavController()
     SyncOutcomeToasts()
     val container = appContainer()
+    val context = LocalContext.current
+    // Find in Hashlark reports its outcome once per tap, wherever the viewer is by then.
+    LaunchedEffect(container.findLauncher) {
+        container.findLauncher.messages.collect { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+    }
     val activeServer by container.connection.activeServer.collectAsStateWithLifecycle()
     val pendingMovieId by deepLinkMovieId.collectAsStateWithLifecycle()
 

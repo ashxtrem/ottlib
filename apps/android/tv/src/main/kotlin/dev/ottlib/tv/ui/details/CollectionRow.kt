@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.ottlib.core.presentation.details.CollectionSummary
+import dev.ottlib.core.presentation.details.MissingPart
 import dev.ottlib.core.presentation.theme.OttlibColors
 import dev.ottlib.tv.ui.components.PosterCard
 import dev.ottlib.tv.ui.components.PosterWidth
@@ -35,10 +37,14 @@ import dev.ottlib.tv.ui.components.PosterWidth
 /** Focus keys of the collection row's cards, recorded in DetailsViewModel.lastFocusedKey. */
 fun collectionPosterKey(id: Long) = "collection:$id"
 const val COLLECTION_SEE_ALL_KEY = "collection:all"
+fun collectionMissingKey(index: Int) = "collection:missing:$index"
 
 private val seeAllShape = RoundedCornerShape(10.dp)
 
-/** The saga's other owned titles, a "See all" card that opens the library filtered to the collection, and how many parts are missing. */
+/**
+ * The saga's other owned titles, then (Hashlark mode) its missing parts as Find cards, a "See all" card that opens the
+ * library filtered to the collection, and otherwise how many parts are missing.
+ */
 @Composable
 fun CollectionRow(
     collection: CollectionSummary,
@@ -48,6 +54,8 @@ fun CollectionRow(
     restoreKey: String?,
     restore: FocusRequester,
     modifier: Modifier = Modifier,
+    /** Non-null only in Hashlark mode: missing parts then show as cards that hand the title to Find. */
+    onFind: ((MissingPart) -> Unit)? = null,
 ) {
     fun Modifier.restoring(key: String) = if (key == restoreKey) focusRequester(restore) else this
     Column(modifier) {
@@ -61,11 +69,16 @@ fun CollectionRow(
                 val key = collectionPosterKey(item.id)
                 PosterCard(item, onClick = { onOpenMovie(item.id) }, onFocused = { onFocused(key) }, modifier = Modifier.restoring(key))
             }
+            // Hashlark mode: the parts the library lacks follow the owned ones; OK finds in place, so focus stays put.
+            if (onFind != null) itemsIndexed(collection.missing, key = { index, _ -> collectionMissingKey(index) }) { index, part ->
+                val key = collectionMissingKey(index)
+                MissingPartCard(part, onFind = { onFind(part) }, onFocused = { onFocused(key) }, modifier = Modifier.restoring(key))
+            }
             item(key = COLLECTION_SEE_ALL_KEY) {
                 SeeAllCard(onClick = onSeeAll, onFocused = { onFocused(COLLECTION_SEE_ALL_KEY) }, modifier = Modifier.restoring(COLLECTION_SEE_ALL_KEY))
             }
         }
-        if (collection.missingCount > 0) {
+        if (collection.missingCount > 0 && (onFind == null || collection.missing.isEmpty())) {
             Text("${collection.missingCount} more not in your library", style = MaterialTheme.typography.bodyMedium, color = OttlibColors.Muted)
         }
     }
