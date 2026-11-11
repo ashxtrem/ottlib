@@ -62,6 +62,11 @@ import { registerSettingsRoutes } from './routes/settings.js';
 import { registerStreamRoutes } from './routes/stream.js';
 import { registerShelfRoutes } from './routes/shelves.js';
 import { registerTorrentRoutes } from './routes/torrents.js';
+import { registerFindRoutes } from './routes/find.js';
+import { FindHandoffService } from './services/findHandoffService.js';
+import { HashlarkLink } from './providers/find/hashlarkLink.js';
+import type { FindHandoff } from './providers/find/FindHandoff.js';
+import { findMode } from '@ottlib/shared';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerAuthGuard } from './routes/authGuard.js';
 import { QbittorrentClient } from './providers/torrent/qbittorrentClient.js';
@@ -125,7 +130,7 @@ declare module 'fastify' {
 }
 
 /** Collaborators a test can replace: the planner's session opener, the ffmpeg check, the HLS session service itself. */
-export interface AppOverrides { sessions?: HlsSessionOpener; ffmpegAvailable?: () => Promise<boolean>; hlsSessions?: TranscodeSessionService; ffmpeg?: FfmpegLocator }
+export interface AppOverrides { sessions?: HlsSessionOpener; ffmpegAvailable?: () => Promise<boolean>; hlsSessions?: TranscodeSessionService; ffmpeg?: FfmpegLocator; findHandoff?: FindHandoff }
 
 export function buildApp(db: Database.Database, appDataPath: string, port: number, overrides: AppOverrides = {}) {
   const app = Fastify({ logger: true, trustProxy: false });
@@ -153,8 +158,9 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   const playback = new PlaybackService(movies, (id) => pins.streamQuery(id), subtitleLibrary, undefined, planner, embeddedSubtitles, creditsResolver);
   const library = new LibraryService(movies, shelfMovies, mediaTracks); const progressRecords = new PlaybackProgressRepository(db); const nextPlayback = new NextPlaybackService(movies, shelfMovies, progressRecords, watches); const playHistory = new PlaybackHistoryService(new PlaybackHistoryRepository(db), progressRecords); const progress = new PlaybackProgressService(progressRecords, watches, nextPlayback, playHistory); const shelves = new ShelfService(shelfRecords, shelfMovies, movies, library);
   const qbittorrent = new QbittorrentClient(() => settings.get()); const qbittorrentSearch = new QbittorrentSearch(qbittorrent); const qbittorrentTorrents = new QbittorrentTorrents(qbittorrent); const torrentSearch = new TorrentSearchService(qbittorrentSearch, movies, () => qbittorrent.isConfigured(), () => releasePreferences(settings.get())); const torrentHandoff = new TorrentHandoffService(qbittorrentTorrents, qbittorrent, settings); const torrentConnection = new TorrentConnectionService(qbittorrent, qbittorrentSearch); const torrentDownloads = new TorrentDownloadService(qbittorrentTorrents, settings);
+  const findHandoff = overrides.findHandoff ?? new HashlarkLink(); const find = new FindHandoffService(findHandoff, () => settings.get());
   const appVersion = readAppVersion(); const latestRelease = new LatestRelease();
-  const health = new HealthService(() => healthChecks({ appDataPath, folders: () => folders.list().map((folder) => folder.path), locateFfmpeg: locate, tmdbKey: () => settings.get().tmdbApiKey, testTmdbKey: checkTmdbKey, torrentSearchEnabled: () => settings.get().torrentSearchEnabled, testQbittorrent: () => torrentConnection.test(), backups, idsMissingExtras: () => movieExtras.idsMissingExtras(), update: { version: () => appVersion, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() } }));
+  const health = new HealthService(() => healthChecks({ appDataPath, folders: () => folders.list().map((folder) => folder.path), locateFfmpeg: locate, tmdbKey: () => settings.get().tmdbApiKey, testTmdbKey: checkTmdbKey, findMode: () => findMode(settings.get()), hashlarkAvailable: () => findHandoff.available(), testQbittorrent: () => torrentConnection.test(), backups, idsMissingExtras: () => movieExtras.idsMissingExtras(), update: { version: () => appVersion, enabled: () => settings.get().updateCheckEnabled, latestTag: () => latestRelease.tag() } }));
   const profileRecords = new ProfileRepository(db); const profilePins = new ProfilePinCheck(); const profileSessionRecords = new ProfileSessionRepository(db); const profileSessions = new ProfileSessionService(profileRecords, profileSessionRecords, profilePins);
   registerAuthGuard(app, pins); registerAuthRoutes(app, pins); registerProfileContext(app, profileSessions);
   registerProfileRoutes(app, new ProfileService(profileRecords, profilePins, profileSessionRecords), profileSessions, new LocalResetService(profileRecords, pins));
@@ -164,11 +170,12 @@ export function buildApp(db: Database.Database, appDataPath: string, port: numbe
   registerCreditsRoutes(app, new CreditsEditService(movies, autoSkip, creditsResolver));
   registerHlsRoutes(app, hlsSessions, new TranscodeInfoService(locate, encodersFor, encoderSetting));
   registerFrameRoutes(app, new FrameService(playback, movies, locate));
-  registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, new UpgradeCandidateService(new MovieUpgradeRepository(db), () => settings.get()), () => settings.get().torrentSearchEnabled);
+  registerTorrentRoutes(app, torrentSearch, torrentHandoff, torrentConnection, torrentDownloads, new UpgradeCandidateService(new MovieUpgradeRepository(db), () => settings.get()), () => findMode(settings.get()) === 'qbittorrent');
+  registerFindRoutes(app, find);
   registerSubtitleRoutes(app, new SubtitleService(subtitleProviders(() => settings.get()), movies, settings, playback, subtitleLibrary));
   registerBackupRoutes(app, backups);
   registerHealthRoutes(app, health);
-  app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled()).get());
+  app.get('/api/server-info', async () => new ServerInfoService(port, () => pins.enabled(), () => find.mode() === 'hashlark' ? 'hashlark' : null).get());
   registerMediaStatic(app, appDataPath);
   const clientDist = join(process.cwd(), 'packages', 'client', 'dist');
   if (existsSync(clientDist)) {

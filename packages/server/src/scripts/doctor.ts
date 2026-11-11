@@ -1,4 +1,6 @@
+import { findMode } from '@ottlib/shared';
 import { readAppVersion } from '../config/appVersion.js';
+import { HashlarkLink } from '../providers/find/hashlarkLink.js';
 import { loadBootstrapConfig, resolveAppRoot } from '../config/configStore.js';
 import { createDatabase } from '../db/db.js';
 import { QbittorrentClient } from '../providers/torrent/qbittorrentClient.js';
@@ -26,6 +28,7 @@ const db = createDatabase(config.absoluteAppDataPath, { backupBeforeMigrate: tru
 try {
   const settings = new SettingRepository(db); const folders = new FolderRepository(db);
   const extras = new MovieExtrasRepository(db);
+  const hashlark = new HashlarkLink();
   const ffmpeg = new FfmpegLocator(); const latestRelease = new LatestRelease(); const version = readAppVersion();
   const qbittorrent = new QbittorrentClient(() => settings.get()); const torrentConnection = new TorrentConnectionService(qbittorrent, new QbittorrentSearch(qbittorrent));
   const health = new HealthService(() => healthChecks({
@@ -34,7 +37,8 @@ try {
     locateFfmpeg: () => ffmpeg.locate(),
     tmdbKey: () => settings.get().tmdbApiKey,
     testTmdbKey: checkTmdbKey,
-    torrentSearchEnabled: () => settings.get().torrentSearchEnabled,
+    findMode: () => findMode(settings.get()),
+    hashlarkAvailable: () => hashlark.available(),
     testQbittorrent: () => torrentConnection.test(),
     backups: new BackupService(new BackupRepository(db), config.absoluteAppDataPath),
     idsMissingExtras: () => extras.idsMissingExtras(),
