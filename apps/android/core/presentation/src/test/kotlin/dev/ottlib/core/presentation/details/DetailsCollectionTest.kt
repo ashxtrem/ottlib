@@ -68,6 +68,7 @@ class DetailsCollectionTest {
         assertEquals(listOf(1L, 3L), saga.owned.map { it.id })
         assertEquals(listOf(false, true), saga.owned.map { it.isNew })
         assertEquals(2, saga.missingCount)
+        assertEquals(listOf(MissingPart("Part 4", 2010, null), MissingPart("Part 4", 2010, null)), saga.missing)
     }
 
     @Test fun theCollectionSkipsTitlesHiddenOnThisDevice() = withDetails(inSaga = true, hidden = MutableStateFlow(setOf("m:3"))) { viewModel ->
