@@ -7,11 +7,15 @@ import { useActiveTorrents } from '../hooks/useActiveTorrents';
 import { useQbittorrentStatus } from '../hooks/useQbittorrentStatus';
 import { useTorrentSearch } from '../hooks/useTorrentSearch';
 import { useSettings } from '../hooks/useSettings';
+import { HashlarkFindPanel } from '../components/HashlarkFindPanel';
+import { findMode } from '@ottlib/shared';
 
 export function TorrentSearchPage() {
   const settings = useSettings();
   if (!settings.data) return null;
-  if (!settings.data.torrentSearchEnabled) return <section className="rounded-xl border border-dashed border-border p-12 text-center"><h1 className="text-lg font-semibold">Torrent search is off</h1><p className="mt-2 text-sm text-muted">It's an optional qBittorrent integration. Turn it on under Settings → Torrent search.</p><Link to="/settings" className="mt-4 inline-flex rounded-lg border border-border-strong px-4 py-2 text-sm font-medium hover:bg-surface-raised">Open settings</Link></section>;
+  const mode = findMode(settings.data);
+  if (mode === 'hashlark') return <HashlarkFindPanel />;
+  if (mode === 'off') return <section className="rounded-xl border border-dashed border-border p-12 text-center"><h1 className="text-lg font-semibold">Torrent search is off</h1><p className="mt-2 text-sm text-muted">It's an optional qBittorrent integration. Turn it on under Settings → Find and torrent search.</p><Link to="/settings" className="mt-4 inline-flex rounded-lg border border-border-strong px-4 py-2 text-sm font-medium hover:bg-surface-raised">Open settings</Link></section>;
   return <TorrentSearch />;
 }
 

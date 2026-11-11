@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PROFILE_SESSION_HEADER, authStatusSchema, autoSkipDefaultsSchema, profileMeSchema, profileSelectResultSchema, profileSummarySchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieCollectionSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
+import { PROFILE_SESSION_HEADER, authStatusSchema, autoSkipDefaultsSchema, findHandoffResultSchema,profileMeSchema, profileSelectResultSchema, profileSummarySchema, recommendationSchema, manualMatchCandidateSchema, matchCandidateSchema, movieCollectionSchema, movieFilterOptionsSchema, movieListItemSchema, movieListPageSchema, movieSchema, pinLoginResultSchema, playbackProgressResultSchema, playbackSourceSchema, scanRunSchema, serverInfoSchema, shelfDetailSchema, shelfSummarySchema } from '@ottlib/shared';
 import * as metadataProviders from '../providers/metadata/metadataProviders.js';
 import type { MetadataProvider } from '../providers/metadata/MetadataProvider.js';
 import { subtitleDownloadResponseSchema, subtitleOptionsSchema, subtitleSearchResponseSchema } from '@ottlib/shared/subtitles';
@@ -14,6 +14,7 @@ import { MediaTrackRepository } from '../repositories/mediaTrackRepository.js';
 import { MovieExtrasRepository } from '../repositories/movieExtrasRepository.js';
 import { MovieRepository } from '../repositories/movieRepository.js';
 import { ScanRunRepository } from '../repositories/scanRunRepository.js';
+import { SettingRepository } from '../repositories/settingRepository.js';
 import { PosterCacheService } from '../services/posterCacheService.js';
 
 // Endpoints used by the native (Android TV) client. Responses are written to /contract/fixtures, which the
@@ -351,6 +352,19 @@ describe('native client endpoints', () => {
       const shelf = (await app.inject({ method: 'POST', url: '/api/shelves', payload: { name: 'Sci-Fi', movieIds: [1] } })).json() as { id: number };
       await snapshot('shelf-summaries', shelfSummarySchema.array().parse((await app.inject({ method: 'GET', url: '/api/shelves' })).json()), media);
       await snapshot('shelf-detail', shelfDetailSchema.parse((await app.inject({ method: 'GET', url: `/api/shelves/${shelf.id}`, headers })).json()), media);
+    } finally { await app.close(); db.close(); }
+  });
+
+  it('hand a Find search to Hashlark when the server is in Hashlark mode', async () => {
+    const open = vi.fn();
+    const { app, db, media } = fixture({ findHandoff: { name: 'hashlark', available: () => true, open } });
+    try {
+      new SettingRepository(db).update({ torrentSearchEnabled: true, findProvider: 'hashlark' });
+      expect(serverInfoSchema.parse((await app.inject({ method: 'GET', url: '/api/server-info' })).json()).findHandoff).toBe('hashlark');
+      const response = await app.inject({ method: 'POST', url: '/api/find/handoff', headers, payload: { title: 'Arrival', year: 2016, imdbId: 'tt2543164' } });
+      expect(response.statusCode).toBe(200);
+      expect(open).toHaveBeenCalledTimes(1);
+      await snapshot('find-handoff', findHandoffResultSchema.parse(response.json()), media);
     } finally { await app.close(); db.close(); }
   });
 

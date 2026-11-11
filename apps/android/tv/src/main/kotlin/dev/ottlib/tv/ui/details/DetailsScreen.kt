@@ -106,8 +106,10 @@ private fun MovieDetails(movie: Movie, viewModel: DetailsViewModel, actions: Det
     val castMembers by viewModel.castMembers.collectAsStateWithLifecycle()
     val logoUrl by viewModel.logoUrl.collectAsStateWithLifecycle()
     val collection by viewModel.collection.collectAsStateWithLifecycle()
+    val findAvailable by container.findLauncher.available.collectAsStateWithLifecycle()
 
     val primary = remember { FocusRequester() }
+    val findFocus = remember { FocusRequester() }
     val restore = remember { FocusRequester() }
     // Read once per entry: the card focused before leaving this screen.
     val restoreKey = remember(movie.id) { viewModel.lastFocusedKey }
@@ -148,6 +150,10 @@ private fun MovieDetails(movie: Movie, viewModel: DetailsViewModel, actions: Det
                     if (url == null || !openInExternalPlayer(context, url, movie.title)) Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
                 }, enabled = !movie.missing) { Text("Play in another app") }
             }
+            // Its own row: the row above can already hold two long buttons and doesn't wrap.
+            if (findAvailable) Row(modifier = forgetCard) {
+                OutlinedButton(onClick = { container.findLauncher.find(movie.title, movie.year, movie.imdbId) }, modifier = Modifier.focusRequester(findFocus)) { Text("Find in Hashlark") }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = forgetCard) {
                 OutlinedButton(onClick = { metadataOpen = true }, modifier = Modifier.focusRequester(metadataFocus)) {
                     Text(if (movie.metadataStatus == "suggested") "Review suggested matches" else "Manage metadata")
@@ -178,6 +184,7 @@ private fun MovieDetails(movie: Movie, viewModel: DetailsViewModel, actions: Det
                     restoreKey = restoreKey,
                     restore = restore,
                     modifier = Modifier.padding(top = 8.dp),
+                    onFind = if (findAvailable) { part -> container.findLauncher.find(part.title, part.year) } else null,
                 )
             }
             if (recommendations.isNotEmpty()) {
@@ -199,14 +206,15 @@ private fun MovieDetails(movie: Movie, viewModel: DetailsViewModel, actions: Det
             }
         }
     }
-    // First entry focuses Play; returning puts focus back on the card that had it (Play when that card is gone).
+    // First entry focuses Play (Find in Hashlark on a missing title, where Play is disabled); returning puts focus back on
+    // the card that had it (the first button when that card is gone).
     LaunchedEffect(movie.id) {
         // The saved card's row (cast, collection, recommendations) may compose a few frames later: retry before Play.
         var restored = false
         if (restoreKey != null) repeat(10) {
             if (!restored) { withFrameNanos { }; restored = runCatching { restore.requestFocus() }.getOrDefault(false) }
         }
-        if (!restored) primary.tryRequestFocus()
+        if (!restored) (if (movie.missing && findAvailable) findFocus else primary).tryRequestFocus()
     }
     if (metadataOpen) {
         val editor = viewModel(key = "metadata-${movie.id}") { MetadataViewModel(container.api, container.metadataRefresh, movie) }

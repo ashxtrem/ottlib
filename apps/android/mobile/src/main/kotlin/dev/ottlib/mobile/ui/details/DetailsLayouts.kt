@@ -50,7 +50,7 @@ fun CompactDetails(movie: Movie, imageUrl: String?, posterUrl: String?, busy: Bo
         Column(Modifier.padding(horizontal = 16.dp).offset(y = (-24).dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             ActionButtons(movie, busy, actions, fillWidth = true)
             MovieInfo(movie, actions)
-            CollectionRow(actions.extras.collection, actions.onOpenMovie, actions.onOpenCollection)
+            CollectionRow(actions.extras.collection, actions.onOpenMovie, actions.onOpenCollection, actions.findAvailable, actions.onFindMissing)
             RecommendationsRow(actions.recommendations, actions.onOpenMovie)
         }
     }
@@ -71,7 +71,7 @@ fun WideDetails(movie: Movie, imageUrl: String?, posterUrl: String?, busy: Boole
                 TitleBlock(movie, actions.extras)
                 ActionButtons(movie, busy, actions, fillWidth = false)
                 MovieInfo(movie, actions)
-                CollectionRow(actions.extras.collection, actions.onOpenMovie, actions.onOpenCollection)
+                CollectionRow(actions.extras.collection, actions.onOpenMovie, actions.onOpenCollection, actions.findAvailable, actions.onFindMissing)
                 RecommendationsRow(actions.recommendations, actions.onOpenMovie)
             }
         }

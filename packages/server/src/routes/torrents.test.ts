@@ -24,6 +24,15 @@ describe('GET /api/torrents/upgrade-candidates', () => {
     } finally { await app.close(); db.close(); }
   });
 
+  it('answers 404 in Hashlark mode, even with torrent search on', async () => {
+    const { app, db } = fixture();
+    try {
+      await app.inject({ method: 'PUT', url: '/api/settings', payload: { torrentSearchEnabled: true, findProvider: 'hashlark' } });
+      expect((await app.inject({ method: 'GET', url: '/api/torrents/upgrade-candidates' })).statusCode).toBe(404);
+      expect((await app.inject({ method: 'GET', url: '/api/torrents/connection' })).statusCode).toBe(404);
+    } finally { await app.close(); db.close(); }
+  });
+
   it('lists low-resolution and old-codec titles once torrent search is on', async () => {
     const { app, db } = fixture();
     try {

@@ -122,7 +122,9 @@ export const serverInfoSchema = z.object({
   port: z.number().int(),
   addresses: z.array(z.string()),
   /** True when an access PIN is set: clients must sign in before anything but this endpoint answers. */
-  authRequired: z.boolean()
+  authRequired: z.boolean(),
+  /** `hashlark` when Find hands searches to the Hashlark desktop app on the server PC; null otherwise. */
+  findHandoff: z.enum(['hashlark']).nullable()
 });
 
 /** Optional body of POST /api/movies/:id/play-local. */

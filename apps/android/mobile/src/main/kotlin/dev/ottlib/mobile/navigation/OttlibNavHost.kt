@@ -1,5 +1,6 @@
 package dev.ottlib.mobile.navigation
 
+import android.widget.Toast
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -7,7 +8,9 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -34,6 +37,7 @@ import dev.ottlib.mobile.ui.settings.SettingsScreen
 fun OttlibNavHost() {
     val nav = rememberNavController()
     SyncOutcomeToasts()
+    FindMessageToasts()
     val entry by nav.currentBackStackEntryAsState()
     val current = TopLevel.entries.firstOrNull { it.route == entry?.destination?.route }
     // Follows the window, not the device: a bottom bar on the Fold's cover screen, a rail when unfolded.
@@ -137,6 +141,16 @@ fun OttlibNavHost() {
                 )
             }
         }
+    }
+}
+
+/** How a Hashlark hand-off ended (sent, not installed, failed), shown wherever the viewer is when the answer arrives. */
+@Composable
+private fun FindMessageToasts() {
+    val finder = appContainer().findLauncher
+    val context = LocalContext.current
+    LaunchedEffect(finder) {
+        finder.messages.collect { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     }
 }
 

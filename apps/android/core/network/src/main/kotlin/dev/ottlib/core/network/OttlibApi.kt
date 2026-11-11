@@ -9,6 +9,8 @@ import dev.ottlib.core.model.Credits
 import dev.ottlib.core.model.CreditsMarkRequest
 import dev.ottlib.core.model.CreditsMarkResult
 import dev.ottlib.core.model.EpisodeSelection
+import dev.ottlib.core.model.FindHandoffRequest
+import dev.ottlib.core.model.FindHandoffResult
 import dev.ottlib.core.model.ImdbLookupRequest
 import dev.ottlib.core.model.MetadataCandidate
 import dev.ottlib.core.model.MetadataRefreshRequest
@@ -81,6 +83,10 @@ class OttlibApi(private val client: OkHttpClient, private val baseUrl: () -> Htt
     /** Signs in to [server] with its access PIN and returns the session token. Wrong PINs throw [ApiException] (401, or 429 when locked out). */
     suspend fun login(server: HttpUrl, pin: String): String =
         send<PinLoginResult>("POST", server.resolve("/api/auth/login")!!, OttlibJson.encodeToString(PinLoginRequest.serializer(), PinLoginRequest(pin))).token
+
+    /** Hands a Find search to the Hashlark app on the server PC; a missing link throws [ApiException] 409 with errorCode `HASHLARK_NOT_FOUND`. */
+    suspend fun findHandoff(request: FindHandoffRequest): FindHandoffResult =
+        send("POST", url("/api/find/handoff"), OttlibJson.encodeToString(FindHandoffRequest.serializer(), request))
 
     suspend fun profiles(): List<ProfileSummary> = get(url("/api/profiles"))
     /** Starts a profile session; a wrong PIN throws [ApiException] 403 with errorCode `PROFILE_PIN_INVALID`. */

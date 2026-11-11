@@ -17,7 +17,8 @@ import { focusRing, pressable } from './components/interactionStyles';
 import { PinGate } from './components/PinGate';
 import { ProfileGate } from './components/ProfileGate';
 import { ProfileMenu } from './components/ProfileMenu';
-import { useTorrentSearchEnabled } from './hooks/useTorrentSearchEnabled';
+import { useFindMode } from './hooks/useFindMode';
+import { FindButton } from './components/FindButton';
 import { useSearchShortcut } from './hooks/useSearchShortcut';
 
 const floatingButtonClassName = `inline-flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent-soft/50 transition-[background-color,transform] duration-fast ease-emphasis hover:scale-105 hover:bg-accent-hover ${focusRing} ${pressable}`;
@@ -27,12 +28,12 @@ function FloatingNavigationButtons() {
   const navigate = useNavigate();
   const backToLibrary = useBackToLibrary();
   const backToLibraryLabel = useBackToLibraryLabel();
-  const torrentSearchEnabled = useTorrentSearchEnabled();
+  const findMode = useFindMode();
   const isShelfDetail = /^\/shelves\/\d+$/.test(pathname);
   const onBack = isShelfDetail ? () => navigate('/shelves') : backToLibrary;
   const backLabel = isShelfDetail ? 'Back to shelves' : backToLibraryLabel;
   const back = <button type="button" onClick={onBack} aria-label={backLabel} title={backLabel} className={`${floatingButtonClassName} animate-pop-in`}><BackIcon /><span className="sr-only">{backLabel}</span></button>;
-  if (pathname === '/' || pathname === '/library') return <div key={pathname} className="fixed bottom-5 right-5 z-20 flex flex-col gap-3">{torrentSearchEnabled && <Link to="/torrents" viewTransition aria-label="Search torrents" title="Torrent search" className={`${floatingButtonClassName} animate-pop-in [animation-delay:80ms]`}><DownloadIcon /><span className="sr-only">Search torrents</span></Link>}<Link to="/shelves" viewTransition aria-label="Open shelves" title="Shelves" className={`${floatingButtonClassName} animate-pop-in [animation-delay:40ms]`}><ShelvesIcon /><span className="sr-only">Open shelves</span></Link><Link to="/settings" viewTransition aria-label="Open settings" title="Settings" className={`${floatingButtonClassName} animate-pop-in`}><SettingsIcon /><span className="sr-only">Open settings</span></Link></div>;
+  if (pathname === '/' || pathname === '/library') return <div key={pathname} className="fixed bottom-5 right-5 z-20 flex flex-col gap-3"><FindButton mode={findMode} label="Search torrents" title="Torrent search" icon={<DownloadIcon />} viewTransition className={`${floatingButtonClassName} animate-pop-in [animation-delay:80ms]`} /><Link to="/shelves" viewTransition aria-label="Open shelves" title="Shelves" className={`${floatingButtonClassName} animate-pop-in [animation-delay:40ms]`}><ShelvesIcon /><span className="sr-only">Open shelves</span></Link><Link to="/settings" viewTransition aria-label="Open settings" title="Settings" className={`${floatingButtonClassName} animate-pop-in`}><SettingsIcon /><span className="sr-only">Open settings</span></Link></div>;
   if (pathname === '/shelves') return <div key={pathname} className="fixed bottom-5 right-5 z-20 flex gap-3"><Link to="/shelves?create=1" viewTransition aria-label="Create shelf" title="Create shelf" className={`${floatingButtonClassName} animate-pop-in [animation-delay:40ms]`}><PlusIcon /><span className="sr-only">Create shelf</span></Link>{back}</div>;
   return <div key={pathname} className="fixed bottom-5 right-5 z-20">{back}</div>;
 }
