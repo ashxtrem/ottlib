@@ -15,4 +15,6 @@ data class ServerInfo(
     val addresses: List<String>,
     /** True when the server has an access PIN: sign in (`POST /api/auth/login`) before calling anything else. */
     val authRequired: Boolean = false,
+    /** `hashlark` when Find hands searches to the Hashlark app on the server PC (`POST /api/find/handoff`); null otherwise. */
+    val findHandoff: String? = null,
 )
