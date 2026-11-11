@@ -176,3 +176,14 @@ T3 runs alongside T2 and T4. T5 and T6 run alongside each other.
 
 ## 13. Progress log
 - 2026-11-11: plan written and approved.
+- 2026-11-11: built by `/plan-runner` (run `20261111-hashlark-handoff`), T1–T6 merged; §8 (Hashlark repo) left out, built
+  separately. Checks: `npm run build` clean; web 91 files / 411 tests, server 113 files / 664 tests, shared 3 files / 13
+  tests; Android `gradlew test` and the `:tv` / `:mobile` compiles pass.
+  - Plan corrections: `LibraryPage.tsx` passes the mode to `LibraryEmptyState` only (`CollectionRow` reads the hook);
+    the missing-part type is a new `MissingPart` in `core/presentation`, mapped from `MissingCollectionPart`.
+  - Gate fixes: TV "Find in Hashlark" sits in its own row (the shared row clipped with three buttons); `FindLauncher`
+    caps the title at 200 and drops a malformed IMDb id before the call.
+  - Left as is: torrent routes' 404 text in Hashlark mode still says "Torrent search is turned off"; non-API failures on
+    Android toast the raw error text; TV first focus isn't retried when server info arrives after a missing title opens.
+  - Not checked on a device or browser: TV D-pad focus paths, phone layouts, web dark mode, and the real launch
+    (`rundll32`) and window focus, which need the new Hashlark installed on the server PC.

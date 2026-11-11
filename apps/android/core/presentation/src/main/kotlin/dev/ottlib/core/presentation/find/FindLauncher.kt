@@ -37,7 +37,8 @@ class FindLauncher(
     fun find(title: String, year: Int? = null, imdbId: String? = null) {
         scope.launch {
             val message = try {
-                handoff(FindHandoffRequest(title = title, year = year, imdbId = imdbId))
+                // The server rejects a longer title or a malformed id with a 400, so trim to what it accepts.
+                handoff(FindHandoffRequest(title = title.take(MAX_TITLE), year = year, imdbId = imdbId?.takeIf { IMDB_ID.matches(it) }))
                 "Opened in Hashlark on ${serverName.value?.name ?: "the server PC"}."
             } catch (error: CancellationException) {
                 throw error
@@ -53,6 +54,8 @@ class FindLauncher(
     private companion object {
         const val HASHLARK = "hashlark"
         const val NOT_INSTALLED = "HASHLARK_NOT_FOUND"
-        const val FAILED = "Couldn't open Hashlark on the server PC."
+        const val MAX_TITLE = 200
+        val IMDB_ID = Regex("^tt\\d{5,10}$")
+        const val FAILED ="Couldn't open Hashlark on the server PC."
     }
 }

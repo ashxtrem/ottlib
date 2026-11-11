@@ -149,7 +149,10 @@ private fun MovieDetails(movie: Movie, viewModel: DetailsViewModel, actions: Det
                     val url = viewModel.streamUrl()
                     if (url == null || !openInExternalPlayer(context, url, movie.title)) Toast.makeText(context, "No other video player is installed", Toast.LENGTH_LONG).show()
                 }, enabled = !movie.missing) { Text("Play in another app") }
-                if (findAvailable) OutlinedButton(onClick = { container.findLauncher.find(movie.title, movie.year, movie.imdbId) }, modifier = Modifier.focusRequester(findFocus)) { Text("Find in Hashlark") }
+            }
+            // Its own row: the row above can already hold two long buttons and doesn't wrap.
+            if (findAvailable) Row(modifier = forgetCard) {
+                OutlinedButton(onClick = { container.findLauncher.find(movie.title, movie.year, movie.imdbId) }, modifier = Modifier.focusRequester(findFocus)) { Text("Find in Hashlark") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = forgetCard) {
                 OutlinedButton(onClick = { metadataOpen = true }, modifier = Modifier.focusRequester(metadataFocus)) {
