@@ -1,10 +1,10 @@
 import type { Movie } from '@ottlib/shared';
-import { Link } from 'react-router-dom';
+import { FindButton } from './FindButton';
 import { PlayButton } from './PlayButton';
 import { PlayMoreMenu } from './PlayMoreMenu';
 import { RevealInFolderButton } from './RevealInFolderButton';
 import { focusRing, pressable } from './interactionStyles';
-import { useTorrentSearchEnabled } from '../hooks/useTorrentSearchEnabled';
+import { useFindMode } from '../hooks/useFindMode';
 
 const secondaryButtonClassName = `inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-strong text-foreground transition-[background-color,transform] duration-fast ease-emphasis hover:bg-surface-raised ${focusRing} ${pressable} disabled:cursor-not-allowed disabled:opacity-60`;
 
@@ -24,7 +24,7 @@ type MovieActionButtonsProps = {
 export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitles, onToggleWatched, watchPending, hidden, onToggleHidden, onTrailer }: MovieActionButtonsProps) {
   const watchLabel = movie.watched ? 'Mark as unwatched' : 'Mark as watched';
   const hideLabel = hidden ? (movie.showKey ? 'Unhide this show' : 'Unhide this title') : (movie.showKey ? 'Hide this show on this device' : 'Hide this title on this device');
-  const torrentSearchEnabled = useTorrentSearchEnabled();
+  const findMode = useFindMode();
 
   return <div className="space-y-2">
     <div className="flex items-center gap-2">
@@ -33,7 +33,7 @@ export function MovieActionButtons({ imdbUrl, movie, onManageShelves, onSubtitle
     </div>
     {movie.trailerKey && onTrailer && <button type="button" onClick={onTrailer} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised ${pressable} ${focusRing}`}>Trailer</button>}
     <button type="button" onClick={onSubtitles} disabled={movie.missing} className={`rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised disabled:opacity-50 ${focusRing}`}>Find subtitles</button>
-    {torrentSearchEnabled && <Link to={`/torrents?q=${encodeURIComponent(movie.title)}${movie.year ? `&year=${movie.year}` : ''}`} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`}>{movie.missing ? 'Find replacement' : 'Find this'}</Link>}
+    <FindButton mode={findMode} query={{ title: movie.title, year: movie.year, imdbId: movie.imdbId }} label={movie.missing ? 'Find replacement' : 'Find this'} className={`inline-flex rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,transform] duration-fast ease-emphasis ${pressable} ${focusRing} ${movie.missing ? 'bg-warning text-warning-foreground hover:brightness-95' : 'border border-border-strong hover:bg-surface-raised'}`} />
     <div className="flex flex-wrap items-center gap-2">
       <RevealInFolderButton movieId={movie.id} />
       <a href={imdbUrl} target="_blank" rel="noopener noreferrer" title="View on IMDb" aria-label="View on IMDb" className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border border-imdb-hover/70 text-imdb-hover transition-[background-color,transform] duration-fast ease-emphasis hover:bg-imdb-hover/10 ${pressable} ${focusRing} focus-visible:outline-imdb-hover`}>

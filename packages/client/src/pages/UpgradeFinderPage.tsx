@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import type { Settings, UpgradeCandidate, UpgradeReason } from '@ottlib/shared';
+import { findMode, type Settings, type UpgradeCandidate, type UpgradeReason } from '@ottlib/shared';
 import { focusRing } from '../components/interactionStyles';
+import { HashlarkFindPanel } from '../components/HashlarkFindPanel';
 import { useSettings } from '../hooks/useSettings';
 import { useUpgradeCandidates } from '../hooks/useUpgradeCandidates';
 
@@ -28,7 +29,7 @@ export function UpgradeFinderView({ candidates, preferredResolution, loading = f
       <p className="mt-1 text-sm text-muted">Titles in your library that could be replaced with a better release.</p>
       <Link to="/torrents" className={`mt-2 inline-block text-sm text-accent hover:underline ${focusRing}`}>Back to torrent search</Link>
     </div>
-    {preferredResolution === null && <p className="rounded-lg border border-border bg-surface p-3 text-sm text-muted">No preferred resolution is set, so only titles in an old video codec are listed. Pick one under <Link to="/settings" className="text-accent hover:underline">Settings → Torrent search</Link> to also find low-resolution titles.</p>}
+    {preferredResolution === null && <p className="rounded-lg border border-border bg-surface p-3 text-sm text-muted">No preferred resolution is set, so only titles in an old video codec are listed. Pick one under <Link to="/settings" className="text-accent hover:underline">Settings → Find and torrent search</Link> to also find low-resolution titles.</p>}
     {error && <p className="rounded-lg border border-error/30 bg-error-soft p-3 text-sm text-error">{error}</p>}
     {loading && !candidates && <p className="text-sm text-muted">Looking for upgrades…</p>}
     {candidates && candidates.length === 0 && <section className="rounded-xl border border-dashed border-border p-10 text-center"><h2 className="font-semibold">Nothing to upgrade</h2><p className="mt-2 text-sm text-muted">No titles match your preferences right now.</p></section>}
@@ -41,9 +42,10 @@ export function UpgradeFinderView({ candidates, preferredResolution, loading = f
 
 export function UpgradeFinderPage() {
   const settings = useSettings();
-  const enabled = settings.data?.torrentSearchEnabled === true;
-  const candidates = useUpgradeCandidates(enabled);
+  const mode = settings.data ? findMode(settings.data) : 'off';
+  const candidates = useUpgradeCandidates(mode === 'qbittorrent');
   if (!settings.data) return null;
-  if (!enabled) return <section className="rounded-xl border border-dashed border-border p-12 text-center"><h1 className="text-lg font-semibold">Torrent search is off</h1><p className="mt-2 text-sm text-muted">The upgrade finder is part of the optional qBittorrent integration. Turn it on under Settings → Torrent search.</p><Link to="/settings" className="mt-4 inline-flex rounded-lg border border-border-strong px-4 py-2 text-sm font-medium hover:bg-surface-raised">Open settings</Link></section>;
+  if (mode === 'hashlark') return <HashlarkFindPanel />;
+  if (mode === 'off') return <section className="rounded-xl border border-dashed border-border p-12 text-center"><h1 className="text-lg font-semibold">Torrent search is off</h1><p className="mt-2 text-sm text-muted">The upgrade finder is part of the optional qBittorrent integration. Turn it on under Settings → Find and torrent search.</p><Link to="/settings" className="mt-4 inline-flex rounded-lg border border-border-strong px-4 py-2 text-sm font-medium hover:bg-surface-raised">Open settings</Link></section>;
   return <UpgradeFinderView candidates={candidates.data} preferredResolution={settings.data.torrentPreferredResolution} loading={candidates.isLoading} error={candidates.error?.message} />;
 }

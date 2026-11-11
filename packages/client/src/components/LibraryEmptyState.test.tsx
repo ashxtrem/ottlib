@@ -30,4 +30,11 @@ describe('LibraryEmptyState', () => {
     expect(markup).toContain('No videos found yet');
     expect(markup).toContain('4 media files');
   });
+
+  it('offers torrent search only while Find uses qBittorrent', () => {
+    const ready = { folders: [folder], scanHistory: [completedScan], tmdbConfigured: true };
+    expect(render({ ...ready, findMode: 'qbittorrent' })).toContain('href="/torrents"');
+    expect(render(ready)).not.toContain('Search torrents');
+    expect(render({ ...ready, findMode: 'off' })).not.toContain('/torrents');
+  });
 });

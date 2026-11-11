@@ -1,19 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
-import type { MovieCollection } from '@ottlib/shared';
+import type { FindMode, MovieCollection } from '@ottlib/shared';
 import { NoArtworkCard } from './NoArtworkCard';
 import { PosterImage } from './PosterImage';
 import { focusRing, liftable } from './interactionStyles';
 import { useCollection } from '../hooks/useCollection';
-import { useTorrentSearchEnabled } from '../hooks/useTorrentSearchEnabled';
+import { useFindMode } from '../hooks/useFindMode';
+import { FindButton } from './FindButton';
 
-export function torrentSearchHref(title: string, year: number | null): string {
-  return `/torrents?q=${encodeURIComponent(title)}${year ? `&year=${year}` : ''}`;
-}
+type CollectionRowViewProps = { collection: MovieCollection; currentId: number; findMode: FindMode; linkState?: unknown };
 
-type CollectionRowViewProps = { collection: MovieCollection; currentId: number; torrentSearchEnabled: boolean; linkState?: unknown };
-
-/** "Part of <name>": owned titles as cards, missing ones dimmed with their year and an optional torrent search link. */
-export function CollectionRowView({ collection, currentId, torrentSearchEnabled, linkState }: CollectionRowViewProps) {
+/** "Part of <name>": owned titles as cards, missing ones dimmed with their year and a Find button while Find is on. */
+export function CollectionRowView({ collection, currentId, findMode, linkState }: CollectionRowViewProps) {
   if (!collection.owned.length && !collection.missing.length) return null;
   return <section aria-labelledby="collection-row-heading" className="rounded-xl border border-border bg-surface p-5">
     <h2 id="collection-row-heading" className="font-semibold">Part of {collection.name}</h2>
@@ -30,7 +27,7 @@ export function CollectionRowView({ collection, currentId, torrentSearchEnabled,
         </div>
         <p className="mt-2 line-clamp-2 break-words text-sm font-medium text-muted">{part.title}</p>
         <p className="text-xs text-subtle">{part.year ?? '—'} · Not in library</p>
-        {torrentSearchEnabled && <Link to={torrentSearchHref(part.title, part.year)} aria-label={`Find ${part.title}`} className={`mt-1 inline-flex rounded-md text-xs font-medium text-accent hover:underline ${focusRing}`}>Find</Link>}
+        <FindButton mode={findMode} query={{ title: part.title, year: part.year }} label="Find" ariaLabel={`Find ${part.title}`} className={`mt-1 inline-flex rounded-md text-xs font-medium text-accent hover:underline ${focusRing}`} />
       </li>)}
     </ul>
   </section>;
@@ -39,8 +36,8 @@ export function CollectionRowView({ collection, currentId, torrentSearchEnabled,
 /** The title page's collection row; hidden when the title is not part of a collection. */
 export function CollectionRow({ movieId }: { movieId: string }) {
   const collection = useCollection(movieId);
-  const torrentSearchEnabled = useTorrentSearchEnabled();
+  const findMode = useFindMode();
   const { state } = useLocation();
   if (!collection.data) return null;
-  return <CollectionRowView collection={collection.data} currentId={Number(movieId)} torrentSearchEnabled={torrentSearchEnabled} linkState={state} />;
+  return <CollectionRowView collection={collection.data} currentId={Number(movieId)} findMode={findMode} linkState={state} />;
 }

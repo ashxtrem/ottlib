@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { torrentPreferencesUpdate } from '../utils/torrentPreferences';
 import { QbittorrentSettingsSection } from './QbittorrentSettingsSection';
 
-const render = (settings: Partial<Settings>, enabled = true) => renderToStaticMarkup(<QbittorrentSettingsSection settings={{ qbittorrentUrl: '', qbittorrentUsername: '', qbittorrentPassword: '', qbittorrentCategory: 'ottlib', qbittorrentSavePath: '', torrentPreferredResolution: null, torrentPreferredCodec: null, torrentMaxSizeGb: null, ...settings } as Settings} enabled={enabled} onEnabledChange={() => undefined} testing={false} onTest={() => undefined} />);
+const render = (settings: Partial<Settings>) => renderToStaticMarkup(<QbittorrentSettingsSection settings={{ qbittorrentUrl: '', qbittorrentUsername: '', qbittorrentPassword: '', qbittorrentCategory: 'ottlib', qbittorrentSavePath: '', torrentPreferredResolution: null, torrentPreferredCodec: null, torrentMaxSizeGb: null, ...settings } as Settings} testing={false} onTest={() => undefined} />);
 
 describe('QbittorrentSettingsSection release preferences', () => {
   it('shows the saved resolution, codec and size cap', () => {
@@ -14,9 +14,8 @@ describe('QbittorrentSettingsSection release preferences', () => {
     expect(markup).toMatch(/name="torrentMaxSizeGb"[^>]*value="12.5"/);
   });
 
-  it('defaults to no preference and hides the fields while torrent search is off', () => {
+  it('defaults to no preference', () => {
     expect(render({})).toMatch(/<option value="" selected="">No preference/);
-    expect(render({}, false)).not.toContain('torrentPreferredResolution');
   });
 });
 
