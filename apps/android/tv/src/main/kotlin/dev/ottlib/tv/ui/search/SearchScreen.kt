@@ -44,6 +44,10 @@ fun SearchScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Un
     var awaitingRecent by remember { mutableStateOf(false) }
     val showChips = recents.isNotEmpty() && (text.isEmpty() || awaitingRecent)
     val hasResults = (results as? LoadState.Loaded)?.value?.isNotEmpty() == true
+    val findAvailable by container.findLauncher.available.collectAsStateWithLifecycle()
+    // Nothing matched and the server hands Find to Hashlark: offer the typed text there.
+    val offerFind = findAvailable && text.isNotBlank() && (results as? LoadState.Loaded)?.value?.isEmpty() == true
+    val findFocus = remember { FocusRequester() }
 
     Column(Modifier.fillMaxSize()) {
         TopNavigation(TopDestination.Search, onNavigate)
@@ -53,11 +57,12 @@ fun SearchScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Un
             placeholder = "Search titles or IMDb IDs",
             imeAction = ImeAction.Search,
             modifier = Modifier.padding(horizontal = ScreenPadding, vertical = 12.dp).width(640.dp).focusRequester(field)
-                // ↓ goes to the recent chips while the box is empty, else to the results.
+                // ↓ goes to the recent chips while the box is empty, else to the results (or the Find button when nothing matched).
                 .focusProperties {
                     down = when {
                         text.isEmpty() && showChips -> firstChip
                         hasResults -> resultFocus
+                        offerFind -> findFocus
                         else -> FocusRequester.Default
                     }
                 },
@@ -67,7 +72,10 @@ fun SearchScreen(onOpenMovie: (Long) -> Unit, onNavigate: (TopDestination) -> Un
             null -> EmptyMessage("Type a title. The remote's microphone button works here too.")
             LoadState.Loading -> LoadingMessage("Searching…")
             is LoadState.Failed -> EmptyMessage(current.message)
-            is LoadState.Loaded -> if (current.value.isEmpty()) EmptyMessage("No titles match “${text.trim()}”.")
+            is LoadState.Loaded -> if (current.value.isEmpty()) {
+                if (offerFind) NoMatchFind(text.trim(), onFind = { container.findLauncher.find(text.trim()) }, focusRequester = findFocus)
+                else EmptyMessage("No titles match “${text.trim()}”.")
+            }
             else PosterGrid(current.value, onOpen = { container.playbackSequence.select(current.value.map { item -> item.id }); onOpenMovie(it.id) }, onFocused = { viewModel.lastFocusedId = it.id }, focusItemId = viewModel.lastFocusedId, focusRequester = resultFocus)
         }
     }
