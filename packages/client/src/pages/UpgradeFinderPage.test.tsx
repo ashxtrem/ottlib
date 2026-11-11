@@ -1,8 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import type { UpgradeCandidate } from '@ottlib/shared';
-import { describe, expect, it } from 'vitest';
-import { findBetterPath, UpgradeFinderView } from './UpgradeFinderPage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../hooks/useSettings', () => ({ useSettings: () => ({ data: { torrentSearchEnabled: true, findProvider: 'hashlark', torrentPreferredResolution: null } }) }));
+
+import { ToastProvider } from '../components/ToastProvider';
+import { findBetterPath, UpgradeFinderPage, UpgradeFinderView } from './UpgradeFinderPage';
 
 const movie = { id: 7, title: 'Heat & Dust', year: 1983, posterUrl: null, resolution: '720p', hdrFormat: null, showKey: null, watched: false, resumePositionMs: null, durationMs: null, missing: false, metadataStatus: 'matched', shelves: [], fresh: null } as unknown as UpgradeCandidate['movie'];
 const render = (props: Parameters<typeof UpgradeFinderView>[0]) => renderToStaticMarkup(<MemoryRouter><UpgradeFinderView {...props} /></MemoryRouter>);
@@ -25,6 +30,15 @@ describe('UpgradeFinderView', () => {
 
   it('says so when there is nothing to upgrade', () => {
     expect(render({ candidates: [], preferredResolution: '1080p' })).toContain('Nothing to upgrade');
+  });
+});
+
+describe('UpgradeFinderPage', () => {
+  it('shows the Hashlark panel in Hashlark mode', () => {
+    const markup = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}><ToastProvider><MemoryRouter><UpgradeFinderPage /></MemoryRouter></ToastProvider></QueryClientProvider>);
+    expect(markup).toContain('Find is set to Hashlark');
+    expect(markup).toContain('>Open Hashlark</button>');
+    expect(markup).not.toContain('Upgrade finder');
   });
 });
 

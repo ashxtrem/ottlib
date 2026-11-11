@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import type { ScanRun, ServerInfo } from '@ottlib/shared';
+import type { FindProvider, ScanRun, ServerInfo } from '@ottlib/shared';
 import { useAutoAcceptBackfill, useFolders, useSettings, useSettingsActions } from '../hooks/useSettings';
 import { useTheme } from '../hooks/useTheme';
 import { api } from '../hooks/apiClient';
@@ -13,7 +13,7 @@ import { ScheduleSettings } from '../components/ScheduleSettings';
 import { schedulePresetFor, schedulePresets, type SchedulePresetId, useScheduleValidation } from '../hooks/useScheduleValidation';
 import { MetadataRefreshDialog } from '../components/MetadataRefreshDialog';
 import { useMetadataRefresh } from '../hooks/useMetadataRefresh';
-import { QbittorrentSettingsSection } from '../components/QbittorrentSettingsSection';
+import { FindSettingsSection } from '../components/FindSettingsSection';
 import { DelayedSkeleton, SkeletonSettings } from '../components/Skeleton';
 import { useSuccessPulse } from '../hooks/useSuccessPulse';
 import { AccessPinSettingsSection } from '../components/AccessPinSettingsSection';
@@ -25,7 +25,7 @@ import { TranscodeSettingsSection } from '../components/settings/TranscodeSettin
 import { BackupSettingsSection } from '../components/settings/BackupSettingsSection';
 import { HealthSettingsSection } from '../components/settings/HealthSettingsSection';
 import { ErrorState } from '../components/ErrorState';
-import { torrentPreferencesUpdate } from '../utils/torrentPreferences';
+import { findSettingsUpdate } from '../utils/findSettingsUpdate';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -47,6 +47,7 @@ export function SettingsPage() {
   const isLocal = useIsLocalClient();
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [torrentSearchEnabled, setTorrentSearchEnabled] = useState(false);
+  const [findProvider, setFindProvider] = useState<FindProvider>('qbittorrent');
   const [schedulePreset, setSchedulePreset] = useState<SchedulePresetId>('nightly');
   const [customScheduleCron, setCustomScheduleCron] = useState('0 3 * * *');
   const [refreshDialogOpen, setRefreshDialogOpen] = useState(false);
@@ -58,6 +59,7 @@ export function SettingsPage() {
     scheduleInitialized.current = true;
     setScheduleEnabled(settings.data.scheduleEnabled);
     setTorrentSearchEnabled(settings.data.torrentSearchEnabled);
+    setFindProvider(settings.data.findProvider);
     setSchedulePreset(schedulePresetFor(settings.data.scheduleCron));
     setCustomScheduleCron(settings.data.scheduleCron);
   }, [settings.data]);
@@ -121,19 +123,10 @@ export function SettingsPage() {
           excludedFolders: String(values.get('excludedFolders')).split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
           scheduleEnabled,
           scheduleCron,
-          torrentSearchEnabled,
+          ...findSettingsUpdate(values, torrentSearchEnabled, findProvider),
         };
-        // The qBittorrent fields are only on the page while torrent search is on; leave saved values alone otherwise.
-        if (torrentSearchEnabled) Object.assign(update, {
-          qbittorrentUrl: String(values.get('qbittorrentUrl') ?? '').trim(),
-          qbittorrentUsername: String(values.get('qbittorrentUsername') ?? '').trim(),
-          qbittorrentCategory: String(values.get('qbittorrentCategory') ?? '').trim(),
-          qbittorrentSavePath: String(values.get('qbittorrentSavePath') ?? '').trim(),
-          ...torrentPreferencesUpdate(values),
-        });
         const tmdbApiKey = values.get('tmdbApiKey'); if (typeof tmdbApiKey === 'string') Object.assign(update, { tmdbApiKey });
         const omdbApiKey = values.get('omdbApiKey'); if (typeof omdbApiKey === 'string') Object.assign(update, { omdbApiKey });
-        const qbittorrentPassword = values.get('qbittorrentPassword'); if (typeof qbittorrentPassword === 'string') Object.assign(update, { qbittorrentPassword });
         actions.update.mutate(update);
       }}
       className="space-y-5 rounded-xl border border-border bg-surface p-5"
@@ -150,7 +143,7 @@ export function SettingsPage() {
       </label>
       {isLocal ? <button type="button" onClick={browseForExcludedFolder} disabled={actions.pickFolder.isPending} className="rounded-lg border border-border-strong px-4 py-2 text-sm hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60">{actions.pickFolder.isPending ? 'Opening…' : 'Browse excluded folder…'}</button> : <p className="text-xs text-muted">Type a path on the server, e.g. E:\\Movies.</p>}
       <ScheduleSettings enabled={scheduleEnabled} onEnabledChange={setScheduleEnabled} preset={schedulePreset} onPresetChange={setSchedulePreset} customCron={customScheduleCron} onCustomCronChange={setCustomScheduleCron} validation={scheduleValidation} />
-      <QbittorrentSettingsSection settings={current} enabled={torrentSearchEnabled} onEnabledChange={setTorrentSearchEnabled} testing={actions.testQbittorrent.isPending} testSuccess={actions.testQbittorrent.isSuccess && actions.testQbittorrent.data?.status === 'connected'} onTest={() => actions.testQbittorrent.mutate()} testError={actions.testQbittorrent.error?.message} testMessage={actions.testQbittorrent.data?.message} testConnected={actions.testQbittorrent.data?.status === 'connected'} />
+      <FindSettingsSection settings={current} enabled={torrentSearchEnabled} onEnabledChange={setTorrentSearchEnabled} provider={findProvider} onProviderChange={setFindProvider} qbittorrent={{ testing:actions.testQbittorrent.isPending, testSuccess: actions.testQbittorrent.isSuccess && actions.testQbittorrent.data?.status === 'connected', onTest: () => actions.testQbittorrent.mutate(), testError: actions.testQbittorrent.error?.message, testMessage: actions.testQbittorrent.data?.message, testConnected: actions.testQbittorrent.data?.status === 'connected' }} />
       <button disabled={actions.update.isPending || customScheduleInvalid} className={`rounded-lg bg-accent px-4 py-2 font-medium text-accent-foreground transition-[background-color,transform] duration-fast ease-emphasis hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60 ${saved ? 'bg-success text-success-foreground hover:bg-success' : ''}`}>{actions.update.isPending ? 'Saving…' : saved ? 'Saved' : 'Save settings'}</button>
       {actions.update.error && <p className="text-sm text-error">{actions.update.error.message}</p>}
     </form>
