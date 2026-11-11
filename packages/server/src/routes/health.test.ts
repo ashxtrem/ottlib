@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { healthReportSchema } from '@ottlib/shared';
-import { buildApp } from '../app.js';
+import { buildApp, type AppOverrides } from '../app.js';
 import { createDatabase } from '../db/db.js';
 import { FfmpegLocator } from '../providers/transcode/ffmpegLocator.js';
 import { FolderRepository } from '../repositories/folderRepository.js';
@@ -17,10 +17,10 @@ afterEach(async () => {
 });
 
 /** No ffmpeg, no TMDb key, no VERSION in the test's working directory: nothing reaches the network. */
-function fixture() {
+function fixture(overrides: AppOverrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'ottlib-health-routes-')); directories.push(dir);
   const db = createDatabase(dir);
-  const app = buildApp(db, dir, 0, { ffmpeg: new FfmpegLocator(async () => { throw new Error('no ffmpeg'); }) });
+  const app = buildApp(db, dir, 0, { ffmpeg: new FfmpegLocator(async () => { throw new Error('no ffmpeg'); }), ...overrides });
   closers.push(() => app.close(), async () => { db.close(); });
   return { app, db, dir };
 }
@@ -50,6 +50,21 @@ describe('health routes', () => {
     new SettingRepository(db).update({ torrentSearchEnabled: true });
     const report = await get(app, '/api/health');
     expect(report.checks.find((check) => check.id === 'qbittorrent')).toMatchObject({ state: 'fail' });
+    expect(report.checks.some((check) => check.id === 'hashlark')).toBe(false);
+  });
+
+  it('is absent in Hashlark mode, where the Hashlark check stands in', async () => {
+    const { app, db } = fixture({ findHandoff: { name: 'hashlark', available: () => false, open: () => undefined } });
+    new SettingRepository(db).update({ torrentSearchEnabled: true, findProvider: 'hashlark' });
+    const report = await get(app, '/api/health');
+    expect(report.checks.some((check) => check.id === 'qbittorrent')).toBe(false);
+    expect(report.checks.find((check) => check.id === 'hashlark')).toMatchObject({ state: 'warn' });
+  });
+
+  it('has neither Find check while Find is off', async () => {
+    const { app } = fixture();
+    const ids = (await get(app, '/api/health')).checks.map((check) => check.id);
+    expect(ids).not.toContain('qbittorrent'); expect(ids).not.toContain('hashlark');
   });
 
   it('answers a second call from the cache; ?fresh=1 runs the checks again', async () => {

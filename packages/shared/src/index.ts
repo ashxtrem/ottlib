@@ -9,7 +9,9 @@ export * from './backups.js';
 export * from './health.js';
 export * from './collections.js';
 export * from './upgradeCandidates.js';
+export * from './find.js';
 import { collectionFilterOptionSchema } from './collections.js';
+import { findProviderSchema } from './find.js';
 import { torrentPreferredCodecSchema, torrentPreferredResolutionSchema } from './torrent.js';
 
 const languageNames: Record<string, string> = {
@@ -197,6 +199,8 @@ export const settingsSchema = z.object({
   subtitleSearchLanguages: z.array(z.string().regex(/^[a-z]{2,3}(?:-[a-z]{2,3})?$/)).min(1).max(10),
   /** Off by default: torrent search and qBittorrent handoff are an opt-in integration. */
   torrentSearchEnabled: z.boolean(),
+  /** What Find opens while it is on: qBittorrent's in-app search (default) or the Hashlark desktop app. */
+  findProvider: findProviderSchema,
   qbittorrentUrl: z.string(),
   qbittorrentUsername: z.string(),
   qbittorrentPassword: z.string(),

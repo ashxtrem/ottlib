@@ -42,6 +42,7 @@ export const defaultSettings = {
   subdlApiKey: '',
   subtitleSearchLanguages: ['en'],
   torrentSearchEnabled: false,
+  findProvider: 'qbittorrent' as Settings['findProvider'],
   qbittorrentUrl: '',
   qbittorrentUsername: '',
   qbittorrentPassword: '',
